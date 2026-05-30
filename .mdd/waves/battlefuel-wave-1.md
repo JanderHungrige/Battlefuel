@@ -3,11 +3,11 @@ id: battlefuel-wave-1
 title: "Wave 1: Unit Database & Data Factory"
 initiative: battlefuel
 initiative_version: 2
-status: planned
+status: complete
 depends_on: none
 demo_state: "Query the seeded NATO unit catalog over /api/v1/units and get full per-type stats; switch the active data provider via config with no code change."
 created: 2026-05-30
-hash: 7dda6611
+hash: 4e82429c
 ---
 
 # Wave 1: Unit Database & Data Factory
@@ -26,10 +26,10 @@ map exists to position them on. Backend-only: FastAPI + PostgreSQL/PostGIS, full
 ## Features
 | # | Feature | Doc | Status | Depends on |
 |---|---------|-----|--------|------------|
-| 1 | unit-stats-model | — | planned | — |
-| 2 | data-source-factory | — | planned | unit-stats-model |
-| 3 | seed-unit-catalog | — | planned | data-source-factory |
-| 4 | unit-query-api | — | planned | data-source-factory |
+| 1 | unit-stats-model | docs/01-unit-stats-model.md | complete | — |
+| 2 | data-source-factory | docs/02-data-source-factory.md | complete | unit-stats-model |
+| 3 | seed-unit-catalog | docs/03-seed-unit-catalog.md | complete | data-source-factory |
+| 4 | unit-query-api | docs/04-unit-query-api.md | complete | data-source-factory |
 
 ### Feature notes
 - **unit-stats-model** — typed domain model (Pydantic) + DB schema for a NATO unit type:
