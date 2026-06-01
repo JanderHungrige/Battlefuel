@@ -308,6 +308,54 @@ body {
   cursor: not-allowed;
 }
 
+/* Threat event pop-ups (bottom-right stack). */
+.threat-alerts {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 25;
+  max-width: 280px;
+}
+
+.threat-alert {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--panel);
+  border: 1px solid #5b2222;
+  border-left: 3px solid #ff3030;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.threat-alert-badge {
+  color: #ff9a9a;
+  font-weight: 600;
+}
+
+.threat-alert-text {
+  color: var(--text);
+}
+
+/* Hex hover tooltip (MapLibre popup). */
+.hex-popup .maplibregl-popup-content {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.hex-popup .maplibregl-popup-tip {
+  border-top-color: var(--panel);
+  border-bottom-color: var(--panel);
+}
+
 .legend {
   position: absolute;
   bottom: 12px;

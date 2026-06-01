@@ -138,6 +138,14 @@ export interface UnitUpdate {
   distance_m: number
 }
 
+/** A transient threat notification surfaced when a tile_update raises threat. */
+export interface TileAlert {
+  id: number
+  h3_index: string
+  threat_level: number
+  terrain: TerrainType
+}
+
 /** An operator-placed obstacle the router avoids (blocks an H3 cell). */
 export interface Obstacle {
   id: string

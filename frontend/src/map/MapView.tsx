@@ -184,6 +184,27 @@ function wireInteraction(map: maplibregl.Map, propsRef: { current: MapViewProps 
   }
 }
 
+/** Hover tooltip showing a hex's attributes (terrain, threat, road, intel). */
+function wireHover(map: maplibregl.Map): void {
+  const popup = new maplibregl.Popup({
+    closeButton: false,
+    closeOnClick: false,
+    className: 'hex-popup',
+  })
+  map.on('mousemove', 'tiles-fill', (e) => {
+    const props = e.features?.[0]?.properties
+    if (!props) return
+    popup
+      .setLngLat(e.lngLat)
+      .setHTML(
+        `<b>${props.terrain}</b> · threat ${props.threat_level}/5<br>` +
+          `road ${props.road_condition} · intel ${props.intel_level}`,
+      )
+      .addTo(map)
+  })
+  map.on('mouseleave', 'tiles-fill', () => popup.remove())
+}
+
 export function MapView(props: MapViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
@@ -219,6 +240,7 @@ export function MapView(props: MapViewProps) {
       setData(map, 'destination', destinationToGeoJSON(p.destination))
       setData(map, 'obstacles', obstaclesToGeoJSON(p.obstacles))
       wireInteraction(map, propsRef)
+      wireHover(map)
       readyRef.current = true
     })
     mapRef.current = map

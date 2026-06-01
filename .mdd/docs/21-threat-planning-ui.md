@@ -9,7 +9,9 @@ source_files:
   - frontend/src/hooks/simSocket.ts
   - frontend/src/hooks/useSimSocket.ts
   - frontend/src/map/MapView.tsx
+  - frontend/src/map/overlays.ts
   - frontend/src/components/MoveRoutesPanel.tsx
+  - frontend/src/components/ThreatAlerts.tsx
   - frontend/src/App.tsx
   - frontend/src/index.css
 routes: []
@@ -18,6 +20,8 @@ test_files:
   - frontend/src/hooks/simSocket.test.ts
   - frontend/src/hooks/useSimSocket.test.ts
   - frontend/src/components/MoveRoutesPanel.test.tsx
+  - frontend/src/components/ThreatAlerts.test.tsx
+  - frontend/src/map/overlays.test.ts
 data_flow: reads-existing
 last_synced: 2026-06-01
 status: complete
@@ -55,6 +59,10 @@ render a live threat overlay on the hex map that recolors as `tile_update` frame
   `threat_level` (0 → transparent, 5 → strong red). Driven by the existing `tiles` source, so
   the Wave-3 once-init + `setData` sync updates it live.
 - **MoveRoutesPanel** flags an option whose `threat_max` crosses a warning threshold.
+- **Hex hover tooltip** (MapView): hovering a tile shows a popup with terrain/threat/road/intel
+  (tile GeoJSON now carries `road_condition`/`intel_level` in its properties).
+- **Threat pop-ups** (`ThreatAlerts`): a `tile_update` at threat ≥ 3 (`isThreatAlert`) appends a
+  capped (last 5) alert in `useSimSocket`, shown as a small toast stack.
 
 ```
 tile_update WS → useSimSocket.tileUpdates → App.displayedTiles (merge) → MapView threat layer

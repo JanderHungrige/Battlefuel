@@ -77,6 +77,28 @@ describe('useSimSocket', () => {
     expect(result.current.positions).toEqual({})
   })
 
+  it('surfaces a threat alert for high-threat tile frames only', () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket as unknown as typeof WebSocket)
+    const { result } = renderHook(() => useSimSocket())
+    const ws = FakeWebSocket.last
+    const frame = (h3: string, threat: number): string =>
+      JSON.stringify({
+        type: 'tile_update',
+        h3_index: h3,
+        terrain: 'forest',
+        threat_level: threat,
+        road_condition: 'clear',
+        intel_level: 'low',
+        weather: 'clear',
+        cover: 'none',
+      })
+    act(() => ws?.onmessage?.({ data: frame('cell-low', 1) }))
+    act(() => ws?.onmessage?.({ data: frame('cell-hi', 4) }))
+    expect(result.current.tileAlerts).toHaveLength(1)
+    expect(result.current.tileAlerts[0].h3_index).toBe('cell-hi')
+    expect(result.current.tileAlerts[0].threat_level).toBe(4)
+  })
+
   it('does not open a socket when disabled', () => {
     vi.stubGlobal('WebSocket', FakeWebSocket as unknown as typeof WebSocket)
     renderHook(() => useSimSocket(false))

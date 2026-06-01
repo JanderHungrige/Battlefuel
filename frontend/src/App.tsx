@@ -3,6 +3,7 @@ import { ApiError, api } from './api/client'
 import type { RouteMetric, RouteOption, Theater, Tile, UnitInstance, UnitType } from './api/types'
 import { InspectPanel } from './components/InspectPanel'
 import { MoveRoutesPanel } from './components/MoveRoutesPanel'
+import { ThreatAlerts } from './components/ThreatAlerts'
 import { OSM_ATTRIBUTION } from './config'
 import { useObstacleOps } from './hooks/useObstacleOps'
 import { useSimSocket } from './hooks/useSimSocket'
@@ -39,7 +40,7 @@ export default function App() {
 
   // Live movement: routes confirmed this session, keyed by unit instance id.
   const [activeRoutes, setActiveRoutes] = useState<Record<string, number[][]>>({})
-  const { positions: live, tileUpdates } = useSimSocket()
+  const { positions: live, tileUpdates, tileAlerts } = useSimSocket()
 
   // Operator ops: manual obstacles + tile edits (+ obstacle-placement mode toggle).
   const { obstacles, placeObstacle, removeObstacle, mutateTile } = useObstacleOps()
@@ -226,6 +227,7 @@ export default function App() {
               onClearSelection={clear}
             />
             <TerrainLegend />
+            <ThreatAlerts alerts={tileAlerts} />
             {selectedUnit && (
               <MoveRoutesPanel
                 unitName={selectedUnit.name}

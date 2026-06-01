@@ -50,6 +50,13 @@ describe('tilesToGeoJSON', () => {
     expect(ring[0]).toEqual(ring[ring.length - 1]) // closed
     expect(fc.features[0].properties?.color).toBe(TERRAIN_COLORS.forest)
   })
+
+  it('carries threat/road/intel in properties for the hover tooltip', () => {
+    const props = tilesToGeoJSON([tile]).features[0].properties
+    expect(props?.threat_level).toBe(2)
+    expect(props?.road_condition).toBe('clear')
+    expect(props?.intel_level).toBe('low')
+  })
 })
 
 describe('unitsToGeoJSON', () => {

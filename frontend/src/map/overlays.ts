@@ -30,6 +30,8 @@ export function tilesToGeoJSON(tiles: Tile[]): FeatureCollection {
         h3_index: t.h3_index,
         terrain: t.terrain,
         threat_level: t.threat_level,
+        road_condition: t.road_condition,
+        intel_level: t.intel_level,
         color: TERRAIN_COLORS[t.terrain] ?? TERRAIN_COLORS.unknown,
       },
     })),

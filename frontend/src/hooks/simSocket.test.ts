@@ -3,6 +3,7 @@ import type { TileUpdate, UnitUpdate } from '../api/types'
 import {
   applyTileUpdate,
   applyUnitUpdate,
+  isThreatAlert,
   parseTileUpdate,
   parseUnitUpdate,
 } from './simSocket'
@@ -90,5 +91,17 @@ describe('applyTileUpdate', () => {
     expect(prev).toEqual({})
     const s2 = applyTileUpdate(s1, { ...tileFrame, threat_level: 1 })
     expect(s2['8811aa'].threat_level).toBe(1)
+  })
+})
+
+describe('isThreatAlert', () => {
+  it('flags tile updates at or above the threat threshold', () => {
+    expect(isThreatAlert({ ...tileFrame, threat_level: 3 })).toBe(true)
+    expect(isThreatAlert({ ...tileFrame, threat_level: 5 })).toBe(true)
+  })
+
+  it('ignores low-threat updates', () => {
+    expect(isThreatAlert({ ...tileFrame, threat_level: 2 })).toBe(false)
+    expect(isThreatAlert({ ...tileFrame, threat_level: 0 })).toBe(false)
   })
 })

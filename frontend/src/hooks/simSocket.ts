@@ -39,6 +39,13 @@ export function applyTileUpdate(
   return { ...state, [update.h3_index]: update }
 }
 
+/** A tile_update at/above this threat level surfaces a pop-up alert. */
+export const THREAT_ALERT_LEVEL = 3
+
+export function isThreatAlert(update: TileUpdate): boolean {
+  return update.threat_level >= THREAT_ALERT_LEVEL
+}
+
 /** Latest frame per instance wins. Returns a new map (never mutates the input). */
 export function applyUnitUpdate(
   state: Record<string, UnitUpdate>,
