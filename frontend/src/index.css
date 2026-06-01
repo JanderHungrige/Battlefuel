@@ -356,17 +356,15 @@ body {
   border-bottom-color: var(--panel);
 }
 
-/* Chatter / radio log (lower-right corner; clear of the inspect panel). */
+/* Chatter / radio log (lower-right corner; clear of the inspect panel).
+   Plain block flow (not flex) so lines always stack vertically and never overlap. */
 .chatter {
   position: absolute;
   bottom: 12px;
   right: 12px;
   width: 260px;
-  max-height: 40%;
+  max-height: calc(100% - 24px);
   overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
   padding: 10px 12px;
   background: var(--panel);
   border: 1px solid var(--border);
@@ -388,7 +386,9 @@ body {
 }
 
 .chatter-msg {
-  flex: 0 0 auto; /* keep natural height; the panel scrolls instead of squishing lines */
+  display: block;
+  width: 100%;
+  margin-top: 4px;
   text-align: left;
   font-size: 12px;
   padding: 5px 8px;
