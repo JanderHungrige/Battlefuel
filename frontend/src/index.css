@@ -363,7 +363,7 @@ body {
   bottom: 12px;
   right: 12px;
   width: 260px;
-  max-height: calc(100% - 24px);
+  height: 340px; /* room for ~10 lines; scrolls beyond that */
   overflow-y: auto;
   padding: 10px 12px;
   background: var(--panel);
@@ -387,8 +387,9 @@ body {
 
 .chatter-msg {
   display: block;
+  position: static;
   width: 100%;
-  margin-top: 4px;
+  margin: 0 0 4px;
   text-align: left;
   font-size: 12px;
   padding: 5px 8px;
