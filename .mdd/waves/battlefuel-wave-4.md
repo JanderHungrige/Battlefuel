@@ -7,7 +7,7 @@ status: planned
 depends_on: battlefuel-wave-3
 demo_state: "Tile attributes alter movement/fuel/threat and feed the routing graph; move-order route options warn on threat sectors; manual obstacles and game-mode random events fire and mutate tiles; incoming orders / sector info (manual + scripted feed) mutate tiles, and the map updates live."
 created: 2026-06-01
-hash: f37d32cb
+hash: b6705e26
 ---
 
 # Wave 4: Dynamic Battlefield — Tile-Driven Cost, Obstacles & Events
