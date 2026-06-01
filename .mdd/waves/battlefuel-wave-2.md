@@ -3,11 +3,11 @@ id: battlefuel-wave-2
 title: "Wave 2: Offline Map & Grid"
 initiative: battlefuel
 initiative_version: 3
-status: planned
+status: complete
 depends_on: battlefuel-wave-1
 demo_state: "Open the BattleFuel web app and see the offline Hohenfels map with a hex grid overlay; tiles show attributes; placed units render with APP-6 NATO symbols; click any tile or unit to inspect it."
 created: 2026-05-31
-hash: 16ab8a04
+hash: b283c2b1
 ---
 
 # Wave 2: Offline Map & Grid
@@ -36,8 +36,8 @@ server-authoritative.
 | 2 | osm-theater-data | docs/06-osm-theater-data.md | complete | db-spatial-foundation |
 | 3 | hex-tile-model-api | docs/07-hex-tile-model-api.md | complete | osm-theater-data |
 | 4 | unit-instances | docs/08-unit-instances.md | complete | db-spatial-foundation |
-| 5 | frontend-map-shell | — | planned | osm-theater-data |
-| 6 | map-overlays-inspect | — | planned | hex-tile-model-api, unit-instances, frontend-map-shell |
+| 5 | frontend-map-shell | docs/09-frontend-map-shell.md | complete | osm-theater-data |
+| 6 | map-overlays-inspect | docs/10-map-overlays-inspect.md | complete | hex-tile-model-api, unit-instances, frontend-map-shell |
 
 Build order: 1 → 2 → {3, 4} → 5 → 6.
 

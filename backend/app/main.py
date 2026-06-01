@@ -1,22 +1,32 @@
 """FastAPI application factory.
 
-All routes live under the ``/api/v1`` prefix. Feature routers (e.g. units) are
-included here; the app itself stays thin so it can be composed in tests.
+All routes live under the ``/api/v1`` prefix. Feature routers are included here; the app
+itself stays thin so it can be composed in tests.
 """
 
 from __future__ import annotations
 
 from fastapi import APIRouter, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.theater import router as theater_router
 from app.api.tiles import router as tiles_router
 from app.api.unit_instances import router as unit_instances_router
 from app.api.units import router as units_router
+from app.config import get_settings
 
 
 def create_app() -> FastAPI:
     """Build and return the BattleFuel FastAPI application."""
 
     app = FastAPI(title="BattleFuel API", version="0.1.0")
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=get_settings().cors_origins,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     api_v1 = APIRouter(prefix="/api/v1")
 
@@ -27,6 +37,7 @@ def create_app() -> FastAPI:
     api_v1.include_router(units_router)
     api_v1.include_router(tiles_router)
     api_v1.include_router(unit_instances_router)
+    api_v1.include_router(theater_router)
     app.include_router(api_v1)
     return app
 

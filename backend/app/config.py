@@ -32,6 +32,12 @@ class Settings(BaseSettings):
     # Provider the factory builds for placed unit instances (Wave 2 ships "db").
     unit_instance_provider: str = "db"
 
+    # Browser origins allowed to call the API (CORS). Dev defaults to the Vite server.
+    cors_origins: list[str] = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
+
 
 def get_settings() -> Settings:
     """Return a freshly-read :class:`Settings` instance.
