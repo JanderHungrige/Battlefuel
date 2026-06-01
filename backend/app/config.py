@@ -47,6 +47,12 @@ class Settings(BaseSettings):
     # Provider the factory builds for fuel depots + stock (Wave 5 ships "db").
     supply_provider: str = "db"
 
+    # Provider the factory builds for refuel orders (Wave 5 ships "db").
+    refuel_order_provider: str = "db"
+
+    # Refuel truck-selection strategy (Wave 5 ships "nearest"; "ortools" arrives in Wave 6).
+    refuel_recommender: str = "nearest"
+
     # Random event engine (Wave 4): master toggle + mean interval between events in game-seconds.
     game_mode: bool = True
     event_mean_interval_game_s: float = 120.0

@@ -21,10 +21,13 @@ from app.db import get_session_maker
 from app.models.unit_instance import UnitInstanceRow
 from app.providers.factory import build_unit_provider
 from app.providers.move_orders import build_move_order_provider
+from app.providers.refuel_orders import build_refuel_order_provider
 from app.providers.tile_feed import TileFeedProvider, build_tile_feed_provider, due_events
 from app.providers.tiles import build_tile_provider
+from app.providers.unit_instances import build_unit_instance_provider
 from app.services.cost_model import TileFactors, tile_factors
 from app.services.event_engine import EventEngine
+from app.services.refuel_service import try_complete_refuel
 from app.services.sim import advance
 from app.services.tile_grid import DEFAULT_RESOLUTION
 from app.services.tile_mutation import apply_tile_mutation, tile_update_frame
@@ -68,6 +71,7 @@ class SimEngine:
                     prev_game_s = self._game_s
                     self._game_s += dt_game
                     await self.tick(session, dt_game)
+                    await self.complete_refuels(session)
                     await self.apply_feed(session, feed, prev_game_s, self._game_s)
                     await events.step(
                         session, build_tile_provider(), self._manager, self._game_s, dt_game
@@ -91,6 +95,32 @@ class SimEngine:
                 await self._manager.broadcast(tile_update_frame(tile))
                 applied += 1
         return applied
+
+    async def complete_refuels(self, session: AsyncSession) -> int:
+        """Complete any active refuel order whose unit + truck are co-located. Public for testing.
+
+        Returns the number of transfers completed; broadcasts a ``refuel_order_update`` per one.
+        """
+        orders = build_refuel_order_provider()
+        instances = build_unit_instance_provider()
+        units = build_unit_provider()
+        completed = 0
+        for order in await orders.list_active(session):
+            done = await try_complete_refuel(session, instances, units, orders, order)
+            if done is not None:
+                await self._manager.broadcast(
+                    {
+                        "type": "refuel_order_update",
+                        "order_id": done.id,
+                        "unit_id": done.unit_id,
+                        "truck_id": done.truck_id,
+                        "status": done.status.value,
+                        "fuel_type": done.fuel_type.value,
+                        "transferred_liters": round(done.transferred_liters, 1),
+                    }
+                )
+                completed += 1
+        return completed
 
     async def tick(self, session: AsyncSession, dt_game_s: float) -> None:
         """Advance every active order by one game-time step. Public for testing."""

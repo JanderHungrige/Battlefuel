@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings, get_settings
@@ -23,6 +23,10 @@ class UnitInstanceProvider(ABC):
     @abstractmethod
     async def get_instance(self, session: AsyncSession, instance_id: str) -> UnitInstance | None:
         """Return a single instance by id, or ``None``."""
+
+    @abstractmethod
+    async def set_fuel(self, session: AsyncSession, instance_id: str, liters: float) -> None:
+        """Set an instance's ``current_fuel_liters`` (the mutation path for fuel transfers)."""
 
 
 def _to_instance(row: UnitInstanceRow) -> UnitInstance:
@@ -46,6 +50,14 @@ class DbUnitInstanceProvider(UnitInstanceProvider):
     async def get_instance(self, session: AsyncSession, instance_id: str) -> UnitInstance | None:
         row = await session.get(UnitInstanceRow, instance_id)
         return _to_instance(row) if row is not None else None
+
+    async def set_fuel(self, session: AsyncSession, instance_id: str, liters: float) -> None:
+        await session.execute(
+            update(UnitInstanceRow)
+            .where(UnitInstanceRow.id == instance_id)
+            .values(current_fuel_liters=liters)
+        )
+        await session.commit()
 
 
 InstanceProviderBuilder = Callable[[], UnitInstanceProvider]
