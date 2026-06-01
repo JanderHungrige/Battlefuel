@@ -39,11 +39,12 @@ export default function App() {
   const [confirming, setConfirming] = useState(false)
 
   const [activeRoutes, setActiveRoutes] = useState<Record<string, number[][]>>({})
-  const { positions: live, tileUpdates, chatter, pushChatter, supplyTick } = useSimSocket()
+  const { positions: live, tileUpdates, chatter, strategic, pushChatter, supplyTick } =
+    useSimSocket()
 
   // OF-8 supply: distribution data + order actions.
   const supply = useSupply(role === 'OF8', supplyTick)
-  const supplyOrders = useSupplyOrders(units, pushChatter, supply.refetch)
+  const supplyOrders = useSupplyOrders(units, unitTypes, pushChatter, supply.refetch)
 
   // Operator ops: obstacles + tile edits + the obstacle-placement mode and chosen kind.
   const { obstacles, placeObstacle, removeObstacle, mutateTile } = useObstacleOps()
@@ -174,18 +175,6 @@ export default function App() {
   // Obstacle placement is an OF-4 tactical tool; never active in the OF-8 supply view.
   const obstacleActive = canShow(role, 'obstacleMode') && obstacleMode
 
-  // Refuel targets: placed units that are not themselves fuel trucks.
-  const refuelTargets = useMemo(
-    () =>
-      units
-        .filter((u) => {
-          const t = unitTypes.find((ut) => ut.id === u.unit_type_id)
-          return t != null && t.nato_unit_type !== 'fuel_supply'
-        })
-        .map((u) => ({ id: u.id, name: u.name })),
-    [units, unitTypes],
-  )
-
   return (
     <div className="app">
       <header className="topbar">
@@ -241,11 +230,20 @@ export default function App() {
             />
             {canShow(role, 'terrainLegend') && <TerrainLegend />}
             <ChatterLog messages={chatter} onSelect={setHighlightH3} />
+            {canShow(role, 'strategicFeed') && (
+              <ChatterLog
+                messages={strategic}
+                title="Strategic Support"
+                className="chatter strategic-feed"
+                testId="strategic-feed"
+                emptyText="Awaiting strategic traffic…"
+              />
+            )}
             {canShow(role, 'supplyPanel') && (
               <SupplyPanel
                 overview={supply.overview}
                 depots={supply.depots}
-                refuelTargets={refuelTargets}
+                refuelTargets={supplyOrders.refuelTargets}
                 recommendation={supplyOrders.recommendation}
                 busy={supplyOrders.busy}
                 message={supplyOrders.message}

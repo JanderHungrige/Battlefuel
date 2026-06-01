@@ -1,7 +1,13 @@
 // Pure helpers for the sim WebSocket: parse and reduce frames. Kept free of the
 // WebSocket API so they are deterministically unit-testable.
 
-import type { BuyOrderUpdate, RefuelOrderUpdate, TileUpdate, UnitUpdate } from '../api/types'
+import type {
+  BuyOrderUpdate,
+  RefuelOrderUpdate,
+  StrategicMessage,
+  TileUpdate,
+  UnitUpdate,
+} from '../api/types'
 
 function parse(raw: string): Record<string, unknown> | null {
   try {
@@ -61,6 +67,15 @@ export function parseRefuelOrderUpdate(raw: string): RefuelOrderUpdate | null {
   const msg = parse(raw)
   if (msg && msg.type === 'refuel_order_update' && typeof msg.order_id === 'string') {
     return msg as unknown as RefuelOrderUpdate
+  }
+  return null
+}
+
+/** Parse a raw WS frame into a StrategicMessage, or null if not a valid strategic_message. */
+export function parseStrategicMessage(raw: string): StrategicMessage | null {
+  const msg = parse(raw)
+  if (msg && msg.type === 'strategic_message' && typeof msg.text === 'string') {
+    return msg as unknown as StrategicMessage
   }
   return null
 }

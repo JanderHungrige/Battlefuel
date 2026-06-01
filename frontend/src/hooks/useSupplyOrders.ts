@@ -2,14 +2,16 @@
 // refuel orders. On a refuel order the backend returns the recommended truck + rendezvous;
 // this hook surfaces them (for the panel) and exposes the truck cell + rendezvous (for the map).
 
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { ApiError, api } from '../api/client'
-import type { ChatterMessage, UnitInstance } from '../api/types'
+import type { ChatterMessage, UnitInstance, UnitType } from '../api/types'
 import type { RecommendationView } from '../components/SupplyPanel'
 
 type PushChatter = (text: string, kind?: ChatterMessage['kind'], h3Index?: string) => void
 
 export interface SupplyOrdersState {
+  /** Placed units eligible for refuel (everything that is not itself a fuel truck). */
+  refuelTargets: { id: string; name: string }[]
   recommendation: RecommendationView | null
   rendezvous: { lat: number; lon: number } | null
   truckHighlightH3: string | null
@@ -23,9 +25,20 @@ export interface SupplyOrdersState {
 
 export function useSupplyOrders(
   units: UnitInstance[],
+  unitTypes: UnitType[],
   pushChatter: PushChatter,
   refetch: () => void,
 ): SupplyOrdersState {
+  const refuelTargets = useMemo(
+    () =>
+      units
+        .filter((u) => {
+          const t = unitTypes.find((ut) => ut.id === u.unit_type_id)
+          return t != null && t.nato_unit_type !== 'fuel_supply'
+        })
+        .map((u) => ({ id: u.id, name: u.name })),
+    [units, unitTypes],
+  )
   const [recommendation, setRecommendation] = useState<RecommendationView | null>(null)
   const [rendezvous, setRendezvous] = useState<{ lat: number; lon: number } | null>(null)
   const [truckHighlightH3, setTruckHighlightH3] = useState<string | null>(null)
@@ -107,6 +120,7 @@ export function useSupplyOrders(
   }, [recommendation, clearRec])
 
   return {
+    refuelTargets,
     recommendation,
     rendezvous,
     truckHighlightH3,

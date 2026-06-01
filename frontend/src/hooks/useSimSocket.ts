@@ -12,6 +12,7 @@ import {
   describeTileUpdate,
   parseBuyOrderUpdate,
   parseRefuelOrderUpdate,
+  parseStrategicMessage,
   parseTileUpdate,
   parseUnitUpdate,
 } from './simSocket'
@@ -23,6 +24,8 @@ export interface SimSocketState {
   positions: Record<string, UnitUpdate>
   tileUpdates: Record<string, TileUpdate>
   chatter: ChatterMessage[]
+  /** OF-8 strategic-support feed: scripted strategic messages + supply-order notifications. */
+  strategic: ChatterMessage[]
   pushChatter: (text: string, kind?: ChatterMessage['kind'], h3Index?: string) => void
   connected: boolean
   /** Bumped whenever a supply order (buy/refuel) frame arrives — consumers refetch on change. */
@@ -33,6 +36,7 @@ export function useSimSocket(enabled = true): SimSocketState {
   const [positions, setPositions] = useState<Record<string, UnitUpdate>>({})
   const [tileUpdates, setTileUpdates] = useState<Record<string, TileUpdate>>({})
   const [chatter, setChatter] = useState<ChatterMessage[]>([])
+  const [strategic, setStrategic] = useState<ChatterMessage[]>([])
   const [connected, setConnected] = useState(false)
   const [supplyTick, setSupplyTick] = useState(0)
   const seq = useRef(0)
@@ -44,6 +48,11 @@ export function useSimSocket(enabled = true): SimSocketState {
     },
     [],
   )
+
+  const pushStrategic = useCallback((text: string, kind: ChatterMessage['kind'] = 'status') => {
+    const msg: ChatterMessage = { id: (seq.current += 1), kind, text }
+    setStrategic((prev) => [...prev, msg].slice(-MAX_CHATTER))
+  }, [])
 
   useEffect(() => {
     if (!enabled || typeof WebSocket === 'undefined') return
@@ -71,13 +80,18 @@ export function useSimSocket(enabled = true): SimSocketState {
         const buy = parseBuyOrderUpdate(raw)
         if (buy) {
           setSupplyTick((n) => n + 1)
-          pushChatter(describeBuyOrderUpdate(buy), 'order')
+          pushStrategic(describeBuyOrderUpdate(buy), 'order')
           return
         }
         const refuel = parseRefuelOrderUpdate(raw)
         if (refuel) {
           setSupplyTick((n) => n + 1)
-          pushChatter(describeRefuelOrderUpdate(refuel), 'order')
+          pushStrategic(describeRefuelOrderUpdate(refuel), 'order')
+          return
+        }
+        const strat = parseStrategicMessage(raw)
+        if (strat) {
+          pushStrategic(strat.text, 'status')
         }
       }
       socket.onclose = () => {
@@ -93,7 +107,7 @@ export function useSimSocket(enabled = true): SimSocketState {
       if (retry) clearTimeout(retry)
       socket?.close()
     }
-  }, [enabled, pushChatter])
+  }, [enabled, pushChatter, pushStrategic])
 
-  return { positions, tileUpdates, chatter, pushChatter, connected, supplyTick }
+  return { positions, tileUpdates, chatter, strategic, pushChatter, connected, supplyTick }
 }

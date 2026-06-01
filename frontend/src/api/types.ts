@@ -275,6 +275,14 @@ export interface RefuelOrderUpdate {
   transferred_liters: number
 }
 
+/** A scripted OF-8 strategic-support message broadcast over the WebSocket (Wave 5). */
+export interface StrategicMessage {
+  type: 'strategic_message'
+  text: string
+  category: string
+  game_s: number
+}
+
 /** A live tile-change frame broadcast when a tile is mutated (Wave 4 dynamic-tile-updates). */
 export interface TileUpdate {
   type: 'tile_update'

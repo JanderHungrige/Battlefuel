@@ -23,6 +23,11 @@ from app.providers.buy_orders import build_buy_order_provider
 from app.providers.factory import build_unit_provider
 from app.providers.move_orders import build_move_order_provider
 from app.providers.refuel_orders import build_refuel_order_provider
+from app.providers.strategic_feed import (
+    StrategicFeedProvider,
+    build_strategic_feed_provider,
+    due_strategic,
+)
 from app.providers.supply import build_supply_provider
 from app.providers.tile_feed import TileFeedProvider, build_tile_feed_provider, due_events
 from app.providers.tiles import build_tile_provider
@@ -62,6 +67,7 @@ class SimEngine:
         settings = get_settings()
         maker = get_session_maker()
         feed = build_tile_feed_provider()
+        strategic = build_strategic_feed_provider()
         events = EventEngine(
             Random(),
             mean_interval_game_s=settings.event_mean_interval_game_s,
@@ -77,6 +83,7 @@ class SimEngine:
                     await self.complete_refuels(session)
                     await self.advance_buy_orders(session, dt_game)
                     await self.apply_feed(session, feed, prev_game_s, self._game_s)
+                    await self.apply_strategic_feed(strategic, prev_game_s, self._game_s)
                     await events.step(
                         session, build_tile_provider(), self._manager, self._game_s, dt_game
                     )
@@ -99,6 +106,24 @@ class SimEngine:
                 await self._manager.broadcast(tile_update_frame(tile))
                 applied += 1
         return applied
+
+    async def apply_strategic_feed(
+        self, strategic: StrategicFeedProvider, prev_s: float, now_s: float
+    ) -> int:
+        """Broadcast scripted strategic messages that came due in (prev_s, now_s]. Public for
+        testing. Returns the number sent."""
+        sent = 0
+        for ev in due_strategic(strategic.events(), prev_s, now_s):
+            await self._manager.broadcast(
+                {
+                    "type": "strategic_message",
+                    "text": ev.text,
+                    "category": ev.category,
+                    "game_s": round(now_s, 1),
+                }
+            )
+            sent += 1
+        return sent
 
     async def complete_refuels(self, session: AsyncSession) -> int:
         """Complete any active refuel order whose unit + truck are co-located. Public for testing.

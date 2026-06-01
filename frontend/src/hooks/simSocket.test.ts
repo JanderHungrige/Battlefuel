@@ -8,6 +8,7 @@ import {
   describeTileUpdate,
   parseBuyOrderUpdate,
   parseRefuelOrderUpdate,
+  parseStrategicMessage,
   parseTileUpdate,
   parseUnitUpdate,
 } from './simSocket'
@@ -167,5 +168,16 @@ describe('parseBuyOrderUpdate / parseRefuelOrderUpdate', () => {
         transferred_liters: 3000,
       }),
     ).toContain('inst-armor-1')
+  })
+})
+
+describe('parseStrategicMessage', () => {
+  it('parses a valid strategic_message and rejects others', () => {
+    const ok = parseStrategicMessage(
+      JSON.stringify({ type: 'strategic_message', text: 'convoy inbound', category: 'logistics', game_s: 60 }),
+    )
+    expect(ok?.text).toBe('convoy inbound')
+    expect(parseStrategicMessage(JSON.stringify({ type: 'unit_update' }))).toBeNull()
+    expect(parseStrategicMessage('nope')).toBeNull()
   })
 })
