@@ -137,3 +137,15 @@ export interface UnitUpdate {
   progress_m: number
   distance_m: number
 }
+
+/** A live tile-change frame broadcast when a tile is mutated (Wave 4 dynamic-tile-updates). */
+export interface TileUpdate {
+  type: 'tile_update'
+  h3_index: string
+  terrain: TerrainType
+  threat_level: number
+  road_condition: Tile['road_condition']
+  intel_level: Tile['intel_level']
+  weather: Tile['weather']
+  cover: Tile['cover']
+}

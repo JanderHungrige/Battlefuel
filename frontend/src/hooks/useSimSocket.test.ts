@@ -58,6 +58,25 @@ describe('useSimSocket', () => {
     expect(result.current.positions['inst-1'].lon).toBe(5)
   })
 
+  it('routes tile_update frames into tileUpdates', () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket as unknown as typeof WebSocket)
+    const { result } = renderHook(() => useSimSocket())
+    const ws = FakeWebSocket.last
+    const tile = JSON.stringify({
+      type: 'tile_update',
+      h3_index: '8811aa',
+      terrain: 'forest',
+      threat_level: 4,
+      road_condition: 'damaged',
+      intel_level: 'high',
+      weather: 'clear',
+      cover: 'none',
+    })
+    act(() => ws?.onmessage?.({ data: tile }))
+    expect(result.current.tileUpdates['8811aa'].threat_level).toBe(4)
+    expect(result.current.positions).toEqual({})
+  })
+
   it('does not open a socket when disabled', () => {
     vi.stubGlobal('WebSocket', FakeWebSocket as unknown as typeof WebSocket)
     renderHook(() => useSimSocket(false))

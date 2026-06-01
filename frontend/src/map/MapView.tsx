@@ -57,6 +57,16 @@ function initLayers(map: maplibregl.Map): void {
     source: 'tiles',
     paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.4 },
   })
+  // Threat overlay: red, opacity ramped by threat_level (0 → transparent, 5 → strong).
+  map.addLayer({
+    id: 'tiles-threat',
+    type: 'fill',
+    source: 'tiles',
+    paint: {
+      'fill-color': '#ff3030',
+      'fill-opacity': ['interpolate', ['linear'], ['get', 'threat_level'], 0, 0, 1, 0.12, 5, 0.55],
+    },
+  })
   map.addLayer({
     id: 'tiles-outline',
     type: 'line',

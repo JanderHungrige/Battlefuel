@@ -2,19 +2,21 @@
 // into a per-instance position map and auto-reconnects after an unexpected close.
 
 import { useEffect, useState } from 'react'
-import type { UnitUpdate } from '../api/types'
+import type { TileUpdate, UnitUpdate } from '../api/types'
 import { WS_BASE } from '../config'
-import { applyUnitUpdate, parseUnitUpdate } from './simSocket'
+import { applyTileUpdate, applyUnitUpdate, parseTileUpdate, parseUnitUpdate } from './simSocket'
 
 const RECONNECT_MS = 2000
 
 export interface SimSocketState {
   positions: Record<string, UnitUpdate>
+  tileUpdates: Record<string, TileUpdate>
   connected: boolean
 }
 
 export function useSimSocket(enabled = true): SimSocketState {
   const [positions, setPositions] = useState<Record<string, UnitUpdate>>({})
+  const [tileUpdates, setTileUpdates] = useState<Record<string, TileUpdate>>({})
   const [connected, setConnected] = useState(false)
 
   useEffect(() => {
@@ -28,8 +30,14 @@ export function useSimSocket(enabled = true): SimSocketState {
       socket = new WebSocket(`${WS_BASE}/ws`)
       socket.onopen = () => setConnected(true)
       socket.onmessage = (e: MessageEvent) => {
-        const update = parseUnitUpdate(String(e.data))
-        if (update) setPositions((prev) => applyUnitUpdate(prev, update))
+        const raw = String(e.data)
+        const unit = parseUnitUpdate(raw)
+        if (unit) {
+          setPositions((prev) => applyUnitUpdate(prev, unit))
+          return
+        }
+        const tile = parseTileUpdate(raw)
+        if (tile) setTileUpdates((prev) => applyTileUpdate(prev, tile))
       }
       socket.onclose = () => {
         setConnected(false)
@@ -46,5 +54,5 @@ export function useSimSocket(enabled = true): SimSocketState {
     }
   }, [enabled])
 
-  return { positions, connected }
+  return { positions, tileUpdates, connected }
 }

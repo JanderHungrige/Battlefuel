@@ -45,7 +45,7 @@ export default function App() {
 
   // Live movement: routes confirmed this session, keyed by unit instance id.
   const [activeRoutes, setActiveRoutes] = useState<Record<string, number[][]>>({})
-  const { positions: live } = useSimSocket()
+  const { positions: live, tileUpdates } = useSimSocket()
 
   useEffect(() => {
     let active = true
@@ -65,9 +65,28 @@ export default function App() {
     }
   }, [])
 
+  // Tiles merged with their latest live tile_update (threat/road/etc.), for the overlay + inspect.
+  const displayedTiles = useMemo(() => {
+    if (Object.keys(tileUpdates).length === 0) return tiles
+    return tiles.map((t) => {
+      const u = tileUpdates[t.h3_index]
+      return u
+        ? {
+            ...t,
+            terrain: u.terrain,
+            threat_level: u.threat_level,
+            road_condition: u.road_condition,
+            intel_level: u.intel_level,
+            weather: u.weather,
+            cover: u.cover,
+          }
+        : t
+    })
+  }, [tiles, tileUpdates])
+
   const selectedTile = useMemo(
-    () => tiles.find((t) => t.h3_index === selectedTileH3),
-    [tiles, selectedTileH3],
+    () => displayedTiles.find((t) => t.h3_index === selectedTileH3),
+    [displayedTiles, selectedTileH3],
   )
   const selectedUnit = useMemo(
     () => units.find((u) => u.id === selectedUnitId),
@@ -174,7 +193,7 @@ export default function App() {
           <>
             <MapView
               theater={theater}
-              tiles={tiles}
+              tiles={displayedTiles}
               units={units}
               unitTypes={unitTypes}
               routeGeometry={routeGeometry}
