@@ -356,13 +356,13 @@ body {
   border-bottom-color: var(--panel);
 }
 
-/* Chatter / radio log (right side). */
+/* Chatter / radio log (lower-right corner; clear of the inspect panel). */
 .chatter {
   position: absolute;
-  top: 12px;
+  bottom: 12px;
   right: 12px;
   width: 260px;
-  max-height: calc(100% - 24px);
+  max-height: 40%;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
