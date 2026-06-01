@@ -73,6 +73,20 @@ optimization libraries). Concretely:
 - Simulation logic (fuel burn, routing cost, events) must have deterministic unit tests —
   inject the clock/RNG so real-time and randomness are controllable in tests.
 
+## Frontend patterns (established Wave 3)
+
+- **MapLibre = once-init + imperative source updates.** Create the map exactly once
+  (`useEffect(..., [])`), add all sources up front, then push data with
+  `(map.getSource(id) as GeoJSONSource).setData(...)` from effects keyed on each data
+  slice. **Never** key the map-creation effect on `props` — that rebuilds the whole map on
+  every render (re-downloads tiles, drops zoom/pan, breaks realtime). Event handlers read
+  the latest props via a ref updated in its own effect, so handlers need not re-register.
+- **WebSocket = pure parse/reduce module + thin reconnecting hook.** Put message
+  validation and state reduction in a pure, socket-free module (unit-testable with plain
+  strings); the hook only owns connection lifecycle (open, reconnect on close, pipe frames
+  through the pure functions). Drop malformed frames with a logged warning — never tear
+  down the socket on one bad frame.
+
 ## API
 
 - Backend routes are versioned under **`/api/v1/`**.
