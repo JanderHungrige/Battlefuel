@@ -3,11 +3,11 @@ id: battlefuel-wave-4
 title: "Wave 4: Dynamic Battlefield — Tile-Driven Cost, Obstacles & Events"
 initiative: battlefuel
 initiative_version: 4
-status: planned
+status: complete
 depends_on: battlefuel-wave-3
 demo_state: "Tile attributes alter movement/fuel/threat and feed the routing graph; move-order route options warn on threat sectors; manual obstacles and game-mode random events fire and mutate tiles; incoming orders / sector info (manual + scripted feed) mutate tiles, and the map updates live."
 created: 2026-06-01
-hash: b6705e26
+hash: fd3d12b7
 ---
 
 # Wave 4: Dynamic Battlefield — Tile-Driven Cost, Obstacles & Events
