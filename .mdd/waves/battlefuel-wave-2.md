@@ -32,10 +32,10 @@ server-authoritative.
 ## Features
 | # | Feature | Doc | Status | Depends on |
 |---|---------|-----|--------|------------|
-| 1 | db-spatial-foundation | — | planned | — |
-| 2 | osm-theater-data | — | planned | db-spatial-foundation |
-| 3 | hex-tile-model-api | — | planned | osm-theater-data |
-| 4 | unit-instances | — | planned | db-spatial-foundation |
+| 1 | db-spatial-foundation | docs/05-db-spatial-foundation.md | complete | — |
+| 2 | osm-theater-data | docs/06-osm-theater-data.md | complete | db-spatial-foundation |
+| 3 | hex-tile-model-api | docs/07-hex-tile-model-api.md | complete | osm-theater-data |
+| 4 | unit-instances | docs/08-unit-instances.md | complete | db-spatial-foundation |
 | 5 | frontend-map-shell | — | planned | osm-theater-data |
 | 6 | map-overlays-inspect | — | planned | hex-tile-model-api, unit-instances, frontend-map-shell |
 

@@ -1,0 +1,23 @@
+# Local development services for BattleFuel.
+# Credentials default to dev values via env substitution; override in a root .env
+# (never committed) for anything non-local.
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: battlefuel-db
+    environment:
+      POSTGRES_USER: ${BATTLEFUEL_DB_USER:-battlefuel}
+      POSTGRES_PASSWORD: ${BATTLEFUEL_DB_PASSWORD:-battlefuel}
+      POSTGRES_DB: ${BATTLEFUEL_DB_NAME:-battlefuel}
+    ports:
+      - "${BATTLEFUEL_DB_PORT:-5432}:5432"
+    volumes:
+      - battlefuel-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${BATTLEFUEL_DB_USER:-battlefuel}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  battlefuel-db-data:

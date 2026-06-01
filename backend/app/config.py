@@ -23,6 +23,15 @@ class Settings(BaseSettings):
     # Name of the unit data provider the factory should build (e.g. "seed").
     unit_provider: str = "seed"
 
+    # Async SQLAlchemy database URL (PostgreSQL + PostGIS via asyncpg).
+    database_url: str = "postgresql+asyncpg://battlefuel:battlefuel@localhost:5432/battlefuel"
+
+    # Provider the factory builds for map tiles (Wave 2 ships "db").
+    tile_provider: str = "db"
+
+    # Provider the factory builds for placed unit instances (Wave 2 ships "db").
+    unit_instance_provider: str = "db"
+
 
 def get_settings() -> Settings:
     """Return a freshly-read :class:`Settings` instance.
