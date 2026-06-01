@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ApiError, api } from './api/client'
 import type { RouteMetric, RouteOption, Theater, Tile, UnitInstance, UnitType } from './api/types'
+import { ChatterLog } from './components/ChatterLog'
 import { InspectPanel } from './components/InspectPanel'
 import { MoveRoutesPanel } from './components/MoveRoutesPanel'
-import { ThreatAlerts } from './components/ThreatAlerts'
+import { ObstacleKindPicker } from './components/ObstacleKindPicker'
+import type { ObstacleKind } from './components/obstacleKinds'
+import { TerrainLegend } from './components/TerrainLegend'
 import { OSM_ATTRIBUTION } from './config'
 import { useObstacleOps } from './hooks/useObstacleOps'
 import { useSimSocket } from './hooks/useSimSocket'
 import { MapView } from './map/MapView'
-import { TERRAIN_COLORS } from './map/overlays'
 
 function errorMessage(e: unknown): string {
   if (e instanceof ApiError) {
@@ -29,6 +31,7 @@ export default function App() {
 
   const [selectedTileH3, setSelectedTileH3] = useState<string | null>(null)
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null)
+  const [highlightH3, setHighlightH3] = useState<string | null>(null)
 
   // Move planning.
   const [destination, setDestination] = useState<{ lat: number; lon: number } | null>(null)
@@ -38,13 +41,13 @@ export default function App() {
   const [planError, setPlanError] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
 
-  // Live movement: routes confirmed this session, keyed by unit instance id.
   const [activeRoutes, setActiveRoutes] = useState<Record<string, number[][]>>({})
-  const { positions: live, tileUpdates, tileAlerts } = useSimSocket()
+  const { positions: live, tileUpdates, chatter, pushChatter } = useSimSocket()
 
-  // Operator ops: manual obstacles + tile edits (+ obstacle-placement mode toggle).
+  // Operator ops: obstacles + tile edits + the obstacle-placement mode and chosen kind.
   const { obstacles, placeObstacle, removeObstacle, mutateTile } = useObstacleOps()
   const [obstacleMode, setObstacleMode] = useState(false)
+  const [obstacleKind, setObstacleKind] = useState<ObstacleKind>('minefield')
 
   useEffect(() => {
     let active = true
@@ -64,22 +67,12 @@ export default function App() {
     }
   }, [])
 
-  // Tiles merged with their latest live tile_update (threat/road/etc.), for the overlay + inspect.
+  // Tiles merged with their latest live tile_update (threat/road/situation/etc.).
   const displayedTiles = useMemo(() => {
     if (Object.keys(tileUpdates).length === 0) return tiles
     return tiles.map((t) => {
       const u = tileUpdates[t.h3_index]
-      return u
-        ? {
-            ...t,
-            terrain: u.terrain,
-            threat_level: u.threat_level,
-            road_condition: u.road_condition,
-            intel_level: u.intel_level,
-            weather: u.weather,
-            cover: u.cover,
-          }
-        : t
+      return u ? { ...t, ...u, h3_index: t.h3_index, boundary: t.boundary } : t
     })
   }, [tiles, tileUpdates])
 
@@ -100,7 +93,6 @@ export default function App() {
     [routeOptions, selectedMetric],
   )
 
-  // Live marker positions (keep through arrival; a cancelled unit reverts to its base point).
   const livePositions = useMemo(() => {
     const out: Record<string, { lat: number; lon: number }> = {}
     for (const u of Object.values(live)) {
@@ -108,7 +100,6 @@ export default function App() {
     }
     return out
   }, [live])
-  // Draw confirmed routes, dropping any whose unit the sim reports finished/cancelled.
   const activeRouteGeometries = useMemo(
     () =>
       Object.entries(activeRoutes)
@@ -132,6 +123,7 @@ export default function App() {
   const clear = useCallback(() => {
     setSelectedTileH3(null)
     setSelectedUnitId(null)
+    setHighlightH3(null)
     resetPlanning()
   }, [resetPlanning])
 
@@ -159,6 +151,7 @@ export default function App() {
     if (!selectedUnitId || !destination || !selectedMetric) return
     setConfirming(true)
     setPlanError(null)
+    const name = selectedUnit?.name ?? selectedUnitId
     api
       .createMoveOrder({
         instance_id: selectedUnitId,
@@ -169,11 +162,12 @@ export default function App() {
       .then((order) => api.confirmMoveOrder(order.id))
       .then((order) => {
         setActiveRoutes((prev) => ({ ...prev, [order.instance_id]: order.geometry }))
+        pushChatter(`Move order confirmed: ${name} (${order.metric})`, 'order')
         clear()
       })
       .catch((e: unknown) => setPlanError(errorMessage(e)))
       .finally(() => setConfirming(false))
-  }, [selectedUnitId, destination, selectedMetric, clear])
+  }, [selectedUnitId, selectedUnit, destination, selectedMetric, clear, pushChatter])
 
   const ready = theater !== null
 
@@ -211,7 +205,8 @@ export default function App() {
               activeRoutes={activeRouteGeometries}
               obstacles={obstacles}
               obstacleMode={obstacleMode}
-              onPlaceObstacle={placeObstacle}
+              highlightH3={highlightH3}
+              onPlaceObstacle={(lat, lon) => placeObstacle(lat, lon, obstacleKind)}
               onRemoveObstacle={removeObstacle}
               onSelectTile={(h3) => {
                 setSelectedUnitId(null)
@@ -227,7 +222,10 @@ export default function App() {
               onClearSelection={clear}
             />
             <TerrainLegend />
-            <ThreatAlerts alerts={tileAlerts} />
+            <ChatterLog messages={chatter} onSelect={setHighlightH3} />
+            {obstacleMode && (
+              <ObstacleKindPicker selected={obstacleKind} onSelect={setObstacleKind} />
+            )}
             {selectedUnit && (
               <MoveRoutesPanel
                 unitName={selectedUnit.name}
@@ -261,19 +259,6 @@ export default function App() {
           </>
         )}
       </main>
-    </div>
-  )
-}
-
-function TerrainLegend() {
-  return (
-    <div className="legend" data-testid="legend">
-      {Object.entries(TERRAIN_COLORS).map(([terrain, color]) => (
-        <span key={terrain} className="legend-item">
-          <span className="legend-swatch" style={{ background: color }} />
-          {terrain}
-        </span>
-      ))}
     </div>
   )
 }

@@ -2,11 +2,22 @@
 
 import type {
   MoveOrderStatus,
+  SectorSituation,
   Tile,
   TileMutationRequest,
   UnitInstance,
   UnitType,
 } from '../api/types'
+
+const SITUATIONS: SectorSituation[] = [
+  'quiet',
+  'enemy_contact',
+  'under_fire',
+  'combat',
+  'secured',
+  'supply_point',
+  'medevac',
+]
 
 export interface LiveUnitState {
   fuel_l: number
@@ -64,6 +75,43 @@ function TileEdit({
           <option value="blocked">blocked</option>
         </select>
       </label>
+      <label className="inspect-row">
+        <span className="inspect-label">Situation</span>
+        <select
+          value={tile.situation ?? ''}
+          data-testid="set-situation"
+          onChange={(e) =>
+            e.target.value && onMutate(tile.h3_index, { situation: e.target.value as SectorSituation })
+          }
+        >
+          <option value="">—</option>
+          {SITUATIONS.map((s) => (
+            <option key={s} value={s}>
+              {s.replace(/_/g, ' ')}
+            </option>
+          ))}
+        </select>
+      </label>
+      <form
+        className="tile-edit-note"
+        onSubmit={(e) => {
+          e.preventDefault()
+          const input = e.currentTarget.elements.namedItem('note') as HTMLInputElement
+          onMutate(tile.h3_index, { note: input.value })
+        }}
+      >
+        <input
+          name="note"
+          type="text"
+          maxLength={280}
+          placeholder="Add note…"
+          defaultValue={tile.note ?? ''}
+          data-testid="set-note-input"
+        />
+        <button type="submit" data-testid="set-note-submit">
+          Save
+        </button>
+      </form>
     </div>
   )
 }

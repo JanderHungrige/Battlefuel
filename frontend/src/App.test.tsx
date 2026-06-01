@@ -23,7 +23,13 @@ vi.mock('./api/client', () => ({
 
 // The live sim socket is exercised in its own tests; keep the shell test deterministic.
 vi.mock('./hooks/useSimSocket', () => ({
-  useSimSocket: () => ({ positions: {}, tileUpdates: {}, tileAlerts: [], connected: false }),
+  useSimSocket: () => ({
+    positions: {},
+    tileUpdates: {},
+    chatter: [],
+    pushChatter: () => {},
+    connected: false,
+  }),
 }))
 
 const HOHENFELS: Theater = {

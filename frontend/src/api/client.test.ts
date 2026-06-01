@@ -98,7 +98,7 @@ describe('api client', () => {
     const [url, init] = fetchMock.mock.calls[0]
     expect(String(url)).toMatch(/\/obstacles$/)
     expect(init.method).toBe('POST')
-    expect(JSON.parse(init.body)).toEqual({ lat: 49.2, lon: 11.85 })
+    expect(JSON.parse(init.body)).toEqual({ lat: 49.2, lon: 11.85, kind: 'manual' })
   })
 
   it('deleteObstacle DELETEs /obstacles/{id}', async () => {

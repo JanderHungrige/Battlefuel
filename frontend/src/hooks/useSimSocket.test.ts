@@ -77,7 +77,7 @@ describe('useSimSocket', () => {
     expect(result.current.positions).toEqual({})
   })
 
-  it('surfaces a threat alert for high-threat tile frames only', () => {
+  it('logs a chatter line for each tile_update, carrying its h3_index', () => {
     vi.stubGlobal('WebSocket', FakeWebSocket as unknown as typeof WebSocket)
     const { result } = renderHook(() => useSimSocket())
     const ws = FakeWebSocket.last
@@ -91,12 +91,20 @@ describe('useSimSocket', () => {
         intel_level: 'low',
         weather: 'clear',
         cover: 'none',
+        situation: null,
+        note: null,
       })
-    act(() => ws?.onmessage?.({ data: frame('cell-low', 1) }))
     act(() => ws?.onmessage?.({ data: frame('cell-hi', 4) }))
-    expect(result.current.tileAlerts).toHaveLength(1)
-    expect(result.current.tileAlerts[0].h3_index).toBe('cell-hi')
-    expect(result.current.tileAlerts[0].threat_level).toBe(4)
+    expect(result.current.chatter).toHaveLength(1)
+    expect(result.current.chatter[0].h3_index).toBe('cell-hi')
+    expect(result.current.chatter[0].text).toContain('threat 4/5')
+  })
+
+  it('pushChatter adds an order line', () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket as unknown as typeof WebSocket)
+    const { result } = renderHook(() => useSimSocket())
+    act(() => result.current.pushChatter('Move order confirmed', 'order'))
+    expect(result.current.chatter.at(-1)?.kind).toBe('order')
   })
 
   it('does not open a socket when disabled', () => {

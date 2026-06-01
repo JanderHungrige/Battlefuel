@@ -2,6 +2,7 @@
 // plus route/destination overlays for move planning. The map is created once and its
 // sources are updated imperatively, so overlays (and live motion) never tear it down.
 
+import { cellToLatLng } from 'h3-js'
 import maplibregl from 'maplibre-gl'
 import { Protocol } from 'pmtiles'
 import { useEffect, useRef } from 'react'
@@ -38,6 +39,7 @@ export interface MapViewProps {
   activeRoutes: number[][][]
   obstacles: Obstacle[]
   obstacleMode: boolean
+  highlightH3: string | null
   onSelectTile: (h3Index: string) => void
   onSelectUnit: (id: string) => void
   onPickDestination: (lat: number, lon: number) => void
@@ -77,6 +79,14 @@ function initLayers(map: maplibregl.Map): void {
     type: 'line',
     source: 'tiles',
     paint: { 'line-color': '#5b6675', 'line-width': 0.5, 'line-opacity': 0.5 },
+  })
+  // Yellow highlight border for the sector referenced by a clicked chatter message.
+  map.addLayer({
+    id: 'tiles-highlight',
+    type: 'line',
+    source: 'tiles',
+    filter: ['==', ['get', 'h3_index'], ''],
+    paint: { 'line-color': '#ffd23f', 'line-width': 3 },
   })
 
   map.addSource('active-routes', { type: 'geojson', data: EMPTY })
@@ -184,14 +194,11 @@ function wireInteraction(map: maplibregl.Map, propsRef: { current: MapViewProps 
   }
 }
 
-/** Hover tooltip showing a hex's attributes (terrain, threat, road, intel). */
+/** Right-click info popup showing a hex's attributes (terrain, threat, road, intel). */
 function wireHover(map: maplibregl.Map): void {
-  const popup = new maplibregl.Popup({
-    closeButton: false,
-    closeOnClick: false,
-    className: 'hex-popup',
-  })
-  map.on('mousemove', 'tiles-fill', (e) => {
+  const popup = new maplibregl.Popup({ closeButton: true, closeOnClick: true, className: 'hex-popup' })
+  map.on('contextmenu', 'tiles-fill', (e) => {
+    e.preventDefault()
     const props = e.features?.[0]?.properties
     if (!props) return
     popup
@@ -202,7 +209,6 @@ function wireHover(map: maplibregl.Map): void {
       )
       .addTo(map)
   })
-  map.on('mouseleave', 'tiles-fill', () => popup.remove())
 }
 
 export function MapView(props: MapViewProps) {
@@ -275,6 +281,15 @@ export function MapView(props: MapViewProps) {
     if (readyRef.current && mapRef.current)
       setData(mapRef.current, 'obstacles', obstaclesToGeoJSON(props.obstacles))
   }, [props.obstacles])
+  useEffect(() => {
+    if (!readyRef.current || !mapRef.current) return
+    const map = mapRef.current
+    map.setFilter('tiles-highlight', ['==', ['get', 'h3_index'], props.highlightH3 ?? ''])
+    if (props.highlightH3) {
+      const [lat, lon] = cellToLatLng(props.highlightH3)
+      map.easeTo({ center: [lon, lat], duration: 600 })
+    }
+  }, [props.highlightH3])
 
   return (
     <div ref={containerRef} data-testid="map-container" style={{ width: '100%', height: '100%' }} />

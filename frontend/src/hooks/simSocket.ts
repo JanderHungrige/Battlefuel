@@ -39,11 +39,12 @@ export function applyTileUpdate(
   return { ...state, [update.h3_index]: update }
 }
 
-/** A tile_update at/above this threat level surfaces a pop-up alert. */
-export const THREAT_ALERT_LEVEL = 3
-
-export function isThreatAlert(update: TileUpdate): boolean {
-  return update.threat_level >= THREAT_ALERT_LEVEL
+/** A short human-readable summary of a tile_update, for the chatter log. */
+export function describeTileUpdate(u: TileUpdate): string {
+  const parts = [`threat ${u.threat_level}/5`, `road ${u.road_condition}`]
+  if (u.situation) parts.push(u.situation.replace(/_/g, ' '))
+  if (u.note) parts.push(`“${u.note}”`)
+  return parts.join(' · ')
 }
 
 /** Latest frame per instance wins. Returns a new map (never mutates the input). */

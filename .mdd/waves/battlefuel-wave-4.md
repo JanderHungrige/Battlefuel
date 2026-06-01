@@ -50,7 +50,7 @@ follows the road network (off-road out of scope).
 | 4 | event-engine         | docs/20-event-engine.md | complete | dynamic-tile-updates |
 | 5 | threat-planning-ui   | docs/21-threat-planning-ui.md | complete | dynamic-tile-updates |
 | 6 | obstacle-tile-ops-ui | docs/22-obstacle-tile-ops-ui.md | complete | manual-obstacles, threat-planning-ui |
-| 7 | ops-chatter-sectors | docs/23-ops-chatter-sectors.md | active | dynamic-tile-updates, threat-planning-ui, obstacle-tile-ops-ui |
+| 7 | ops-chatter-sectors | docs/23-ops-chatter-sectors.md | complete | dynamic-tile-updates, threat-planning-ui, obstacle-tile-ops-ui |
 
 Build order: 1 → 2 → 3 → 4 → 5 (after 2) → 6 (after 3, 5).
 

@@ -3,7 +3,7 @@ import type { TileUpdate, UnitUpdate } from '../api/types'
 import {
   applyTileUpdate,
   applyUnitUpdate,
-  isThreatAlert,
+  describeTileUpdate,
   parseTileUpdate,
   parseUnitUpdate,
 } from './simSocket'
@@ -68,6 +68,8 @@ const tileFrame: TileUpdate = {
   intel_level: 'high',
   weather: 'clear',
   cover: 'none',
+  situation: null,
+  note: null,
 }
 
 describe('parseTileUpdate', () => {
@@ -94,14 +96,12 @@ describe('applyTileUpdate', () => {
   })
 })
 
-describe('isThreatAlert', () => {
-  it('flags tile updates at or above the threat threshold', () => {
-    expect(isThreatAlert({ ...tileFrame, threat_level: 3 })).toBe(true)
-    expect(isThreatAlert({ ...tileFrame, threat_level: 5 })).toBe(true)
-  })
-
-  it('ignores low-threat updates', () => {
-    expect(isThreatAlert({ ...tileFrame, threat_level: 2 })).toBe(false)
-    expect(isThreatAlert({ ...tileFrame, threat_level: 0 })).toBe(false)
+describe('describeTileUpdate', () => {
+  it('summarizes threat and road, including situation/note when present', () => {
+    const text = describeTileUpdate({ ...tileFrame, threat_level: 4, situation: 'under_fire', note: 'ridge' })
+    expect(text).toContain('threat 4/5')
+    expect(text).toContain('road damaged')
+    expect(text).toContain('under fire')
+    expect(text).toContain('ridge')
   })
 })

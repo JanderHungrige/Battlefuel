@@ -68,8 +68,8 @@ export const api = {
 
   // Operator ops (Wave 4).
   listObstacles: (): Promise<Obstacle[]> => getJson<Obstacle[]>('/obstacles'),
-  createObstacle: (lat: number, lon: number): Promise<Obstacle> =>
-    postJson<Obstacle>('/obstacles', { lat, lon }),
+  createObstacle: (lat: number, lon: number, kind = 'manual'): Promise<Obstacle> =>
+    postJson<Obstacle>('/obstacles', { lat, lon, kind }),
   deleteObstacle: (id: string): Promise<{ id: string; status: string }> =>
     deleteJson<{ id: string; status: string }>(`/obstacles/${id}`),
   patchTile: (h3Index: string, mutation: TileMutationRequest): Promise<Tile> =>

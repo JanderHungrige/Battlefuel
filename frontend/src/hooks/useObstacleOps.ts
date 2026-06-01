@@ -8,7 +8,7 @@ import type { Obstacle, TileMutationRequest } from '../api/types'
 
 export interface ObstacleOps {
   obstacles: Obstacle[]
-  placeObstacle: (lat: number, lon: number) => void
+  placeObstacle: (lat: number, lon: number, kind?: string) => void
   removeObstacle: (id: string) => void
   mutateTile: (h3Index: string, mutation: TileMutationRequest) => void
 }
@@ -29,9 +29,9 @@ export function useObstacleOps(): ObstacleOps {
     }
   }, [])
 
-  const placeObstacle = useCallback((lat: number, lon: number) => {
+  const placeObstacle = useCallback((lat: number, lon: number, kind = 'manual') => {
     api
-      .createObstacle(lat, lon)
+      .createObstacle(lat, lon, kind)
       .then((o) => setObstacles((prev) => [...prev, o]))
       .catch((e: unknown) => console.error('[ops] place obstacle failed:', e))
   }, [])

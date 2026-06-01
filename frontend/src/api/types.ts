@@ -37,7 +37,26 @@ export interface Tile {
   weather: 'clear' | 'rain' | 'fog' | 'snow' | 'storm'
   road_condition: 'clear' | 'damaged' | 'blocked'
   cover: 'none' | 'light' | 'heavy'
+  situation?: SectorSituation | null
+  note?: string | null
   boundary: number[][] // ring of [lon, lat]
+}
+
+export type SectorSituation =
+  | 'quiet'
+  | 'enemy_contact'
+  | 'under_fire'
+  | 'combat'
+  | 'secured'
+  | 'supply_point'
+  | 'medevac'
+
+/** One line in the side "radio" chatter log. */
+export interface ChatterMessage {
+  id: number
+  kind: 'status' | 'order'
+  text: string
+  h3_index?: string
 }
 
 export type InstanceStatus =
@@ -138,14 +157,6 @@ export interface UnitUpdate {
   distance_m: number
 }
 
-/** A transient threat notification surfaced when a tile_update raises threat. */
-export interface TileAlert {
-  id: number
-  h3_index: string
-  threat_level: number
-  terrain: TerrainType
-}
-
 /** An operator-placed obstacle the router avoids (blocks an H3 cell). */
 export interface Obstacle {
   id: string
@@ -158,6 +169,8 @@ export interface TileMutationRequest {
   threat_level?: number
   road_condition?: Tile['road_condition']
   intel_level?: Tile['intel_level']
+  situation?: SectorSituation
+  note?: string
 }
 
 /** A live tile-change frame broadcast when a tile is mutated (Wave 4 dynamic-tile-updates). */
@@ -170,4 +183,6 @@ export interface TileUpdate {
   intel_level: Tile['intel_level']
   weather: Tile['weather']
   cover: Tile['cover']
+  situation: SectorSituation | null
+  note: string | null
 }

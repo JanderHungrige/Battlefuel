@@ -34,8 +34,8 @@ test_files:
   - frontend/src/components/InspectPanel.test.tsx
 data_flow: mixed
 last_synced: 2026-06-01
-status: draft
-phase: 7
+status: complete
+phase: all
 mdd_version: 11
 tags: [chatter, radio-log, sectors, situation, obstacles, maplibre, frontend]
 path: Map/Movement
@@ -44,10 +44,11 @@ satisfies_contracts:
   - from: 18-dynamic-tile-updates
     function: "tile_update WS frame (now carries situation/note)"
     when: "sector status changes feed the chatter log"
-    status: pending
-    verified_at: ""
+    status: done
+    verified_at: "frontend/src/hooks/useSimSocket.ts:60"
 security_read_sites: []
-known_issues: []
+known_issues:
+  - "Map interactions (right-click info popup, yellow highlight border, obstacle markers) are verified manually; jsdom has no WebGL. Automated tests cover the chatter reducer/log, obstacle picker, sector situation/note editor, and backend situation/note round-trip."
 ---
 
 # 23 — Ops Chatter & Sector Status

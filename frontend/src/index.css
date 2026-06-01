@@ -356,6 +356,115 @@ body {
   border-bottom-color: var(--panel);
 }
 
+/* Chatter / radio log (right side). */
+.chatter {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 260px;
+  max-height: calc(100% - 24px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  z-index: 18;
+}
+
+.chatter h2 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+}
+
+.chatter-empty {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.chatter-msg {
+  text-align: left;
+  font-size: 12px;
+  padding: 5px 8px;
+  background: #1c222b;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-left: 3px solid #5b6675;
+  border-radius: 4px;
+}
+
+.chatter-msg.order {
+  border-left-color: var(--accent);
+}
+
+.chatter-msg.clickable {
+  cursor: pointer;
+}
+
+.chatter-msg.clickable:hover {
+  border-color: #ffd23f;
+}
+
+/* Obstacle type picker (left side, under the planning area). */
+.obstacle-picker {
+  position: absolute;
+  bottom: 56px;
+  left: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid #5b2222;
+  border-radius: 8px;
+  z-index: 20;
+}
+
+.obstacle-picker h2 {
+  margin: 0 0 4px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #ff9a9a;
+}
+
+.kind-btn {
+  text-align: left;
+  font-size: 12px;
+  padding: 4px 8px;
+  background: #1c222b;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.kind-btn.active {
+  border-color: #ff3030;
+  color: #ff9a9a;
+}
+
+.tile-edit-note {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.tile-edit-note input {
+  flex: 1;
+  min-width: 0;
+  background: #1c222b;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
 .legend {
   position: absolute;
   bottom: 12px;
