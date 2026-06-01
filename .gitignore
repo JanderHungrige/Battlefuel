@@ -18,6 +18,15 @@ __pycache__/
 *.egg-info/
 .coverage
 
+# Generated map-data intermediates (regenerate via backend/scripts/build_basemap.sh)
+# The final data/hohenfels.pmtiles IS committed so the app runs offline out-of-the-box.
+/data/*.osm
+/data/*.osm.pbf
+/data/*.geojson
+
+# Frontend: the basemap is copied here from data/ by sync:assets (don't double-commit)
+/frontend/public/hohenfels.pmtiles
+
 # Claude
 CLAUDE.local.md
 
