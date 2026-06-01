@@ -31,10 +31,10 @@ follows the road network (road speed + normal consumption); off-road movement is
 ## Features
 | # | Feature | Doc | Status | Depends on |
 |---|---------|-----|--------|------------|
-| 1 | routing-graph | — | planned | — |
-| 2 | route-planning-api | — | planned | routing-graph |
-| 3 | move-orders | — | planned | route-planning-api |
-| 4 | sim-engine | — | planned | move-orders |
+| 1 | routing-graph | docs/11-routing-graph.md | complete | — |
+| 2 | route-planning-api | docs/12-route-planning-api.md | complete | routing-graph |
+| 3 | move-orders | docs/13-move-orders.md | complete | route-planning-api |
+| 4 | sim-engine | docs/14-sim-engine.md | complete | move-orders |
 | 5 | move-planning-ui | — | planned | route-planning-api, move-orders |
 | 6 | live-movement-ui | — | planned | sim-engine, move-planning-ui |
 

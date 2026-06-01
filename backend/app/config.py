@@ -32,6 +32,17 @@ class Settings(BaseSettings):
     # Provider the factory builds for placed unit instances (Wave 2 ships "db").
     unit_instance_provider: str = "db"
 
+    # Provider the factory builds for routing (Wave 3 ships "pgrouting").
+    routing_provider: str = "pgrouting"
+
+    # Provider the factory builds for move orders (Wave 3 ships "db").
+    move_order_provider: str = "db"
+
+    # Simulation game-time scale (1 real second = sim_time_scale game seconds).
+    sim_time_scale: float = 60.0
+    # Simulation tick interval in real seconds.
+    sim_tick_seconds: float = 1.0
+
     # Browser origins allowed to call the API (CORS). Dev defaults to the Vite server.
     cors_origins: list[str] = [
         "http://localhost:5173",
