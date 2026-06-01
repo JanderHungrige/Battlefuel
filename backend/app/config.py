@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     # Provider the factory builds for manual obstacles (Wave 4 ships "db").
     obstacle_provider: str = "db"
 
+    # Provider the factory builds for fuel depots + stock (Wave 5 ships "db").
+    supply_provider: str = "db"
+
     # Random event engine (Wave 4): master toggle + mean interval between events in game-seconds.
     game_mode: bool = True
     event_mean_interval_game_s: float = 120.0

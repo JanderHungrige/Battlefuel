@@ -56,7 +56,7 @@ optimization/fuel-order algorithm (OR-Tools) — Wave 5 ships a clearly-seamed p
 ## Features
 | # | Feature | Doc | Status | Depends on |
 |---|---------|-----|--------|------------|
-| 1 | fuel-supply-model        | — | planned | — |
+| 1 | fuel-supply-model        | docs/24-fuel-supply-model.md | complete | — |
 | 2 | supply-stock-api         | — | planned | fuel-supply-model |
 | 3 | refuel-orders            | — | planned | fuel-supply-model |
 | 4 | buy-orders               | — | planned | fuel-supply-model |

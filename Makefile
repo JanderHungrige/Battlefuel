@@ -19,8 +19,8 @@ setup: ## First-time setup: Python venv + deps, frontend deps
 migrate: ## Apply database migrations
 	cd backend && .venv/bin/alembic upgrade head
 
-seed: ## Generate tiles + place demo units (idempotent)
-	cd backend && .venv/bin/python scripts/generate_tiles.py && .venv/bin/python scripts/seed_unit_instances.py
+seed: ## Generate tiles + place demo units + fuel depots (idempotent)
+	cd backend && .venv/bin/python scripts/generate_tiles.py && .venv/bin/python scripts/seed_unit_instances.py && .venv/bin/python scripts/seed_supply.py
 
 test: test-backend test-frontend ## Run all tests
 
