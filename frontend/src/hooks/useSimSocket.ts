@@ -13,7 +13,7 @@ import {
 } from './simSocket'
 
 const RECONNECT_MS = 2000
-const MAX_CHATTER = 50 // keep only the most recent radio lines
+const MAX_CHATTER = 10 // FIFO: keep only the 10 most recent radio lines (oldest drop off)
 
 export interface SimSocketState {
   positions: Record<string, UnitUpdate>

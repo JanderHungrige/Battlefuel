@@ -107,6 +107,17 @@ describe('useSimSocket', () => {
     expect(result.current.chatter.at(-1)?.kind).toBe('order')
   })
 
+  it('keeps a FIFO of the 10 most recent chatter lines', () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket as unknown as typeof WebSocket)
+    const { result } = renderHook(() => useSimSocket())
+    act(() => {
+      for (let i = 1; i <= 12; i += 1) result.current.pushChatter(`m${i}`, 'order')
+    })
+    expect(result.current.chatter).toHaveLength(10)
+    expect(result.current.chatter[0].text).toBe('m3') // m1, m2 dropped off
+    expect(result.current.chatter.at(-1)?.text).toBe('m12')
+  })
+
   it('does not open a socket when disabled', () => {
     vi.stubGlobal('WebSocket', FakeWebSocket as unknown as typeof WebSocket)
     renderHook(() => useSimSocket(false))
