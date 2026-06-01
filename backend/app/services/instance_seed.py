@@ -1,9 +1,11 @@
 """Seed a small set of placed unit instances for the demo (Feature 4).
 
-Idempotent (insert ON CONFLICT DO NOTHING). Each placement references a catalog
-``UnitType`` id (validated against the unit provider) and is positioned inside the
-Hohenfels theater. One unit is left without telemetry (``current_fuel_liters = None``)
-to exercise the "no data → request manual update" path.
+Idempotent **reset** (insert ON CONFLICT DO UPDATE): re-seeding restores each placement to
+its canonical position/fuel/status, so the sim (which moves units and persists them) and
+tests start from a known state. Each placement references a catalog ``UnitType`` id
+(validated against the unit provider) and is positioned inside the Hohenfels theater. One
+unit is left without telemetry (``current_fuel_liters = None``) to exercise the
+"no data → request manual update" path.
 """
 
 from __future__ import annotations
@@ -46,7 +48,19 @@ async def seed_unit_instances(session: AsyncSession) -> int:
                 "current_fuel_liters": fuel,
             }
         )
-    stmt = pg_insert(UnitInstanceRow).values(rows).on_conflict_do_nothing(index_elements=["id"])
+    insert = pg_insert(UnitInstanceRow).values(rows)
+    stmt = insert.on_conflict_do_update(
+        index_elements=["id"],
+        set_={
+            "name": insert.excluded.name,
+            "unit_type_id": insert.excluded.unit_type_id,
+            "lat": insert.excluded.lat,
+            "lon": insert.excluded.lon,
+            "h3_index": insert.excluded.h3_index,
+            "status": insert.excluded.status,
+            "current_fuel_liters": insert.excluded.current_fuel_liters,
+        },
+    )
     await session.execute(stmt)
     await session.commit()
     return len(rows)

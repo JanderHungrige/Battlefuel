@@ -2,7 +2,8 @@
 // terrain colour scheme. Kept free of MapLibre/canvas so they are unit-testable.
 
 import type { FeatureCollection } from 'geojson'
-import type { TerrainType, Tile, UnitInstance } from '../api/types'
+import { cellToLatLng } from 'h3-js'
+import type { Obstacle, TerrainType, Tile, UnitInstance } from '../api/types'
 
 export const TERRAIN_COLORS: Record<TerrainType, string> = {
   open: '#3c4a30',
@@ -29,6 +30,8 @@ export function tilesToGeoJSON(tiles: Tile[]): FeatureCollection {
         h3_index: t.h3_index,
         terrain: t.terrain,
         threat_level: t.threat_level,
+        road_condition: t.road_condition,
+        intel_level: t.intel_level,
         color: TERRAIN_COLORS[t.terrain] ?? TERRAIN_COLORS.unknown,
       },
     })),
@@ -60,6 +63,21 @@ export function unitsToGeoJSON(
           sidc: sidcByType[u.unit_type_id] ?? '',
           moving: pos != null,
         },
+      }
+    }),
+  }
+}
+
+/** Obstacles → point FeatureCollection at each blocked cell's center. */
+export function obstaclesToGeoJSON(obstacles: Obstacle[]): FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: obstacles.map((o) => {
+      const [lat, lon] = cellToLatLng(o.h3_index)
+      return {
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [lon, lat] },
+        properties: { id: o.id },
       }
     }),
   }

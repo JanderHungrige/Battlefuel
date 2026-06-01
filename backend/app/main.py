@@ -14,6 +14,7 @@ from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.move_orders import router as move_orders_router
+from app.api.obstacles import router as obstacles_router
 from app.api.routes import router as routes_router
 from app.api.theater import router as theater_router
 from app.api.tiles import router as tiles_router
@@ -62,6 +63,7 @@ def create_app(enable_sim: bool = False) -> FastAPI:
     api_v1.include_router(theater_router)
     api_v1.include_router(routes_router)
     api_v1.include_router(move_orders_router)
+    api_v1.include_router(obstacles_router)
     api_v1.include_router(ws_router)
     app.include_router(api_v1)
     return app

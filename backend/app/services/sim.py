@@ -61,12 +61,24 @@ class SimStep:
     status: MoveOrderStatus
 
 
-def advance(order: MoveOrder, fuel_l: float, unit_type: UnitType, dt_game_s: float) -> SimStep:
-    """Advance ``order`` by ``dt_game_s`` of game-time at the unit's road speed."""
+def advance(
+    order: MoveOrder,
+    fuel_l: float,
+    unit_type: UnitType,
+    dt_game_s: float,
+    *,
+    speed_factor: float = 1.0,
+    fuel_factor: float = 1.0,
+) -> SimStep:
+    """Advance ``order`` by ``dt_game_s`` of game-time at the unit's tile-adjusted road speed.
+
+    ``speed_factor``/``fuel_factor`` come from the current tile (Wave 4 tile-cost-model):
+    speed 0 (blocked road) ⇒ the unit makes no progress this tick but still burns fuel.
+    """
     total = polyline_length_m(order.geometry)
-    speed_mps = unit_type.movement.speed_road_kph * 1000.0 / 3600.0
+    speed_mps = unit_type.movement.speed_road_kph * speed_factor * 1000.0 / 3600.0
     new_progress = order.progress_m + speed_mps * dt_game_s
-    burn = unit_type.fuel.consumption_normal_lph * (dt_game_s / 3600.0)
+    burn = unit_type.fuel.consumption_normal_lph * fuel_factor * (dt_game_s / 3600.0)
     new_fuel = max(0.0, fuel_l - burn)
     if new_progress >= total:
         end = order.geometry[-1] if order.geometry else [0.0, 0.0]

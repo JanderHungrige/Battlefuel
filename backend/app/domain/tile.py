@@ -54,6 +54,18 @@ class Cover(StrEnum):
     HEAVY = "heavy"
 
 
+class SectorSituation(StrEnum):
+    """Operator-set "what is happening" status for a sector (Wave 4)."""
+
+    QUIET = "quiet"
+    ENEMY_CONTACT = "enemy_contact"
+    UNDER_FIRE = "under_fire"
+    COMBAT = "combat"
+    SECURED = "secured"
+    SUPPLY_POINT = "supply_point"
+    MEDEVAC = "medevac"
+
+
 class Tile(BaseModel):
     """A single hex tile with its game attributes (API representation)."""
 
@@ -69,6 +81,8 @@ class Tile(BaseModel):
     weather: Weather
     road_condition: RoadCondition
     cover: Cover
+    situation: SectorSituation | None = None
+    note: str | None = None
     # Hex boundary as a closed ring of [lon, lat] pairs (GeoJSON order), derived from H3.
     boundary: list[list[float]]
 
@@ -76,3 +90,27 @@ class Tile(BaseModel):
     def boundary_for(h3_index: str) -> list[list[float]]:
         """Return the cell boundary as [lon, lat] pairs (H3 yields lat, lng)."""
         return [[lng, lat] for lat, lng in h3.cell_to_boundary(h3_index)]
+
+
+class TileMutation(BaseModel):
+    """A partial, runtime change to a tile's game attributes (Wave 4 dynamic-tile-updates).
+
+    Geographic fields (terrain, geometry) are immutable; only game state can change.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    threat_level: int | None = Field(default=None, ge=0, le=5)
+    road_condition: RoadCondition | None = None
+    intel_level: IntelLevel | None = None
+    weather: Weather | None = None
+    cover: Cover | None = None
+    situation: SectorSituation | None = None
+    note: str | None = Field(default=None, max_length=280)
+
+    def changes(self) -> dict[str, object]:
+        """Column → stored value for the set fields (enums stored as their string value)."""
+        out: dict[str, object] = {}
+        for field, value in self.model_dump(exclude_none=True).items():
+            out[field] = value.value if isinstance(value, StrEnum) else value
+        return out

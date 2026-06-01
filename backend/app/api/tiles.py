@@ -8,10 +8,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.ws import manager
 from app.db import get_session
 from app.domain.theater import BBox
-from app.domain.tile import Tile
+from app.domain.tile import Tile, TileMutation
 from app.providers.tiles import TileDataProvider, build_tile_provider
+from app.services.tile_mutation import apply_tile_mutation, tile_update_frame
 
 router = APIRouter(tags=["tiles"])
 
@@ -57,4 +59,19 @@ async def get_tile(h3_index: str, session: SessionDep, provider: TileProviderDep
     tile = await provider.get_tile(session, h3_index)
     if tile is None:
         raise HTTPException(status_code=404, detail=f"tile {h3_index!r} not found")
+    return tile
+
+
+@router.patch("/tiles/{h3_index}")
+async def mutate_tile(
+    h3_index: str,
+    mutation: TileMutation,
+    session: SessionDep,
+    provider: TileProviderDep,
+) -> Tile:
+    """Apply a runtime mutation to a tile, re-cost its edges, and broadcast ``tile_update``."""
+    tile = await apply_tile_mutation(session, provider, h3_index, mutation)
+    if tile is None:
+        raise HTTPException(status_code=404, detail=f"tile {h3_index!r} not found")
+    await manager.broadcast(tile_update_frame(tile))
     return tile

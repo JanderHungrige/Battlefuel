@@ -73,6 +73,21 @@ class TestAdvance:
         step = advance(_order(), fuel_l=5.0, unit_type=_ARMOR, dt_game_s=100_000)
         assert step.fuel_l == 0.0
 
+    def test_speed_factor_scales_progress(self) -> None:
+        full = advance(_order(), fuel_l=18000, unit_type=_ARMOR, dt_game_s=30, speed_factor=1.0)
+        half = advance(_order(), fuel_l=18000, unit_type=_ARMOR, dt_game_s=30, speed_factor=0.5)
+        assert half.progress_m == pytest.approx(full.progress_m / 2, rel=1e-6)
+
+    def test_blocked_speed_factor_makes_no_progress_but_burns_fuel(self) -> None:
+        step = advance(_order(), fuel_l=18000, unit_type=_ARMOR, dt_game_s=30, speed_factor=0.0)
+        assert step.progress_m == 0.0
+        assert step.fuel_l < 18000  # stuck on a blocked road still idles fuel
+
+    def test_fuel_factor_increases_burn(self) -> None:
+        base = advance(_order(), fuel_l=18000, unit_type=_ARMOR, dt_game_s=30, fuel_factor=1.0)
+        heavy = advance(_order(), fuel_l=18000, unit_type=_ARMOR, dt_game_s=30, fuel_factor=1.3)
+        assert (18000 - heavy.fuel_l) == pytest.approx((18000 - base.fuel_l) * 1.3, rel=1e-6)
+
 
 class _FakeWS:
     def __init__(self, *, fail: bool = False) -> None:

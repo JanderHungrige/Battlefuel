@@ -58,6 +58,66 @@ describe('useSimSocket', () => {
     expect(result.current.positions['inst-1'].lon).toBe(5)
   })
 
+  it('routes tile_update frames into tileUpdates', () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket as unknown as typeof WebSocket)
+    const { result } = renderHook(() => useSimSocket())
+    const ws = FakeWebSocket.last
+    const tile = JSON.stringify({
+      type: 'tile_update',
+      h3_index: '8811aa',
+      terrain: 'forest',
+      threat_level: 4,
+      road_condition: 'damaged',
+      intel_level: 'high',
+      weather: 'clear',
+      cover: 'none',
+    })
+    act(() => ws?.onmessage?.({ data: tile }))
+    expect(result.current.tileUpdates['8811aa'].threat_level).toBe(4)
+    expect(result.current.positions).toEqual({})
+  })
+
+  it('logs a chatter line for each tile_update, carrying its h3_index', () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket as unknown as typeof WebSocket)
+    const { result } = renderHook(() => useSimSocket())
+    const ws = FakeWebSocket.last
+    const frame = (h3: string, threat: number): string =>
+      JSON.stringify({
+        type: 'tile_update',
+        h3_index: h3,
+        terrain: 'forest',
+        threat_level: threat,
+        road_condition: 'clear',
+        intel_level: 'low',
+        weather: 'clear',
+        cover: 'none',
+        situation: null,
+        note: null,
+      })
+    act(() => ws?.onmessage?.({ data: frame('cell-hi', 4) }))
+    expect(result.current.chatter).toHaveLength(1)
+    expect(result.current.chatter[0].h3_index).toBe('cell-hi')
+    expect(result.current.chatter[0].text).toContain('threat 4/5')
+  })
+
+  it('pushChatter adds an order line', () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket as unknown as typeof WebSocket)
+    const { result } = renderHook(() => useSimSocket())
+    act(() => result.current.pushChatter('Move order confirmed', 'order'))
+    expect(result.current.chatter.at(-1)?.kind).toBe('order')
+  })
+
+  it('keeps a FIFO of the 10 most recent chatter lines', () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket as unknown as typeof WebSocket)
+    const { result } = renderHook(() => useSimSocket())
+    act(() => {
+      for (let i = 1; i <= 12; i += 1) result.current.pushChatter(`m${i}`, 'order')
+    })
+    expect(result.current.chatter).toHaveLength(10)
+    expect(result.current.chatter[0].text).toBe('m3') // m1, m2 dropped off
+    expect(result.current.chatter.at(-1)?.text).toBe('m12')
+  })
+
   it('does not open a socket when disabled', () => {
     vi.stubGlobal('WebSocket', FakeWebSocket as unknown as typeof WebSocket)
     renderHook(() => useSimSocket(false))

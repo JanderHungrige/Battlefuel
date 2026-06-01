@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+from random import Random
 
 import h3
 from sqlalchemy import update
@@ -20,8 +21,15 @@ from app.db import get_session_maker
 from app.models.unit_instance import UnitInstanceRow
 from app.providers.factory import build_unit_provider
 from app.providers.move_orders import build_move_order_provider
+from app.providers.tile_feed import TileFeedProvider, build_tile_feed_provider, due_events
+from app.providers.tiles import build_tile_provider
+from app.services.cost_model import TileFactors, tile_factors
+from app.services.event_engine import EventEngine
 from app.services.sim import advance
 from app.services.tile_grid import DEFAULT_RESOLUTION
+from app.services.tile_mutation import apply_tile_mutation, tile_update_frame
+
+_NEUTRAL_FACTORS = TileFactors(speed_factor=1.0, fuel_factor=1.0)
 
 
 class SimEngine:
@@ -31,6 +39,7 @@ class SimEngine:
         self._manager = manager
         self._task: asyncio.Task[None] | None = None
         self._stop = asyncio.Event()
+        self._game_s = 0.0  # cumulative game-time, drives the scripted tile feed
 
     async def start(self) -> None:
         self._stop.clear()
@@ -46,20 +55,48 @@ class SimEngine:
     async def _run(self) -> None:
         settings = get_settings()
         maker = get_session_maker()
+        feed = build_tile_feed_provider()
+        events = EventEngine(
+            Random(),
+            mean_interval_game_s=settings.event_mean_interval_game_s,
+            enabled=settings.game_mode,
+        )
         dt_game = settings.sim_tick_seconds * settings.sim_time_scale
         while not self._stop.is_set():
             try:
                 async with maker() as session:
+                    prev_game_s = self._game_s
+                    self._game_s += dt_game
                     await self.tick(session, dt_game)
+                    await self.apply_feed(session, feed, prev_game_s, self._game_s)
+                    await events.step(
+                        session, build_tile_provider(), self._manager, self._game_s, dt_game
+                    )
             except Exception:
                 pass
             with contextlib.suppress(asyncio.TimeoutError):
                 await asyncio.wait_for(self._stop.wait(), timeout=settings.sim_tick_seconds)
 
+    async def apply_feed(
+        self, session: AsyncSession, feed: TileFeedProvider, prev_s: float, now_s: float
+    ) -> int:
+        """Apply scripted-feed events that came due in (prev_s, now_s]; broadcast each. Public
+        for testing. Returns the number of mutations applied."""
+        tiles = build_tile_provider()
+        applied = 0
+        for ev in due_events(feed.events(), prev_s, now_s):
+            cell = h3.latlng_to_cell(ev.lat, ev.lon, DEFAULT_RESOLUTION)
+            tile = await apply_tile_mutation(session, tiles, cell, ev.mutation)
+            if tile is not None:
+                await self._manager.broadcast(tile_update_frame(tile))
+                applied += 1
+        return applied
+
     async def tick(self, session: AsyncSession, dt_game_s: float) -> None:
         """Advance every active order by one game-time step. Public for testing."""
         orders = build_move_order_provider()
         units = build_unit_provider()
+        tiles = build_tile_provider()
         for order in await orders.list_active(session):
             row = await session.get(UnitInstanceRow, order.instance_id)
             if row is None:
@@ -72,7 +109,18 @@ class SimEngine:
                 if row.current_fuel_liters is not None
                 else unit_type.fuel.capacity_liters
             )
-            step = advance(order, fuel, unit_type, dt_game_s)
+            tile = await tiles.get_tile(session, row.h3_index) if row.h3_index else None
+            factors = (
+                tile_factors(tile.terrain, tile.road_condition) if tile else _NEUTRAL_FACTORS
+            )
+            step = advance(
+                order,
+                fuel,
+                unit_type,
+                dt_game_s,
+                speed_factor=factors.speed_factor,
+                fuel_factor=factors.fuel_factor,
+            )
             await orders.set_progress(session, order.id, step.progress_m, step.status)
             await session.execute(
                 update(UnitInstanceRow)

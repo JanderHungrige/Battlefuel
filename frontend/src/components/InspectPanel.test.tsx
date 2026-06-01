@@ -108,4 +108,17 @@ describe('InspectPanel', () => {
     render(<InspectPanel unit={unit()} unitType={unitType} onClose={() => {}} />)
     expect(screen.queryByTestId('inspect-live')).not.toBeInTheDocument()
   })
+
+  it('shows tile-edit controls and emits a threat mutation on click', () => {
+    const onMutateTile = vi.fn()
+    render(<InspectPanel tile={tile} onMutateTile={onMutateTile} onClose={() => {}} />)
+    expect(screen.getByTestId('tile-edit')).toBeInTheDocument()
+    screen.getByTestId('set-threat-4').click()
+    expect(onMutateTile).toHaveBeenCalledWith('8811aa', { threat_level: 4 })
+  })
+
+  it('omits tile-edit controls when onMutateTile is not provided', () => {
+    render(<InspectPanel tile={tile} onClose={() => {}} />)
+    expect(screen.queryByTestId('tile-edit')).not.toBeInTheDocument()
+  })
 })

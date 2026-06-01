@@ -27,6 +27,10 @@ class RoutePath(BaseModel):
     metric: RouteMetric
     geometry: list[list[float]] = Field(description="Ordered [lon, lat] points along the path")
     distance_m: float = Field(ge=0)
+    # Terrain-aware sums over the path's edges (Wave 4 tile-cost-model). Default 0 ⇒ the planner
+    # falls back to distance_m for paths computed before annotation.
+    effective_distance_m: float = Field(default=0.0, ge=0, description="Σ time_cost (time-proxy)")
+    fuel_distance_m: float = Field(default=0.0, ge=0, description="Σ fuel_factor·time_cost")
     threat_max: int = Field(ge=0)
     threat_avg: float = Field(ge=0)
 

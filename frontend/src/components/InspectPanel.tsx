@@ -1,6 +1,23 @@
 // Side panel showing details of the selected tile or unit instance.
 
-import type { MoveOrderStatus, Tile, UnitInstance, UnitType } from '../api/types'
+import type {
+  MoveOrderStatus,
+  SectorSituation,
+  Tile,
+  TileMutationRequest,
+  UnitInstance,
+  UnitType,
+} from '../api/types'
+
+const SITUATIONS: SectorSituation[] = [
+  'quiet',
+  'enemy_contact',
+  'under_fire',
+  'combat',
+  'secured',
+  'supply_point',
+  'medevac',
+]
 
 export interface LiveUnitState {
   fuel_l: number
@@ -14,7 +31,89 @@ interface InspectPanelProps {
   unit?: UnitInstance
   unitType?: UnitType
   live?: LiveUnitState
+  onMutateTile?: (h3Index: string, mutation: TileMutationRequest) => void
   onClose: () => void
+}
+
+function TileEdit({
+  tile,
+  onMutate,
+}: {
+  tile: Tile
+  onMutate: (h3Index: string, mutation: TileMutationRequest) => void
+}) {
+  return (
+    <div className="tile-edit" data-testid="tile-edit">
+      <h3>Edit sector</h3>
+      <div className="inspect-row">
+        <span className="inspect-label">Threat</span>
+        <span className="tile-edit-threat">
+          {[0, 1, 2, 3, 4, 5].map((n) => (
+            <button
+              key={n}
+              type="button"
+              className={`threat-btn${tile.threat_level === n ? ' active' : ''}`}
+              data-testid={`set-threat-${n}`}
+              onClick={() => onMutate(tile.h3_index, { threat_level: n })}
+            >
+              {n}
+            </button>
+          ))}
+        </span>
+      </div>
+      <label className="inspect-row">
+        <span className="inspect-label">Road</span>
+        <select
+          value={tile.road_condition}
+          data-testid="set-road"
+          onChange={(e) =>
+            onMutate(tile.h3_index, { road_condition: e.target.value as Tile['road_condition'] })
+          }
+        >
+          <option value="clear">clear</option>
+          <option value="damaged">damaged</option>
+          <option value="blocked">blocked</option>
+        </select>
+      </label>
+      <label className="inspect-row">
+        <span className="inspect-label">Situation</span>
+        <select
+          value={tile.situation ?? ''}
+          data-testid="set-situation"
+          onChange={(e) =>
+            e.target.value && onMutate(tile.h3_index, { situation: e.target.value as SectorSituation })
+          }
+        >
+          <option value="">—</option>
+          {SITUATIONS.map((s) => (
+            <option key={s} value={s}>
+              {s.replace(/_/g, ' ')}
+            </option>
+          ))}
+        </select>
+      </label>
+      <form
+        className="tile-edit-note"
+        onSubmit={(e) => {
+          e.preventDefault()
+          const input = e.currentTarget.elements.namedItem('note') as HTMLInputElement
+          onMutate(tile.h3_index, { note: input.value })
+        }}
+      >
+        <input
+          name="note"
+          type="text"
+          maxLength={280}
+          placeholder="Add note…"
+          defaultValue={tile.note ?? ''}
+          data-testid="set-note-input"
+        />
+        <button type="submit" data-testid="set-note-submit">
+          Save
+        </button>
+      </form>
+    </div>
+  )
 }
 
 function Row({ label, value }: { label: string; value: string | number }) {
@@ -26,7 +125,14 @@ function Row({ label, value }: { label: string; value: string | number }) {
   )
 }
 
-export function InspectPanel({ tile, unit, unitType, live, onClose }: InspectPanelProps) {
+export function InspectPanel({
+  tile,
+  unit,
+  unitType,
+  live,
+  onMutateTile,
+  onClose,
+}: InspectPanelProps) {
   if (!tile && !unit) return null
 
   return (
@@ -45,6 +151,7 @@ export function InspectPanel({ tile, unit, unitType, live, onClose }: InspectPan
           <Row label="Road" value={tile.road_condition} />
           <Row label="Cover" value={tile.cover} />
           <Row label="H3" value={tile.h3_index} />
+          {onMutateTile && <TileEdit tile={tile} onMutate={onMutateTile} />}
         </>
       )}
 

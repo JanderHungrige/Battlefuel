@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { Tile, UnitInstance } from '../api/types'
+import { latLngToCell } from 'h3-js'
 import {
   TERRAIN_COLORS,
   activeRoutesToGeoJSON,
   destinationToGeoJSON,
+  obstaclesToGeoJSON,
   routeToGeoJSON,
   tilesToGeoJSON,
   unitsToGeoJSON,
@@ -48,6 +50,13 @@ describe('tilesToGeoJSON', () => {
     expect(ring[0]).toEqual(ring[ring.length - 1]) // closed
     expect(fc.features[0].properties?.color).toBe(TERRAIN_COLORS.forest)
   })
+
+  it('carries threat/road/intel in properties for the hover tooltip', () => {
+    const props = tilesToGeoJSON([tile]).features[0].properties
+    expect(props?.threat_level).toBe(2)
+    expect(props?.road_condition).toBe('clear')
+    expect(props?.intel_level).toBe('low')
+  })
 })
 
 describe('unitsToGeoJSON', () => {
@@ -72,6 +81,23 @@ describe('unitsToGeoJSON', () => {
     const fc = unitsToGeoJSON([unit], {}, { other: { lat: 0, lon: 0 } })
     expect(fc.features[0].geometry).toEqual({ type: 'Point', coordinates: [11.86, 49.23] })
     expect(fc.features[0].properties?.moving).toBe(false)
+  })
+})
+
+describe('obstaclesToGeoJSON', () => {
+  it('places a point at each obstacle cell center', () => {
+    const cell = latLngToCell(49.2, 11.85, 8)
+    const fc = obstaclesToGeoJSON([{ id: 'ob1', h3_index: cell, kind: 'manual' }])
+    expect(fc.features).toHaveLength(1)
+    expect(fc.features[0].geometry.type).toBe('Point')
+    const [lon, lat] = fc.features[0].geometry.type === 'Point' ? fc.features[0].geometry.coordinates : [0, 0]
+    expect(lon).toBeCloseTo(11.85, 1)
+    expect(lat).toBeCloseTo(49.2, 1)
+    expect(fc.features[0].properties?.id).toBe('ob1')
+  })
+
+  it('is empty when there are no obstacles', () => {
+    expect(obstaclesToGeoJSON([]).features).toHaveLength(0)
   })
 })
 

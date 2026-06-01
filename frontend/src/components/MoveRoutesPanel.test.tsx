@@ -63,6 +63,17 @@ describe('MoveRoutesPanel', () => {
     expect(screen.queryByTestId('route-low-fuel-fast')).not.toBeInTheDocument()
   })
 
+  it('warns when a route crosses a high-threat sector', () => {
+    setup({
+      options: [
+        { ...fastest, threat_max: 4 },
+        { ...safest, threat_max: 1 },
+      ],
+    })
+    expect(screen.getByTestId('route-threat-fast')).toHaveTextContent('threat sector')
+    expect(screen.queryByTestId('route-threat-safe')).not.toBeInTheDocument()
+  })
+
   it('marks the selected option as pressed and selects another on click', () => {
     const props = setup()
     expect(screen.getByTestId('route-option-fast')).toHaveAttribute('aria-pressed', 'true')

@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { UnitUpdate } from '../api/types'
-import { applyUnitUpdate, parseUnitUpdate } from './simSocket'
+import type { TileUpdate, UnitUpdate } from '../api/types'
+import {
+  applyTileUpdate,
+  applyUnitUpdate,
+  describeTileUpdate,
+  parseTileUpdate,
+  parseUnitUpdate,
+} from './simSocket'
 
 const frame: UnitUpdate = {
   type: 'unit_update',
@@ -50,5 +56,52 @@ describe('applyUnitUpdate', () => {
     const prev = {}
     applyUnitUpdate(prev, frame)
     expect(prev).toEqual({})
+  })
+})
+
+const tileFrame: TileUpdate = {
+  type: 'tile_update',
+  h3_index: '8811aa',
+  terrain: 'forest',
+  threat_level: 4,
+  road_condition: 'damaged',
+  intel_level: 'high',
+  weather: 'clear',
+  cover: 'none',
+  situation: null,
+  note: null,
+}
+
+describe('parseTileUpdate', () => {
+  it('parses a valid tile_update frame', () => {
+    const parsed = parseTileUpdate(JSON.stringify(tileFrame))
+    expect(parsed?.h3_index).toBe('8811aa')
+    expect(parsed?.threat_level).toBe(4)
+  })
+
+  it('returns null for a unit_update frame or malformed json', () => {
+    expect(parseTileUpdate(JSON.stringify(frame))).toBeNull()
+    expect(parseTileUpdate('not json')).toBeNull()
+  })
+})
+
+describe('applyTileUpdate', () => {
+  it('keeps the latest frame per h3_index and does not mutate the input', () => {
+    const prev = {}
+    const s1 = applyTileUpdate(prev, tileFrame)
+    expect(s1['8811aa'].threat_level).toBe(4)
+    expect(prev).toEqual({})
+    const s2 = applyTileUpdate(s1, { ...tileFrame, threat_level: 1 })
+    expect(s2['8811aa'].threat_level).toBe(1)
+  })
+})
+
+describe('describeTileUpdate', () => {
+  it('summarizes threat and road, including situation/note when present', () => {
+    const text = describeTileUpdate({ ...tileFrame, threat_level: 4, situation: 'under_fire', note: 'ridge' })
+    expect(text).toContain('threat 4/5')
+    expect(text).toContain('road damaged')
+    expect(text).toContain('under fire')
+    expect(text).toContain('ridge')
   })
 })

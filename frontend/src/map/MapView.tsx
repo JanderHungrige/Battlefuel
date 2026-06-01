@@ -2,16 +2,18 @@
 // plus route/destination overlays for move planning. The map is created once and its
 // sources are updated imperatively, so overlays (and live motion) never tear it down.
 
+import { cellToLatLng } from 'h3-js'
 import maplibregl from 'maplibre-gl'
 import { Protocol } from 'pmtiles'
 import { useEffect, useRef } from 'react'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import type { Theater, Tile, UnitInstance, UnitType } from '../api/types'
+import type { Obstacle, Theater, Tile, UnitInstance, UnitType } from '../api/types'
 import { PMTILES_PATH } from '../config'
 import { buildBasemapStyle } from './basemapStyle'
 import {
   activeRoutesToGeoJSON,
   destinationToGeoJSON,
+  obstaclesToGeoJSON,
   routeToGeoJSON,
   tilesToGeoJSON,
   unitsToGeoJSON,
@@ -35,9 +37,14 @@ export interface MapViewProps {
   planning: boolean
   livePositions: Record<string, { lat: number; lon: number }>
   activeRoutes: number[][][]
+  obstacles: Obstacle[]
+  obstacleMode: boolean
+  highlightH3: string | null
   onSelectTile: (h3Index: string) => void
   onSelectUnit: (id: string) => void
   onPickDestination: (lat: number, lon: number) => void
+  onPlaceObstacle: (lat: number, lon: number) => void
+  onRemoveObstacle: (id: string) => void
   onClearSelection: () => void
 }
 
@@ -57,11 +64,29 @@ function initLayers(map: maplibregl.Map): void {
     source: 'tiles',
     paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.4 },
   })
+  // Threat overlay: red, opacity ramped by threat_level (0 → transparent, 5 → strong).
+  map.addLayer({
+    id: 'tiles-threat',
+    type: 'fill',
+    source: 'tiles',
+    paint: {
+      'fill-color': '#ff3030',
+      'fill-opacity': ['interpolate', ['linear'], ['get', 'threat_level'], 0, 0, 1, 0.12, 5, 0.55],
+    },
+  })
   map.addLayer({
     id: 'tiles-outline',
     type: 'line',
     source: 'tiles',
     paint: { 'line-color': '#5b6675', 'line-width': 0.5, 'line-opacity': 0.5 },
+  })
+  // Yellow highlight border for the sector referenced by a clicked chatter message.
+  map.addLayer({
+    id: 'tiles-highlight',
+    type: 'line',
+    source: 'tiles',
+    filter: ['==', ['get', 'h3_index'], ''],
+    paint: { 'line-color': '#ffd23f', 'line-width': 3 },
   })
 
   map.addSource('active-routes', { type: 'geojson', data: EMPTY })
@@ -102,6 +127,20 @@ function initLayers(map: maplibregl.Map): void {
     source: 'units',
     layout: { 'icon-image': ['get', 'sidc'], 'icon-size': 1, 'icon-allow-overlap': true },
   })
+
+  map.addSource('obstacles', { type: 'geojson', data: EMPTY })
+  map.addLayer({
+    id: 'obstacles',
+    type: 'circle',
+    source: 'obstacles',
+    paint: {
+      'circle-radius': 8,
+      'circle-color': '#ff3030',
+      'circle-opacity': 0.85,
+      'circle-stroke-width': 2,
+      'circle-stroke-color': '#0e1116',
+    },
+  })
 }
 
 function syncUnits(
@@ -124,6 +163,15 @@ function syncUnits(
 function wireInteraction(map: maplibregl.Map, propsRef: { current: MapViewProps }): void {
   map.on('click', (e) => {
     const p = propsRef.current
+    if (p.obstacleMode) {
+      const hitObs = map.queryRenderedFeatures(e.point, { layers: ['obstacles'] })
+      if (hitObs.length > 0) {
+        p.onRemoveObstacle(String(hitObs[0].properties?.id))
+        return
+      }
+      p.onPlaceObstacle(e.lngLat.lat, e.lngLat.lng)
+      return
+    }
     const hitUnits = map.queryRenderedFeatures(e.point, { layers: ['units'] })
     if (hitUnits.length > 0) {
       p.onSelectUnit(String(hitUnits[0].properties?.id))
@@ -144,6 +192,23 @@ function wireInteraction(map: maplibregl.Map, propsRef: { current: MapViewProps 
     map.on('mouseenter', layer, () => (map.getCanvas().style.cursor = 'pointer'))
     map.on('mouseleave', layer, () => (map.getCanvas().style.cursor = ''))
   }
+}
+
+/** Right-click info popup showing a hex's attributes (terrain, threat, road, intel). */
+function wireHover(map: maplibregl.Map): void {
+  const popup = new maplibregl.Popup({ closeButton: true, closeOnClick: true, className: 'hex-popup' })
+  map.on('contextmenu', 'tiles-fill', (e) => {
+    e.preventDefault()
+    const props = e.features?.[0]?.properties
+    if (!props) return
+    popup
+      .setLngLat(e.lngLat)
+      .setHTML(
+        `<b>${props.terrain}</b> · threat ${props.threat_level}/5<br>` +
+          `road ${props.road_condition} · intel ${props.intel_level}`,
+      )
+      .addTo(map)
+  })
 }
 
 export function MapView(props: MapViewProps) {
@@ -179,7 +244,9 @@ export function MapView(props: MapViewProps) {
       setData(map, 'active-routes', activeRoutesToGeoJSON(p.activeRoutes))
       setData(map, 'route', routeToGeoJSON(p.routeGeometry))
       setData(map, 'destination', destinationToGeoJSON(p.destination))
+      setData(map, 'obstacles', obstaclesToGeoJSON(p.obstacles))
       wireInteraction(map, propsRef)
+      wireHover(map)
       readyRef.current = true
     })
     mapRef.current = map
@@ -210,6 +277,19 @@ export function MapView(props: MapViewProps) {
     if (readyRef.current && mapRef.current)
       setData(mapRef.current, 'destination', destinationToGeoJSON(props.destination))
   }, [props.destination])
+  useEffect(() => {
+    if (readyRef.current && mapRef.current)
+      setData(mapRef.current, 'obstacles', obstaclesToGeoJSON(props.obstacles))
+  }, [props.obstacles])
+  useEffect(() => {
+    if (!readyRef.current || !mapRef.current) return
+    const map = mapRef.current
+    map.setFilter('tiles-highlight', ['==', ['get', 'h3_index'], props.highlightH3 ?? ''])
+    if (props.highlightH3) {
+      const [lat, lon] = cellToLatLng(props.highlightH3)
+      map.easeTo({ center: [lon, lat], duration: 600 })
+    }
+  }, [props.highlightH3])
 
   return (
     <div ref={containerRef} data-testid="map-container" style={{ width: '100%', height: '100%' }} />

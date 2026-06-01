@@ -15,6 +15,8 @@ interface MoveRoutesPanelProps {
   onCancel: () => void
 }
 
+const THREAT_WARN = 3 // route options at/above this max threat get a sector warning
+
 const km = (m: number): string => `${(m / 1000).toFixed(1)} km`
 const min = (s: number): string => `${Math.round(s / 60)} min`
 const liters = (l: number): string => `${Math.round(l).toLocaleString()} L`
@@ -44,6 +46,11 @@ function OptionCard({
         <span>left {liters(option.fuel_remaining_l)}</span>
         <span>threat {option.threat_max}</span>
       </span>
+      {option.threat_max >= THREAT_WARN && (
+        <span className="route-option-warning" data-testid={`route-threat-${option.metric}`}>
+          ⚠ crosses threat sector ({option.threat_max}/5)
+        </span>
+      )}
       {!option.sufficient_fuel && (
         <span className="route-option-warning" data-testid={`route-low-fuel-${option.metric}`}>
           ⚠ insufficient fuel
