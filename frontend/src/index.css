@@ -243,6 +243,102 @@ body {
   right: auto;
 }
 
+.advisor-panel {
+  position: absolute;
+  top: 12px;
+  right: 300px;
+  width: 300px;
+  max-height: calc(100% - 24px);
+  overflow-y: auto;
+  padding: 10px 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  z-index: 5;
+}
+
+.advisor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.advisor-head h2 {
+  margin: 0;
+  font-size: 14px;
+  color: var(--accent);
+}
+
+.advisor-head .ghost {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.advisor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.advisor-actions button {
+  padding: 4px 10px;
+  background: #1c222b;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.advisor-actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.advisor-summary {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.advice-rec {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+}
+
+.advice-rationale {
+  flex: 1;
+  font-size: 12px;
+}
+
+.advice-rec button {
+  padding: 2px 10px;
+  background: var(--accent);
+  color: #05080c;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.advisor-msg {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.advisor-msg.error {
+  color: #ff9a9a;
+}
+
 .unit-overview {
   position: absolute;
   top: 12px;

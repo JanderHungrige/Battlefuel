@@ -49,7 +49,7 @@ server-authoritative. **Deferred (later milestone):** ML predictions; auto-execu
 | 2 | refuel-optimizer         | docs/33-refuel-optimizer.md | complete | optimizer-foundation |
 | 3 | redistribution-optimizer | docs/34-redistribution-optimizer.md | complete | optimizer-foundation |
 | 4 | movement-route-advisor   | docs/35-movement-route-advisor.md | complete | optimizer-foundation |
-| 5 | advisor-ui               | — | planned | refuel-optimizer, redistribution-optimizer, movement-route-advisor |
+| 5 | advisor-ui               | docs/36-advisor-ui.md | complete | refuel-optimizer, redistribution-optimizer, movement-route-advisor |
 
 Build order: 1 → (2, 3, 4 after 1) → 5 (after 2, 3, 4).
 

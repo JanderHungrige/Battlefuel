@@ -2,6 +2,7 @@
 
 import { API_BASE } from '../config'
 import type {
+  AdviceResult,
   BuyOrder,
   CreateBuyOrderRequest,
   CreateMoveOrderRequest,
@@ -100,4 +101,13 @@ export const api = {
     postJson<RefuelOrder>(`/refuel-orders/${id}/confirm`),
   cancelRefuelOrder: (id: string): Promise<RefuelOrder> =>
     postJson<RefuelOrder>(`/refuel-orders/${id}/cancel`),
+
+  // Advice / optimization engine (Wave 6).
+  getReposition: (): Promise<AdviceResult> => getJson<AdviceResult>('/advice/reposition'),
+  getRefuelPlan: (): Promise<AdviceResult> => getJson<AdviceResult>('/advice/refuel-plan'),
+  getRedistribution: (): Promise<AdviceResult> => getJson<AdviceResult>('/advice/redistribution'),
+  getRouteAdvice: (instanceId: string, destLat: number, destLon: number): Promise<AdviceResult> =>
+    getJson<AdviceResult>(
+      `/advice/route?instance_id=${encodeURIComponent(instanceId)}&dest_lat=${destLat}&dest_lon=${destLon}`,
+    ),
 }

@@ -275,6 +275,24 @@ export interface RefuelOrderUpdate {
   transferred_liters: number
 }
 
+// --- Advice / optimization engine (Wave 6) ---
+
+export type RecommendationKind = 'route' | 'reposition' | 'refuel' | 'redistribution'
+
+export interface Recommendation {
+  kind: RecommendationKind
+  target: string
+  action: Record<string, unknown>
+  score: number
+  rationale: string
+}
+
+export interface AdviceResult {
+  kind: RecommendationKind
+  recommendations: Recommendation[]
+  summary: string | null
+}
+
 /** A scripted OF-8 strategic-support message broadcast over the WebSocket (Wave 5). */
 export interface StrategicMessage {
   type: 'strategic_message'

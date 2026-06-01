@@ -1,7 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { api } from './api/client'
-import { errorMessage } from './api/errors'
-import type { RouteMetric, RouteOption } from './api/types'
+import { AdvisorPanel } from './components/AdvisorPanel'
 import { ChatterLog } from './components/ChatterLog'
 import { InspectPanel } from './components/InspectPanel'
 import { MoveRoutesPanel } from './components/MoveRoutesPanel'
@@ -15,6 +13,8 @@ import { OSM_ATTRIBUTION } from './config'
 import { canShow, type Role } from './roles'
 import { useObstacleOps } from './hooks/useObstacleOps'
 import { useSimSocket } from './hooks/useSimSocket'
+import { useAdvisor } from './hooks/useAdvisor'
+import { useMovePlanning } from './hooks/useMovePlanning'
 import { useSupply } from './hooks/useSupply'
 import { useSupplyOrders } from './hooks/useSupplyOrders'
 import { useTheaterData } from './hooks/useTheaterData'
@@ -29,22 +29,8 @@ export default function App() {
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null)
   const [highlightH3, setHighlightH3] = useState<string | null>(null)
 
-  // Move planning.
-  const [destination, setDestination] = useState<{ lat: number; lon: number } | null>(null)
-  const [routeOptions, setRouteOptions] = useState<RouteOption[]>([])
-  const [selectedMetric, setSelectedMetric] = useState<RouteMetric | null>(null)
-  const [planLoading, setPlanLoading] = useState(false)
-  const [planError, setPlanError] = useState<string | null>(null)
-  const [confirming, setConfirming] = useState(false)
-
-  const [activeRoutes, setActiveRoutes] = useState<Record<string, number[][]>>({})
   const { positions: live, tileUpdates, chatter, strategic, pushChatter, supplyTick } =
     useSimSocket()
-
-  // OF-8 supply: distribution data + order actions.
-  const supply = useSupply(role === 'OF8', supplyTick)
-  const supplyOrders = useSupplyOrders(units, unitTypes, pushChatter, supply.refetch)
-  const roster = useUnitOverview(setUnits)
 
   // Operator ops: obstacles + tile edits + the obstacle-placement mode and chosen kind.
   const { obstacles, placeObstacle, removeObstacle, mutateTile } = useObstacleOps()
@@ -72,10 +58,18 @@ export default function App() {
     () => unitTypes.find((ut) => ut.id === selectedUnit?.unit_type_id),
     [unitTypes, selectedUnit],
   )
-  const routeGeometry = useMemo(
-    () => routeOptions.find((o) => o.metric === selectedMetric)?.geometry ?? null,
-    [routeOptions, selectedMetric],
-  )
+
+  // Move planning (destination, route options, confirm) lives in its own hook.
+  const planning = useMovePlanning(selectedUnitId, selectedUnit?.name ?? null, live, pushChatter)
+
+  // OF-8 supply + advisor + unit roster.
+  const supply = useSupply(role === 'OF8', supplyTick)
+  const supplyOrders = useSupplyOrders(units, unitTypes, pushChatter, supply.refetch)
+  const roster = useUnitOverview(setUnits)
+  const advisor = useAdvisor(pushChatter, supply.refetch, {
+    instanceId: selectedUnitId,
+    destination: planning.destination,
+  })
 
   const livePositions = useMemo(() => {
     const out: Record<string, { lat: number; lon: number }> = {}
@@ -84,74 +78,14 @@ export default function App() {
     }
     return out
   }, [live])
-  const activeRouteGeometries = useMemo(
-    () =>
-      Object.entries(activeRoutes)
-        .filter(([instId]) => {
-          const u = live[instId]
-          return !(u && (u.status === 'complete' || u.status === 'cancelled'))
-        })
-        .map(([, geom]) => geom),
-    [activeRoutes, live],
-  )
   const selectedLive = selectedUnitId ? live[selectedUnitId] : undefined
-
-  const resetPlanning = useCallback(() => {
-    setDestination(null)
-    setRouteOptions([])
-    setSelectedMetric(null)
-    setPlanError(null)
-    setPlanLoading(false)
-  }, [])
 
   const clear = useCallback(() => {
     setSelectedTileH3(null)
     setSelectedUnitId(null)
     setHighlightH3(null)
-    resetPlanning()
-  }, [resetPlanning])
-
-  const pickDestination = useCallback(
-    (lat: number, lon: number) => {
-      if (!selectedUnitId) return
-      setDestination({ lat, lon })
-      setRouteOptions([])
-      setSelectedMetric(null)
-      setPlanError(null)
-      setPlanLoading(true)
-      api
-        .planRoute({ instance_id: selectedUnitId, dest_lat: lat, dest_lon: lon })
-        .then((opts) => {
-          setRouteOptions(opts)
-          setSelectedMetric(opts[0]?.metric ?? null)
-        })
-        .catch((e: unknown) => setPlanError(errorMessage(e)))
-        .finally(() => setPlanLoading(false))
-    },
-    [selectedUnitId],
-  )
-
-  const confirmMove = useCallback(() => {
-    if (!selectedUnitId || !destination || !selectedMetric) return
-    setConfirming(true)
-    setPlanError(null)
-    const name = selectedUnit?.name ?? selectedUnitId
-    api
-      .createMoveOrder({
-        instance_id: selectedUnitId,
-        dest_lat: destination.lat,
-        dest_lon: destination.lon,
-        metric: selectedMetric,
-      })
-      .then((order) => api.confirmMoveOrder(order.id))
-      .then((order) => {
-        setActiveRoutes((prev) => ({ ...prev, [order.instance_id]: order.geometry }))
-        pushChatter(`Move order confirmed: ${name} (${order.metric})`, 'order')
-        clear()
-      })
-      .catch((e: unknown) => setPlanError(errorMessage(e)))
-      .finally(() => setConfirming(false))
-  }, [selectedUnitId, selectedUnit, destination, selectedMetric, clear, pushChatter])
+    planning.resetPlanning()
+  }, [planning])
 
   const ready = theater !== null
   // Obstacle placement is an OF-4 tactical tool; never active in the OF-8 supply view.
@@ -170,6 +104,15 @@ export default function App() {
             onClick={roster.toggle}
           >
             Units
+          </button>
+        )}
+        {theater && canShow(role, 'advisor') && (
+          <button
+            className={`mode-toggle${advisor.open ? ' active' : ''}`}
+            data-testid="advisor-toggle"
+            onClick={advisor.toggle}
+          >
+            Advisor
           </button>
         )}
         {theater && canShow(role, 'obstacleMode') && (
@@ -194,11 +137,11 @@ export default function App() {
               tiles={displayedTiles}
               units={units}
               unitTypes={unitTypes}
-              routeGeometry={routeGeometry}
-              destination={destination}
+              routeGeometry={planning.routeGeometry}
+              destination={planning.destination}
               planning={selectedUnitId !== null}
               livePositions={livePositions}
-              activeRoutes={activeRouteGeometries}
+              activeRoutes={planning.activeRouteGeometries}
               obstacles={obstacles}
               obstacleMode={obstacleActive}
               depots={canShow(role, 'depotOverlay') ? supply.depots : []}
@@ -208,15 +151,15 @@ export default function App() {
               onRemoveObstacle={removeObstacle}
               onSelectTile={(h3) => {
                 setSelectedUnitId(null)
-                resetPlanning()
+                planning.resetPlanning()
                 setSelectedTileH3(h3)
               }}
               onSelectUnit={(id) => {
                 setSelectedTileH3(null)
-                resetPlanning()
+                planning.resetPlanning()
                 setSelectedUnitId(id)
               }}
-              onPickDestination={pickDestination}
+              onPickDestination={planning.pickDestination}
               onClearSelection={clear}
             />
             {canShow(role, 'terrainLegend') && <TerrainLegend />}
@@ -250,14 +193,26 @@ export default function App() {
             {canShow(role, 'moveRoutes') && selectedUnit && (
               <MoveRoutesPanel
                 unitName={selectedUnit.name}
-                loading={planLoading}
-                error={planError}
-                options={routeOptions}
-                selectedMetric={selectedMetric}
-                confirming={confirming}
-                onSelectOption={setSelectedMetric}
-                onConfirm={confirmMove}
+                loading={planning.planLoading}
+                error={planning.planError}
+                options={planning.routeOptions}
+                selectedMetric={planning.selectedMetric}
+                confirming={planning.confirming}
+                onSelectOption={planning.setSelectedMetric}
+                onConfirm={() => planning.confirmMove(clear)}
                 onCancel={clear}
+              />
+            )}
+            {canShow(role, 'advisor') && advisor.open && (
+              <AdvisorPanel
+                result={advisor.result}
+                loading={advisor.loading}
+                error={advisor.error}
+                busy={advisor.busy}
+                canRoute={selectedUnitId !== null && planning.destination !== null}
+                onRequest={advisor.request}
+                onApply={advisor.apply}
+                onClose={advisor.toggle}
               />
             )}
             {canShow(role, 'unitOverview') && roster.open && (
