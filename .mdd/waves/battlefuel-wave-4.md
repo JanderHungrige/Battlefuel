@@ -48,7 +48,7 @@ follows the road network (off-road out of scope).
 | 2 | dynamic-tile-updates | docs/18-dynamic-tile-updates.md | complete | tile-cost-model |
 | 3 | manual-obstacles     | docs/19-manual-obstacles.md | complete | tile-cost-model |
 | 4 | event-engine         | docs/20-event-engine.md | complete | dynamic-tile-updates |
-| 5 | threat-planning-ui   | docs/21-threat-planning-ui.md | active | dynamic-tile-updates |
+| 5 | threat-planning-ui   | — | planned | dynamic-tile-updates |
 | 6 | obstacle-tile-ops-ui | — | planned | manual-obstacles, threat-planning-ui |
 
 Build order: 1 → 2 → 3 → 4 → 5 (after 2) → 6 (after 3, 5).
