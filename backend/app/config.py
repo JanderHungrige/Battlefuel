@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     # Scripted "incoming sector info" tile feed (Wave 4): "scripted" or "none".
     tile_feed_provider: str = "scripted"
 
+    # Provider the factory builds for manual obstacles (Wave 4 ships "db").
+    obstacle_provider: str = "db"
+
     # Simulation game-time scale (1 real second = sim_time_scale game seconds).
     sim_time_scale: float = 60.0
     # Simulation tick interval in real seconds.

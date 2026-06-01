@@ -60,10 +60,12 @@ class PgRoutingProvider(RoutingProvider):
         dest_lon: float,
         metric: RouteMetric,
     ) -> RoutePath | None:
+        # Exclude impassable (blocked) edges and any edge in a cell with a manual obstacle.
         edges_sql = (
             f"SELECT gid AS id, source, target, {_COST_COLUMN[metric]} AS cost, "
             f"{_RCOST_COLUMN[metric]} AS reverse_cost FROM ways "
-            f"WHERE COALESCE(time_cost, length_m) < {_BLOCKED_COST}"
+            f"WHERE COALESCE(time_cost, length_m) < {_BLOCKED_COST} "
+            f"AND (cell_h3 IS NULL OR cell_h3 NOT IN (SELECT h3_index FROM obstacles))"
         )
         query = text(
             """

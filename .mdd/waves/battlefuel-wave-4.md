@@ -46,8 +46,8 @@ follows the road network (off-road out of scope).
 |---|---------|-----|--------|------------|
 | 1 | tile-cost-model      | docs/17-tile-cost-model.md | complete | — |
 | 2 | dynamic-tile-updates | docs/18-dynamic-tile-updates.md | complete | tile-cost-model |
-| 3 | manual-obstacles     | docs/19-manual-obstacles.md | active | tile-cost-model |
-| 4 | event-engine         | — | planned | dynamic-tile-updates |
+| 3 | manual-obstacles     | docs/19-manual-obstacles.md | complete | tile-cost-model |
+| 4 | event-engine         | docs/20-event-engine.md | active | dynamic-tile-updates |
 | 5 | threat-planning-ui   | — | planned | dynamic-tile-updates |
 | 6 | obstacle-tile-ops-ui | — | planned | manual-obstacles, threat-planning-ui |
 
