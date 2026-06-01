@@ -13,6 +13,7 @@ from contextlib import asynccontextmanager
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.buy_orders import router as buy_orders_router
 from app.api.move_orders import router as move_orders_router
 from app.api.obstacles import router as obstacles_router
 from app.api.refuel_orders import router as refuel_orders_router
@@ -68,6 +69,7 @@ def create_app(enable_sim: bool = False) -> FastAPI:
     api_v1.include_router(obstacles_router)
     api_v1.include_router(supply_router)
     api_v1.include_router(refuel_orders_router)
+    api_v1.include_router(buy_orders_router)
     api_v1.include_router(ws_router)
     app.include_router(api_v1)
     return app

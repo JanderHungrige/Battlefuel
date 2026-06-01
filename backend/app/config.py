@@ -53,6 +53,12 @@ class Settings(BaseSettings):
     # Refuel truck-selection strategy (Wave 5 ships "nearest"; "ortools" arrives in Wave 6).
     refuel_recommender: str = "nearest"
 
+    # Provider the factory builds for buy orders (Wave 5 ships "db").
+    buy_order_provider: str = "db"
+
+    # Default fuel-procurement lead time in game-seconds (overridable per buy order).
+    buy_order_lead_time_game_s: float = 600.0
+
     # Random event engine (Wave 4): master toggle + mean interval between events in game-seconds.
     game_mode: bool = True
     event_mean_interval_game_s: float = 120.0
