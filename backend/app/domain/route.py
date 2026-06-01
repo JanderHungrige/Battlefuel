@@ -1,0 +1,48 @@
+"""Routing domain models (Wave 3).
+
+``RoutePath`` is the raw output of the routing graph (Feature routing-graph): the path
+geometry plus distance and threat aggregates. ``RouteOption`` (Feature route-planning-api)
+layers unit-specific duration and fuel on top.
+"""
+
+from __future__ import annotations
+
+from enum import StrEnum
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class RouteMetric(StrEnum):
+    """Which cost the router minimizes."""
+
+    FAST = "fast"  # minimize distance (≈ time at constant unit speed)
+    SAFE = "safe"  # minimize threat-weighted distance
+
+
+class RoutePath(BaseModel):
+    """A computed path through the road graph."""
+
+    model_config = ConfigDict(frozen=True)
+
+    metric: RouteMetric
+    geometry: list[list[float]] = Field(description="Ordered [lon, lat] points along the path")
+    distance_m: float = Field(ge=0)
+    threat_max: int = Field(ge=0)
+    threat_avg: float = Field(ge=0)
+
+
+class RouteOption(BaseModel):
+    """A route presented to the commander: a path plus unit-specific time & fuel estimates."""
+
+    model_config = ConfigDict(frozen=True)
+
+    label: str  # "fastest" | "safest"
+    metric: RouteMetric
+    geometry: list[list[float]]
+    distance_m: float = Field(ge=0)
+    duration_s: float = Field(ge=0)
+    threat_max: int = Field(ge=0)
+    threat_avg: float = Field(ge=0)
+    fuel_consumed_l: float = Field(ge=0)
+    fuel_remaining_l: float = Field(ge=0)
+    sufficient_fuel: bool

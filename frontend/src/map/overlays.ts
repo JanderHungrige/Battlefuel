@@ -35,22 +35,80 @@ export function tilesToGeoJSON(tiles: Tile[]): FeatureCollection {
   }
 }
 
-/** Unit instances → point FeatureCollection carrying the APP-6 SIDC for rendering. */
+/**
+ * Unit instances → point FeatureCollection carrying the APP-6 SIDC for rendering.
+ * `live` overrides a unit's coordinates with its current simulated position (if present).
+ */
 export function unitsToGeoJSON(
   units: UnitInstance[],
   sidcByType: Record<string, string>,
+  live?: Record<string, { lat: number; lon: number }>,
 ): FeatureCollection {
   return {
     type: 'FeatureCollection',
-    features: units.map((u) => ({
-      type: 'Feature',
-      geometry: { type: 'Point', coordinates: [u.lon, u.lat] },
-      properties: {
-        id: u.id,
-        name: u.name,
-        status: u.status,
-        sidc: sidcByType[u.unit_type_id] ?? '',
+    features: units.map((u) => {
+      const pos = live?.[u.id]
+      const lon = pos ? pos.lon : u.lon
+      const lat = pos ? pos.lat : u.lat
+      return {
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [lon, lat] },
+        properties: {
+          id: u.id,
+          name: u.name,
+          status: u.status,
+          sidc: sidcByType[u.unit_type_id] ?? '',
+          moving: pos != null,
+        },
+      }
+    }),
+  }
+}
+
+/** Multiple active-route geometries → a LineString FeatureCollection. */
+export function activeRoutesToGeoJSON(geometries: number[][][]): FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: geometries
+      .filter((g) => g.length >= 2)
+      .map((g) => ({
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates: g },
+        properties: {},
+      })),
+  }
+}
+
+/** A planned/active route → a single LineString feature (empty collection when null). */
+export function routeToGeoJSON(geometry: number[][] | null | undefined): FeatureCollection {
+  if (!geometry || geometry.length < 2) {
+    return { type: 'FeatureCollection', features: [] }
+  }
+  return {
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates: geometry },
+        properties: {},
       },
-    })),
+    ],
+  }
+}
+
+/** A picked destination → a single Point feature (empty collection when null). */
+export function destinationToGeoJSON(
+  dest: { lat: number; lon: number } | null | undefined,
+): FeatureCollection {
+  if (!dest) return { type: 'FeatureCollection', features: [] }
+  return {
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [dest.lon, dest.lat] },
+        properties: {},
+      },
+    ],
   }
 }

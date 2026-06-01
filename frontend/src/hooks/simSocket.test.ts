@@ -1,0 +1,54 @@
+import { describe, expect, it, vi } from 'vitest'
+import type { UnitUpdate } from '../api/types'
+import { applyUnitUpdate, parseUnitUpdate } from './simSocket'
+
+const frame: UnitUpdate = {
+  type: 'unit_update',
+  instance_id: 'inst-1',
+  order_id: 'o1',
+  lat: 49.22,
+  lon: 11.85,
+  fuel_l: 1500,
+  status: 'active',
+  progress_m: 1200,
+  distance_m: 5000,
+}
+
+describe('parseUnitUpdate', () => {
+  it('parses a valid unit_update frame', () => {
+    const parsed = parseUnitUpdate(JSON.stringify(frame))
+    expect(parsed).not.toBeNull()
+    expect(parsed?.instance_id).toBe('inst-1')
+    expect(parsed?.fuel_l).toBe(1500)
+  })
+
+  it('returns null for a frame of the wrong type', () => {
+    expect(parseUnitUpdate(JSON.stringify({ type: 'pong' }))).toBeNull()
+  })
+
+  it('returns null when instance_id is missing', () => {
+    expect(parseUnitUpdate(JSON.stringify({ type: 'unit_update' }))).toBeNull()
+  })
+
+  it('logs and returns null for malformed JSON (does not throw)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    expect(parseUnitUpdate('not json')).toBeNull()
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+  })
+})
+
+describe('applyUnitUpdate', () => {
+  it('adds a new instance and replaces an older frame for the same instance', () => {
+    const s1 = applyUnitUpdate({}, frame)
+    expect(s1['inst-1'].progress_m).toBe(1200)
+    const s2 = applyUnitUpdate(s1, { ...frame, progress_m: 3400 })
+    expect(s2['inst-1'].progress_m).toBe(3400)
+  })
+
+  it('does not mutate the previous state', () => {
+    const prev = {}
+    applyUnitUpdate(prev, frame)
+    expect(prev).toEqual({})
+  })
+})

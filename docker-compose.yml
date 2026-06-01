@@ -3,7 +3,8 @@
 # (never committed) for anything non-local.
 services:
   db:
-    image: postgis/postgis:16-3.4
+    build: ./db
+    image: battlefuel-db:16-3.4-pgrouting
     container_name: battlefuel-db
     environment:
       POSTGRES_USER: ${BATTLEFUEL_DB_USER:-battlefuel}
@@ -13,6 +14,7 @@ services:
       - "${BATTLEFUEL_DB_PORT:-5432}:5432"
     volumes:
       - battlefuel-db-data:/var/lib/postgresql/data
+      - ./data:/data:ro   # OSM extract for osm2pgrouting (read-only)
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${BATTLEFUEL_DB_USER:-battlefuel}"]
       interval: 5s

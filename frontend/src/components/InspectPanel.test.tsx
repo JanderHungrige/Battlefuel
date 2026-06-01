@@ -88,4 +88,24 @@ describe('InspectPanel', () => {
     screen.getByLabelText('Close').click()
     expect(onClose).toHaveBeenCalledOnce()
   })
+
+  it('shows the live fuel and progress section while a unit is moving', () => {
+    render(
+      <InspectPanel
+        unit={unit()}
+        unitType={unitType}
+        live={{ fuel_l: 12345, progress_m: 1500, distance_m: 8000, status: 'active' }}
+        onClose={() => {}}
+      />,
+    )
+    const live = screen.getByTestId('inspect-live')
+    expect(live).toHaveTextContent('12,345 L')
+    expect(live).toHaveTextContent('1,500 / 8,000 m')
+    expect(live).toHaveTextContent('active')
+  })
+
+  it('omits the live section when no live update is present', () => {
+    render(<InspectPanel unit={unit()} unitType={unitType} onClose={() => {}} />)
+    expect(screen.queryByTestId('inspect-live')).not.toBeInTheDocument()
+  })
 })
