@@ -3,11 +3,11 @@ id: battlefuel-wave-5
 title: "Wave 5: Joint-Force Supply — OF-8 View, Fuel Stocks, Buy & Refuel Orders"
 initiative: battlefuel
 initiative_version: 4
-status: planned
+status: complete
 depends_on: battlefuel-wave-4
 demo_state: "Switch to the OF-8 (joint-force) view to see fuel stocks and distribution across depots; place a fuel buy order that replenishes a depot over sim-time; place a refuel order that recommends the closest fuel truck and a rendezvous (the operator moves the truck manually, and transfer happens when co-located); receive strategic support messages; and open a unit overview that surfaces missing telemetry with a 'request manual update' action."
 created: 2026-06-01
-hash: 78b2bbd4
+hash: c08fd54f
 ---
 
 # Wave 5: Joint-Force Supply — OF-8 View, Fuel Stocks, Buy & Refuel Orders
