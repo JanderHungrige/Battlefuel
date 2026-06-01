@@ -3,7 +3,11 @@ import type { TileUpdate, UnitUpdate } from '../api/types'
 import {
   applyTileUpdate,
   applyUnitUpdate,
+  describeBuyOrderUpdate,
+  describeRefuelOrderUpdate,
   describeTileUpdate,
+  parseBuyOrderUpdate,
+  parseRefuelOrderUpdate,
   parseTileUpdate,
   parseUnitUpdate,
 } from './simSocket'
@@ -103,5 +107,65 @@ describe('describeTileUpdate', () => {
     expect(text).toContain('road damaged')
     expect(text).toContain('under fire')
     expect(text).toContain('ridge')
+  })
+})
+
+describe('parseBuyOrderUpdate / parseRefuelOrderUpdate', () => {
+  it('parses a valid buy_order_update and rejects other frames', () => {
+    const ok = parseBuyOrderUpdate(
+      JSON.stringify({
+        type: 'buy_order_update',
+        order_id: 'b1',
+        depot_id: 'depot-main',
+        fuel_type: 'diesel',
+        quantity_liters: 5000,
+        status: 'delivered',
+        remaining_game_s: 0,
+      }),
+    )
+    expect(ok?.order_id).toBe('b1')
+    expect(parseBuyOrderUpdate(JSON.stringify({ type: 'unit_update' }))).toBeNull()
+    expect(parseBuyOrderUpdate('not json')).toBeNull()
+  })
+
+  it('parses a valid refuel_order_update', () => {
+    const ok = parseRefuelOrderUpdate(
+      JSON.stringify({
+        type: 'refuel_order_update',
+        order_id: 'r1',
+        unit_id: 'inst-armor-1',
+        truck_id: 'inst-fuel-1',
+        status: 'complete',
+        fuel_type: 'diesel',
+        transferred_liters: 3000,
+      }),
+    )
+    expect(ok?.truck_id).toBe('inst-fuel-1')
+    expect(parseRefuelOrderUpdate(JSON.stringify({ type: 'tile_update' }))).toBeNull()
+  })
+
+  it('describes order frames for the feed', () => {
+    expect(
+      describeBuyOrderUpdate({
+        type: 'buy_order_update',
+        order_id: 'b1',
+        depot_id: 'depot-main',
+        fuel_type: 'diesel',
+        quantity_liters: 5000,
+        status: 'delivered',
+        remaining_game_s: 0,
+      }),
+    ).toContain('depot-main')
+    expect(
+      describeRefuelOrderUpdate({
+        type: 'refuel_order_update',
+        order_id: 'r1',
+        unit_id: 'inst-armor-1',
+        truck_id: 'inst-fuel-1',
+        status: 'complete',
+        fuel_type: 'diesel',
+        transferred_liters: 3000,
+      }),
+    ).toContain('inst-armor-1')
   })
 })

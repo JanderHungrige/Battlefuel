@@ -96,17 +96,145 @@ body {
   color: #05080c;
 }
 
-.of8-placeholder {
+.supply-panel {
   position: absolute;
   top: 12px;
   left: 12px;
-  width: 280px;
+  width: 300px;
+  max-height: calc(100% - 24px);
+  overflow-y: auto;
   padding: 12px 14px;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 8px;
-  color: var(--muted);
   font-size: 13px;
+}
+
+.supply-panel h2 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: var(--accent);
+}
+
+.supply-panel h3 {
+  margin: 12px 0 6px;
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.depot-row,
+.trucks {
+  margin-bottom: 8px;
+}
+
+.depot-name {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.stock-row,
+.truck-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.truck-row {
+  justify-content: space-between;
+}
+
+.stock-label {
+  width: 52px;
+  color: var(--muted);
+}
+
+.stock-bar {
+  flex: 1;
+  height: 6px;
+  background: #1c222b;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.stock-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.stock-val {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.supply-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
+.supply-form select,
+.supply-form input {
+  background: #1c222b;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.supply-form input {
+  width: 90px;
+}
+
+.supply-form button {
+  padding: 4px 12px;
+  background: var(--accent);
+  color: #05080c;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.supply-form button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.recommendation {
+  flex-basis: 100%;
+  margin-top: 6px;
+  padding: 8px;
+  background: #1c222b;
+  border: 1px solid #ffb020;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.recommendation .rec-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.recommendation button.ghost {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.supply-msg {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted);
 }
 
 .tile-edit {

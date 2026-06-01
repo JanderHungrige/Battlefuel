@@ -7,7 +7,11 @@ import { WS_BASE } from '../config'
 import {
   applyTileUpdate,
   applyUnitUpdate,
+  describeBuyOrderUpdate,
+  describeRefuelOrderUpdate,
   describeTileUpdate,
+  parseBuyOrderUpdate,
+  parseRefuelOrderUpdate,
   parseTileUpdate,
   parseUnitUpdate,
 } from './simSocket'
@@ -21,6 +25,8 @@ export interface SimSocketState {
   chatter: ChatterMessage[]
   pushChatter: (text: string, kind?: ChatterMessage['kind'], h3Index?: string) => void
   connected: boolean
+  /** Bumped whenever a supply order (buy/refuel) frame arrives — consumers refetch on change. */
+  supplyTick: number
 }
 
 export function useSimSocket(enabled = true): SimSocketState {
@@ -28,6 +34,7 @@ export function useSimSocket(enabled = true): SimSocketState {
   const [tileUpdates, setTileUpdates] = useState<Record<string, TileUpdate>>({})
   const [chatter, setChatter] = useState<ChatterMessage[]>([])
   const [connected, setConnected] = useState(false)
+  const [supplyTick, setSupplyTick] = useState(0)
   const seq = useRef(0)
 
   const pushChatter = useCallback(
@@ -59,6 +66,18 @@ export function useSimSocket(enabled = true): SimSocketState {
         if (tile) {
           setTileUpdates((prev) => applyTileUpdate(prev, tile))
           pushChatter(`Sector: ${describeTileUpdate(tile)}`, 'status', tile.h3_index)
+          return
+        }
+        const buy = parseBuyOrderUpdate(raw)
+        if (buy) {
+          setSupplyTick((n) => n + 1)
+          pushChatter(describeBuyOrderUpdate(buy), 'order')
+          return
+        }
+        const refuel = parseRefuelOrderUpdate(raw)
+        if (refuel) {
+          setSupplyTick((n) => n + 1)
+          pushChatter(describeRefuelOrderUpdate(refuel), 'order')
         }
       }
       socket.onclose = () => {
@@ -76,5 +95,5 @@ export function useSimSocket(enabled = true): SimSocketState {
     }
   }, [enabled, pushChatter])
 
-  return { positions, tileUpdates, chatter, pushChatter, connected }
+  return { positions, tileUpdates, chatter, pushChatter, connected, supplyTick }
 }

@@ -1,7 +1,7 @@
 // Pure helpers for the sim WebSocket: parse and reduce frames. Kept free of the
 // WebSocket API so they are deterministically unit-testable.
 
-import type { TileUpdate, UnitUpdate } from '../api/types'
+import type { BuyOrderUpdate, RefuelOrderUpdate, TileUpdate, UnitUpdate } from '../api/types'
 
 function parse(raw: string): Record<string, unknown> | null {
   try {
@@ -45,6 +45,34 @@ export function describeTileUpdate(u: TileUpdate): string {
   if (u.situation) parts.push(u.situation.replace(/_/g, ' '))
   if (u.note) parts.push(`“${u.note}”`)
   return parts.join(' · ')
+}
+
+/** Parse a raw WS frame into a BuyOrderUpdate, or null if it is not a valid buy_order_update. */
+export function parseBuyOrderUpdate(raw: string): BuyOrderUpdate | null {
+  const msg = parse(raw)
+  if (msg && msg.type === 'buy_order_update' && typeof msg.order_id === 'string') {
+    return msg as unknown as BuyOrderUpdate
+  }
+  return null
+}
+
+/** Parse a raw WS frame into a RefuelOrderUpdate, or null if not a valid refuel_order_update. */
+export function parseRefuelOrderUpdate(raw: string): RefuelOrderUpdate | null {
+  const msg = parse(raw)
+  if (msg && msg.type === 'refuel_order_update' && typeof msg.order_id === 'string') {
+    return msg as unknown as RefuelOrderUpdate
+  }
+  return null
+}
+
+/** A short human-readable summary of a buy-order delivery, for the chatter/strategic feed. */
+export function describeBuyOrderUpdate(u: BuyOrderUpdate): string {
+  return `Buy order delivered: ${Math.round(u.quantity_liters)} L ${u.fuel_type} → ${u.depot_id}`
+}
+
+/** A short human-readable summary of a completed refuel, for the chatter/strategic feed. */
+export function describeRefuelOrderUpdate(u: RefuelOrderUpdate): string {
+  return `Refuel complete: ${Math.round(u.transferred_liters)} L ${u.fuel_type} → ${u.unit_id}`
 }
 
 /** Latest frame per instance wins. Returns a new map (never mutates the input). */

@@ -61,7 +61,7 @@ optimization/fuel-order algorithm (OR-Tools) — Wave 5 ships a clearly-seamed p
 | 3 | refuel-orders            | docs/26-refuel-orders.md | complete | fuel-supply-model |
 | 4 | buy-orders               | docs/27-buy-orders.md | complete | fuel-supply-model |
 | 5 | role-view-switch         | docs/28-role-view-switch.md | complete | — |
-| 6 | of8-supply-ui            | — | planned | supply-stock-api, refuel-orders, buy-orders, role-view-switch |
+| 6 | of8-supply-ui            | docs/29-of8-supply-ui.md | complete | supply-stock-api, refuel-orders, buy-orders, role-view-switch |
 | 7 | strategic-support-chatter | — | planned | role-view-switch, of8-supply-ui |
 | 8 | unit-overview-telemetry  | — | planned | role-view-switch |
 

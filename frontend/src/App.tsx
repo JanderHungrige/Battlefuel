@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ApiError, api } from './api/client'
+import { api } from './api/client'
+import { errorMessage } from './api/errors'
 import type { RouteMetric, RouteOption, Theater, Tile, UnitInstance, UnitType } from './api/types'
 import { ChatterLog } from './components/ChatterLog'
 import { InspectPanel } from './components/InspectPanel'
@@ -7,22 +8,15 @@ import { MoveRoutesPanel } from './components/MoveRoutesPanel'
 import { ObstacleKindPicker } from './components/ObstacleKindPicker'
 import type { ObstacleKind } from './components/obstacleKinds'
 import { RoleToggle } from './components/RoleToggle'
+import { SupplyPanel } from './components/SupplyPanel'
 import { TerrainLegend } from './components/TerrainLegend'
 import { OSM_ATTRIBUTION } from './config'
 import { canShow, type Role } from './roles'
 import { useObstacleOps } from './hooks/useObstacleOps'
 import { useSimSocket } from './hooks/useSimSocket'
+import { useSupply } from './hooks/useSupply'
+import { useSupplyOrders } from './hooks/useSupplyOrders'
 import { MapView } from './map/MapView'
-
-function errorMessage(e: unknown): string {
-  if (e instanceof ApiError) {
-    if (e.status === 422) return 'No route to that destination.'
-    if (e.status === 404) return 'Unit not found.'
-    if (e.status === 409) return 'Unit type not in catalog.'
-    return e.message
-  }
-  return e instanceof Error ? e.message : String(e)
-}
 
 export default function App() {
   const [role, setRole] = useState<Role>('OF4')
@@ -45,7 +39,11 @@ export default function App() {
   const [confirming, setConfirming] = useState(false)
 
   const [activeRoutes, setActiveRoutes] = useState<Record<string, number[][]>>({})
-  const { positions: live, tileUpdates, chatter, pushChatter } = useSimSocket()
+  const { positions: live, tileUpdates, chatter, pushChatter, supplyTick } = useSimSocket()
+
+  // OF-8 supply: distribution data + order actions.
+  const supply = useSupply(role === 'OF8', supplyTick)
+  const supplyOrders = useSupplyOrders(units, pushChatter, supply.refetch)
 
   // Operator ops: obstacles + tile edits + the obstacle-placement mode and chosen kind.
   const { obstacles, placeObstacle, removeObstacle, mutateTile } = useObstacleOps()
@@ -176,6 +174,18 @@ export default function App() {
   // Obstacle placement is an OF-4 tactical tool; never active in the OF-8 supply view.
   const obstacleActive = canShow(role, 'obstacleMode') && obstacleMode
 
+  // Refuel targets: placed units that are not themselves fuel trucks.
+  const refuelTargets = useMemo(
+    () =>
+      units
+        .filter((u) => {
+          const t = unitTypes.find((ut) => ut.id === u.unit_type_id)
+          return t != null && t.nato_unit_type !== 'fuel_supply'
+        })
+        .map((u) => ({ id: u.id, name: u.name })),
+    [units, unitTypes],
+  )
+
   return (
     <div className="app">
       <header className="topbar">
@@ -211,7 +221,9 @@ export default function App() {
               activeRoutes={activeRouteGeometries}
               obstacles={obstacles}
               obstacleMode={obstacleActive}
-              highlightH3={highlightH3}
+              depots={canShow(role, 'depotOverlay') ? supply.depots : []}
+              rendezvous={canShow(role, 'supplyPanel') ? supplyOrders.rendezvous : null}
+              highlightH3={supplyOrders.truckHighlightH3 ?? highlightH3}
               onPlaceObstacle={(lat, lon) => placeObstacle(lat, lon, obstacleKind)}
               onRemoveObstacle={removeObstacle}
               onSelectTile={(h3) => {
@@ -229,10 +241,19 @@ export default function App() {
             />
             {canShow(role, 'terrainLegend') && <TerrainLegend />}
             <ChatterLog messages={chatter} onSelect={setHighlightH3} />
-            {role === 'OF8' && (
-              <aside className="of8-placeholder" data-testid="of8-placeholder">
-                OF-8 Joint-Force supply view
-              </aside>
+            {canShow(role, 'supplyPanel') && (
+              <SupplyPanel
+                overview={supply.overview}
+                depots={supply.depots}
+                refuelTargets={refuelTargets}
+                recommendation={supplyOrders.recommendation}
+                busy={supplyOrders.busy}
+                message={supplyOrders.message}
+                onBuy={supplyOrders.placeBuy}
+                onRefuel={supplyOrders.placeRefuel}
+                onConfirmRefuel={supplyOrders.confirmRefuel}
+                onCancelRefuel={supplyOrders.cancelRefuel}
+              />
             )}
             {obstacleActive && (
               <ObstacleKindPicker selected={obstacleKind} onSelect={setObstacleKind} />
