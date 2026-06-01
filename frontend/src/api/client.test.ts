@@ -87,4 +87,41 @@ describe('api client', () => {
       api.planRoute({ instance_id: 'inst-1', dest_lat: 0, dest_lon: 0 }),
     ).rejects.toBeInstanceOf(ApiError)
   })
+
+  it('createObstacle POSTs lat/lon to /obstacles', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, status: 201, json: async () => ({ id: 'ob1' }) })
+    vi.stubGlobal('fetch', fetchMock)
+    const o = await api.createObstacle(49.2, 11.85)
+    expect(o.id).toBe('ob1')
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toMatch(/\/obstacles$/)
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(init.body)).toEqual({ lat: 49.2, lon: 11.85 })
+  })
+
+  it('deleteObstacle DELETEs /obstacles/{id}', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, status: 200, json: async () => ({ id: 'ob1', status: 'removed' }) })
+    vi.stubGlobal('fetch', fetchMock)
+    const r = await api.deleteObstacle('ob1')
+    expect(r.status).toBe('removed')
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toMatch(/\/obstacles\/ob1$/)
+    expect(init.method).toBe('DELETE')
+  })
+
+  it('patchTile PATCHes the mutation to /tiles/{h3}', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, status: 200, json: async () => ({ h3_index: 'abc' }) })
+    vi.stubGlobal('fetch', fetchMock)
+    await api.patchTile('abc', { threat_level: 5 })
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toMatch(/\/tiles\/abc$/)
+    expect(init.method).toBe('PATCH')
+    expect(JSON.parse(init.body).threat_level).toBe(5)
+  })
 })

@@ -138,6 +138,20 @@ export interface UnitUpdate {
   distance_m: number
 }
 
+/** An operator-placed obstacle the router avoids (blocks an H3 cell). */
+export interface Obstacle {
+  id: string
+  h3_index: string
+  kind: string
+}
+
+/** Partial tile mutation sent to PATCH /tiles/{h3}. */
+export interface TileMutationRequest {
+  threat_level?: number
+  road_condition?: Tile['road_condition']
+  intel_level?: Tile['intel_level']
+}
+
 /** A live tile-change frame broadcast when a tile is mutated (Wave 4 dynamic-tile-updates). */
 export interface TileUpdate {
   type: 'tile_update'

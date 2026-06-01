@@ -6,12 +6,13 @@ import maplibregl from 'maplibre-gl'
 import { Protocol } from 'pmtiles'
 import { useEffect, useRef } from 'react'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import type { Theater, Tile, UnitInstance, UnitType } from '../api/types'
+import type { Obstacle, Theater, Tile, UnitInstance, UnitType } from '../api/types'
 import { PMTILES_PATH } from '../config'
 import { buildBasemapStyle } from './basemapStyle'
 import {
   activeRoutesToGeoJSON,
   destinationToGeoJSON,
+  obstaclesToGeoJSON,
   routeToGeoJSON,
   tilesToGeoJSON,
   unitsToGeoJSON,
@@ -35,9 +36,13 @@ export interface MapViewProps {
   planning: boolean
   livePositions: Record<string, { lat: number; lon: number }>
   activeRoutes: number[][][]
+  obstacles: Obstacle[]
+  obstacleMode: boolean
   onSelectTile: (h3Index: string) => void
   onSelectUnit: (id: string) => void
   onPickDestination: (lat: number, lon: number) => void
+  onPlaceObstacle: (lat: number, lon: number) => void
+  onRemoveObstacle: (id: string) => void
   onClearSelection: () => void
 }
 
@@ -112,6 +117,20 @@ function initLayers(map: maplibregl.Map): void {
     source: 'units',
     layout: { 'icon-image': ['get', 'sidc'], 'icon-size': 1, 'icon-allow-overlap': true },
   })
+
+  map.addSource('obstacles', { type: 'geojson', data: EMPTY })
+  map.addLayer({
+    id: 'obstacles',
+    type: 'circle',
+    source: 'obstacles',
+    paint: {
+      'circle-radius': 8,
+      'circle-color': '#ff3030',
+      'circle-opacity': 0.85,
+      'circle-stroke-width': 2,
+      'circle-stroke-color': '#0e1116',
+    },
+  })
 }
 
 function syncUnits(
@@ -134,6 +153,15 @@ function syncUnits(
 function wireInteraction(map: maplibregl.Map, propsRef: { current: MapViewProps }): void {
   map.on('click', (e) => {
     const p = propsRef.current
+    if (p.obstacleMode) {
+      const hitObs = map.queryRenderedFeatures(e.point, { layers: ['obstacles'] })
+      if (hitObs.length > 0) {
+        p.onRemoveObstacle(String(hitObs[0].properties?.id))
+        return
+      }
+      p.onPlaceObstacle(e.lngLat.lat, e.lngLat.lng)
+      return
+    }
     const hitUnits = map.queryRenderedFeatures(e.point, { layers: ['units'] })
     if (hitUnits.length > 0) {
       p.onSelectUnit(String(hitUnits[0].properties?.id))
@@ -189,6 +217,7 @@ export function MapView(props: MapViewProps) {
       setData(map, 'active-routes', activeRoutesToGeoJSON(p.activeRoutes))
       setData(map, 'route', routeToGeoJSON(p.routeGeometry))
       setData(map, 'destination', destinationToGeoJSON(p.destination))
+      setData(map, 'obstacles', obstaclesToGeoJSON(p.obstacles))
       wireInteraction(map, propsRef)
       readyRef.current = true
     })
@@ -220,6 +249,10 @@ export function MapView(props: MapViewProps) {
     if (readyRef.current && mapRef.current)
       setData(mapRef.current, 'destination', destinationToGeoJSON(props.destination))
   }, [props.destination])
+  useEffect(() => {
+    if (readyRef.current && mapRef.current)
+      setData(mapRef.current, 'obstacles', obstaclesToGeoJSON(props.obstacles))
+  }, [props.obstacles])
 
   return (
     <div ref={containerRef} data-testid="map-container" style={{ width: '100%', height: '100%' }} />

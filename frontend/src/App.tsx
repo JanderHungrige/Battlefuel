@@ -1,16 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ApiError, api } from './api/client'
-import type {
-  RouteMetric,
-  RouteOption,
-  Theater,
-  Tile,
-  UnitInstance,
-  UnitType,
-} from './api/types'
+import type { RouteMetric, RouteOption, Theater, Tile, UnitInstance, UnitType } from './api/types'
 import { InspectPanel } from './components/InspectPanel'
 import { MoveRoutesPanel } from './components/MoveRoutesPanel'
 import { OSM_ATTRIBUTION } from './config'
+import { useObstacleOps } from './hooks/useObstacleOps'
 import { useSimSocket } from './hooks/useSimSocket'
 import { MapView } from './map/MapView'
 import { TERRAIN_COLORS } from './map/overlays'
@@ -46,6 +40,10 @@ export default function App() {
   // Live movement: routes confirmed this session, keyed by unit instance id.
   const [activeRoutes, setActiveRoutes] = useState<Record<string, number[][]>>({})
   const { positions: live, tileUpdates } = useSimSocket()
+
+  // Operator ops: manual obstacles + tile edits (+ obstacle-placement mode toggle).
+  const { obstacles, placeObstacle, removeObstacle, mutateTile } = useObstacleOps()
+  const [obstacleMode, setObstacleMode] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -183,6 +181,15 @@ export default function App() {
       <header className="topbar">
         <span className="brand">BattleFuel</span>
         {theater && <span className="theater">{theater.name}</span>}
+        {theater && (
+          <button
+            className={`mode-toggle${obstacleMode ? ' active' : ''}`}
+            data-testid="obstacle-mode-toggle"
+            onClick={() => setObstacleMode((m) => !m)}
+          >
+            {obstacleMode ? '🚧 Obstacle mode: ON' : 'Obstacle mode'}
+          </button>
+        )}
         <span className="spacer" />
         <span className="attribution">{OSM_ATTRIBUTION}</span>
       </header>
@@ -201,6 +208,10 @@ export default function App() {
               planning={selectedUnitId !== null}
               livePositions={livePositions}
               activeRoutes={activeRouteGeometries}
+              obstacles={obstacles}
+              obstacleMode={obstacleMode}
+              onPlaceObstacle={placeObstacle}
+              onRemoveObstacle={removeObstacle}
               onSelectTile={(h3) => {
                 setSelectedUnitId(null)
                 resetPlanning()
@@ -242,6 +253,7 @@ export default function App() {
                     }
                   : undefined
               }
+              onMutateTile={mutateTile}
               onClose={clear}
             />
           </>

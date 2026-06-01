@@ -54,6 +54,64 @@ body {
   flex: 1;
 }
 
+.mode-toggle {
+  padding: 4px 10px;
+  background: #1c222b;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.mode-toggle.active {
+  border-color: #ff3030;
+  color: #ff9a9a;
+}
+
+.tile-edit {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.tile-edit h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+}
+
+.tile-edit-threat {
+  display: flex;
+  gap: 4px;
+}
+
+.threat-btn {
+  width: 22px;
+  height: 22px;
+  background: #1c222b;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.threat-btn.active {
+  border-color: var(--accent);
+  background: #06231f;
+}
+
+.tile-edit select {
+  background: #1c222b;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 4px;
+}
+
 .topbar .attribution {
   color: var(--muted);
   font-size: 11px;
