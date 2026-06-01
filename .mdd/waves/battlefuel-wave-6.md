@@ -46,7 +46,7 @@ server-authoritative. **Deferred (later milestone):** ML predictions; auto-execu
 | # | Feature | Doc | Status | Depends on |
 |---|---------|-----|--------|------------|
 | 1 | optimizer-foundation     | docs/32-optimizer-foundation.md | complete | — |
-| 2 | refuel-optimizer         | — | planned | optimizer-foundation |
+| 2 | refuel-optimizer         | docs/33-refuel-optimizer.md | complete | optimizer-foundation |
 | 3 | redistribution-optimizer | — | planned | optimizer-foundation |
 | 4 | movement-route-advisor   | — | planned | optimizer-foundation |
 | 5 | advisor-ui               | — | planned | refuel-optimizer, redistribution-optimizer, movement-route-advisor |

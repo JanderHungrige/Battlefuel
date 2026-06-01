@@ -47,7 +47,7 @@ plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
 # Third-party libs without complete type stubs.
-module = ["geoalchemy2.*", "asyncpg.*", "h3.*"]
+module = ["geoalchemy2.*", "asyncpg.*", "h3.*", "ortools.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

@@ -52,6 +52,30 @@ class NearestRefuelRecommender(RefuelRecommender):
         )
 
 
+class OrToolsRefuelRecommender(RefuelRecommender):
+    """OR-Tools cost-aware pick (Wave 6): routes the single unit through ``assign_trucks`` so the
+    per-order recommendation uses the same distance + fuel-adequacy cost as the multi-unit plan.
+    A drop-in for the Wave-5 factory — flip ``settings.refuel_recommender = "ortools"``.
+    """
+
+    def recommend(
+        self, unit: UnitInstance, trucks: Sequence[UnitInstance]
+    ) -> RefuelRecommendation | None:
+        # Imported lazily so the (heavier) ortools import only loads when this strategy is used.
+        from app.services.refuel_assignment import assign_trucks
+
+        result = assign_trucks([unit], list(trucks))
+        if not result:
+            return None
+        _, truck_id, cost = result[0]
+        return RefuelRecommendation(
+            truck_id=truck_id,
+            rendezvous=Rendezvous(lat=unit.lat, lon=unit.lon, h3_index=unit.h3_index),
+            score=cost,
+            rationale=f"OR-Tools pick: {truck_id} (cost {cost:.1f} = distance + fuel adequacy)",
+        )
+
+
 RecommenderBuilder = Callable[[], RefuelRecommender]
 _REGISTRY: dict[str, RecommenderBuilder] = {}
 
@@ -77,3 +101,4 @@ def build_refuel_recommender(settings: Settings | None = None) -> RefuelRecommen
 
 
 register_refuel_recommender("nearest", NearestRefuelRecommender)
+register_refuel_recommender("ortools", OrToolsRefuelRecommender)
