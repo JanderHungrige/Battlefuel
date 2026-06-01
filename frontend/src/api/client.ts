@@ -59,6 +59,10 @@ export const api = {
   getTheater: (): Promise<Theater> => getJson<Theater>('/theater'),
   getTiles: (): Promise<Tile[]> => getJson<Tile[]>('/tiles'),
   getUnitInstances: (): Promise<UnitInstance[]> => getJson<UnitInstance[]>('/unit-instances'),
+  setTelemetry: (id: string, currentFuelLiters: number): Promise<UnitInstance> =>
+    postJson<UnitInstance>(`/unit-instances/${id}/telemetry`, {
+      current_fuel_liters: currentFuelLiters,
+    }),
   getUnitTypes: (): Promise<UnitType[]> => getJson<UnitType[]>('/units'),
   getUnitType: (id: string): Promise<UnitType> => getJson<UnitType>(`/units/${id}`),
 

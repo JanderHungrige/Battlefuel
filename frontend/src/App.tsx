@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { api } from './api/client'
 import { errorMessage } from './api/errors'
-import type { RouteMetric, RouteOption, Theater, Tile, UnitInstance, UnitType } from './api/types'
+import type { RouteMetric, RouteOption } from './api/types'
 import { ChatterLog } from './components/ChatterLog'
 import { InspectPanel } from './components/InspectPanel'
 import { MoveRoutesPanel } from './components/MoveRoutesPanel'
@@ -10,21 +10,20 @@ import type { ObstacleKind } from './components/obstacleKinds'
 import { RoleToggle } from './components/RoleToggle'
 import { SupplyPanel } from './components/SupplyPanel'
 import { TerrainLegend } from './components/TerrainLegend'
+import { UnitOverview } from './components/UnitOverview'
 import { OSM_ATTRIBUTION } from './config'
 import { canShow, type Role } from './roles'
 import { useObstacleOps } from './hooks/useObstacleOps'
 import { useSimSocket } from './hooks/useSimSocket'
 import { useSupply } from './hooks/useSupply'
 import { useSupplyOrders } from './hooks/useSupplyOrders'
+import { useTheaterData } from './hooks/useTheaterData'
+import { useUnitOverview } from './hooks/useUnitOverview'
 import { MapView } from './map/MapView'
 
 export default function App() {
   const [role, setRole] = useState<Role>('OF4')
-  const [theater, setTheater] = useState<Theater | null>(null)
-  const [tiles, setTiles] = useState<Tile[]>([])
-  const [units, setUnits] = useState<UnitInstance[]>([])
-  const [unitTypes, setUnitTypes] = useState<UnitType[]>([])
-  const [error, setError] = useState<string | null>(null)
+  const { theater, tiles, units, setUnits, unitTypes, error } = useTheaterData()
 
   const [selectedTileH3, setSelectedTileH3] = useState<string | null>(null)
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null)
@@ -45,29 +44,12 @@ export default function App() {
   // OF-8 supply: distribution data + order actions.
   const supply = useSupply(role === 'OF8', supplyTick)
   const supplyOrders = useSupplyOrders(units, unitTypes, pushChatter, supply.refetch)
+  const roster = useUnitOverview(setUnits)
 
   // Operator ops: obstacles + tile edits + the obstacle-placement mode and chosen kind.
   const { obstacles, placeObstacle, removeObstacle, mutateTile } = useObstacleOps()
   const [obstacleMode, setObstacleMode] = useState(false)
   const [obstacleKind, setObstacleKind] = useState<ObstacleKind>('minefield')
-
-  useEffect(() => {
-    let active = true
-    Promise.all([api.getTheater(), api.getTiles(), api.getUnitInstances(), api.getUnitTypes()])
-      .then(([t, ti, u, ut]) => {
-        if (!active) return
-        setTheater(t)
-        setTiles(ti)
-        setUnits(u)
-        setUnitTypes(ut)
-      })
-      .catch((e: unknown) => {
-        if (active) setError(e instanceof Error ? e.message : String(e))
-      })
-    return () => {
-      active = false
-    }
-  }, [])
 
   // Tiles merged with their latest live tile_update (threat/road/situation/etc.).
   const displayedTiles = useMemo(() => {
@@ -181,6 +163,15 @@ export default function App() {
         <span className="brand">BattleFuel</span>
         {theater && <span className="theater">{theater.name}</span>}
         {theater && <RoleToggle role={role} onChange={setRole} />}
+        {theater && canShow(role, 'unitOverview') && (
+          <button
+            className={`mode-toggle${roster.open ? ' active' : ''}`}
+            data-testid="unit-overview-toggle"
+            onClick={roster.toggle}
+          >
+            Units
+          </button>
+        )}
         {theater && canShow(role, 'obstacleMode') && (
           <button
             className={`mode-toggle${obstacleMode ? ' active' : ''}`}
@@ -267,6 +258,14 @@ export default function App() {
                 onSelectOption={setSelectedMetric}
                 onConfirm={confirmMove}
                 onCancel={clear}
+              />
+            )}
+            {canShow(role, 'unitOverview') && roster.open && (
+              <UnitOverview
+                units={units}
+                unitTypes={unitTypes}
+                onSetTelemetry={roster.setTelemetry}
+                onClose={roster.toggle}
               />
             )}
             <InspectPanel

@@ -63,7 +63,7 @@ optimization/fuel-order algorithm (OR-Tools) — Wave 5 ships a clearly-seamed p
 | 5 | role-view-switch         | docs/28-role-view-switch.md | complete | — |
 | 6 | of8-supply-ui            | docs/29-of8-supply-ui.md | complete | supply-stock-api, refuel-orders, buy-orders, role-view-switch |
 | 7 | strategic-support-chatter | docs/30-strategic-support-chatter.md | complete | role-view-switch, of8-supply-ui |
-| 8 | unit-overview-telemetry  | — | planned | role-view-switch |
+| 8 | unit-overview-telemetry  | docs/31-unit-overview-telemetry.md | complete | role-view-switch |
 
 Build order: 1 → (2, 3, 4 after 1) → 5 (independent, can run anytime) → 6 (after 2, 3, 4, 5)
 → 7 (after 5, 6) → 8 (after 5).

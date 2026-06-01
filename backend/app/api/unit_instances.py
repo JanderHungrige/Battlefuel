@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
@@ -44,3 +45,24 @@ async def get_unit_instance(
     if instance is None:
         raise HTTPException(status_code=404, detail=f"unit instance {instance_id!r} not found")
     return instance
+
+
+class TelemetryUpdateRequest(BaseModel):
+    current_fuel_liters: float = Field(ge=0)
+
+
+@router.post("/unit-instances/{instance_id}/telemetry")
+async def set_unit_telemetry(
+    instance_id: str,
+    req: TelemetryUpdateRequest,
+    session: SessionDep,
+    provider: InstanceProviderDep,
+) -> UnitInstance:
+    """Manually set an instance's fuel telemetry (the "request manual update" action for units
+    with no data). Server-authoritative; returns the updated instance, or 404 if unknown."""
+    if await provider.get_instance(session, instance_id) is None:
+        raise HTTPException(status_code=404, detail=f"unit instance {instance_id!r} not found")
+    await provider.set_fuel(session, instance_id, req.current_fuel_liters)
+    updated = await provider.get_instance(session, instance_id)
+    assert updated is not None
+    return updated
