@@ -28,6 +28,7 @@ satisfies_contracts:
     verified_at: "backend/app/providers/seed.py:39"
 known_issues:
   - "Stat values and SIDC entity codes are provisional/illustrative (see open-research notes); replace with authoritative data when a real source is wired."
+  - "backend/app/providers/seed_data.py is 331 lines, over the 300-line quality gate. Split deferred to Wave 4 cleanup (e.g. separate catalog data from the _sidc()/provider logic)."
 sister_projects: []
 ---
 
