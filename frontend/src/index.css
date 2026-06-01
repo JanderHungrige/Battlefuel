@@ -388,6 +388,7 @@ body {
 }
 
 .chatter-msg {
+  flex: 0 0 auto; /* keep natural height; the panel scrolls instead of squishing lines */
   text-align: left;
   font-size: 12px;
   padding: 5px 8px;
