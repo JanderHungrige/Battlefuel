@@ -2,8 +2,8 @@
 id: battlefuel
 title: BattleFuel
 status: active
-version: 3
-hash: fd19623d
+version: 4
+hash: 0f75b128
 created: 2026-05-29
 ---
 
