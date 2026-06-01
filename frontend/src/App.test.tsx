@@ -11,12 +11,18 @@ vi.mock('./map/MapView', () => ({
 
 const getTheater = vi.fn()
 vi.mock('./api/client', () => ({
+  ApiError: class ApiError extends Error {},
   api: {
     getTheater: () => getTheater(),
     getTiles: () => Promise.resolve([]),
     getUnitInstances: () => Promise.resolve([]),
     getUnitTypes: () => Promise.resolve([]),
   },
+}))
+
+// The live sim socket is exercised in its own tests; keep the shell test deterministic.
+vi.mock('./hooks/useSimSocket', () => ({
+  useSimSocket: () => ({ positions: {}, connected: false }),
 }))
 
 const HOHENFELS: Theater = {

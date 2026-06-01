@@ -17,11 +17,15 @@ DB="${BATTLEFUEL_DB_NAME:-battlefuel}"
 USER="${BATTLEFUEL_DB_USER:-battlefuel}"
 PASS="${BATTLEFUEL_DB_PASSWORD:-battlefuel}"
 
-echo "[1/3] Fetching highways-only OSM extract (nodes-first) via Overpass…"
-Q='[out:xml][timeout:180];way[highway](49.18,11.78,49.27,11.92);(._;>;);out body;'
-curl -sS --fail -A "BattleFuel/0.1 (dev; OSM ODbL)" \
-  --data-urlencode "data=$Q" https://overpass-api.de/api/interpreter -o "$ROADS"
-echo "  -> $(du -h "$ROADS" | cut -f1)"
+if [ -f "$ROADS" ]; then
+  echo "[1/3] Using existing roads extract: $ROADS ($(du -h "$ROADS" | cut -f1))"
+else
+  echo "[1/3] Fetching highways-only OSM extract (nodes-first) via Overpass…"
+  Q='[out:xml][timeout:180];way[highway](49.18,11.78,49.27,11.92);(._;>;);out body;'
+  curl -sS --fail -A "BattleFuel/0.1 (dev; OSM ODbL)" \
+    --data-urlencode "data=$Q" https://overpass-api.de/api/interpreter -o "$ROADS"
+  echo "  -> $(du -h "$ROADS" | cut -f1)"
+fi
 
 echo "[2/3] osm2pgrouting (in container) → ways / ways_vertices_pgr …"
 docker exec "$CONTAINER" osm2pgrouting \

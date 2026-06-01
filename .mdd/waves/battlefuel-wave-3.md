@@ -3,11 +3,11 @@ id: battlefuel-wave-3
 title: "Wave 3: Routing & Movement"
 initiative: battlefuel
 initiative_version: 4
-status: planned
+status: complete
 depends_on: battlefuel-wave-2
 demo_state: "In the app, select a unit, click a destination, and see route options (fastest & safest) with remaining fuel on arrival, duration, and route threat level; confirm a move order and watch the unit traverse the route in real time as its fuel depletes."
 created: 2026-06-01
-hash: d0616bd4
+hash: e4a84306
 ---
 
 # Wave 3: Routing & Movement
@@ -35,8 +35,8 @@ follows the road network (road speed + normal consumption); off-road movement is
 | 2 | route-planning-api | docs/12-route-planning-api.md | complete | routing-graph |
 | 3 | move-orders | docs/13-move-orders.md | complete | route-planning-api |
 | 4 | sim-engine | docs/14-sim-engine.md | complete | move-orders |
-| 5 | move-planning-ui | — | planned | route-planning-api, move-orders |
-| 6 | live-movement-ui | — | planned | sim-engine, move-planning-ui |
+| 5 | move-planning-ui | docs/15-move-planning-ui.md | complete | route-planning-api, move-orders |
+| 6 | live-movement-ui | docs/16-live-movement-ui.md | complete | sim-engine, move-planning-ui |
 
 Build order: 1 → 2 → 3 → 4 → 5 (after 2 & 3) → 6.
 
@@ -44,7 +44,9 @@ Build order: 1 → 2 → 3 → 4 → 5 (after 2 & 3) → 6.
 - **routing-graph** — build a noded pgRouting topology from the Hohenfels OSM extract via
   **osm2pgrouting** (ways/vertices with cost/reverse_cost). Add a custom cost that augments
   travel time by tile threat (edge → H3 cell → `tiles.threat_level`). Shortest-path query
-  (`pgr_dijkstra`) wrapped behind a provider.
+  (`pgr_dijkstra`) wrapped behind a provider. The graph build (`build_routing_graph.sh` +
+  `annotate_routing.py`) is wired into `make dev` (guarded by an empty-`ways` check, reuses
+  the offline `data/hohenfels-roads.osm`) so the demo runs from one command.
 - **route-planning-api** — `POST /api/v1/routes/plan` (start, destination, unit type/instance)
   → **fastest** and **safest** route options; each with geometry, distance, duration (road
   speed), fuel consumed + remaining (normal consumption), and aggregate route threat level.

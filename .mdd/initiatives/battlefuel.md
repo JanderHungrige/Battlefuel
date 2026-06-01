@@ -3,7 +3,7 @@ id: battlefuel
 title: BattleFuel
 status: active
 version: 4
-hash: 0f75b128
+hash: 228ced4c
 created: 2026-05-29
 ---
 
@@ -94,7 +94,7 @@ recon ability, operational status, supply requirements, telemetry freshness.
 |------|------|------------|--------|
 | Wave 1 | waves/battlefuel-wave-1.md | Query the seeded NATO unit catalog over /api/v1/units and get full per-type stats; switch the active data provider via config with no code change. | complete |
 | Wave 2 | waves/battlefuel-wave-2.md | See an offline OSM map with a grid overlay; tiles carry attributes; units render with NATO symbology; inspect any tile or unit. | complete |
-| Wave 3 | waves/battlefuel-wave-3.md | Plan a unit move offline; see route options with remaining fuel, duration, and threat level; confirm a move order; watch the unit traverse and fuel deplete. | planned |
+| Wave 3 | waves/battlefuel-wave-3.md | Plan a unit move offline; see route options with remaining fuel, duration, and threat level; confirm a move order; watch the unit traverse and fuel deplete. | complete |
 | Wave 4 | waves/battlefuel-wave-4.md | Tile attributes alter movement/fuel/threat and feed the graph; move-order pop-ups warn on threat sectors; manual obstacles and game-mode random events fire; incoming orders/sector info mutate tiles. | planned |
 | Wave 5 | waves/battlefuel-wave-5.md | Switch to the OF-8 view: see fuel stocks and distribution, place fuel buy and refuel orders, receive strategic support messages; unit overview handles missing telemetry. | planned |
 | Wave 6 | waves/battlefuel-wave-6.md | Ask the engine for advice: optimal movements, threat-aware routing, best refuel points, and stock-redistribution plans with rationale. | planned |

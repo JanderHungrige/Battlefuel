@@ -1,0 +1,104 @@
+// Planning panel: shows fastest/safest route options for the selected unit and
+// confirms a move order. All numeric values come straight from the backend planner.
+
+import type { RouteMetric, RouteOption } from '../api/types'
+
+interface MoveRoutesPanelProps {
+  unitName: string
+  loading: boolean
+  error: string | null
+  options: RouteOption[]
+  selectedMetric: RouteMetric | null
+  confirming: boolean
+  onSelectOption: (metric: RouteMetric) => void
+  onConfirm: () => void
+  onCancel: () => void
+}
+
+const km = (m: number): string => `${(m / 1000).toFixed(1)} km`
+const min = (s: number): string => `${Math.round(s / 60)} min`
+const liters = (l: number): string => `${Math.round(l).toLocaleString()} L`
+
+function OptionCard({
+  option,
+  selected,
+  onSelect,
+}: {
+  option: RouteOption
+  selected: boolean
+  onSelect: () => void
+}) {
+  return (
+    <button
+      type="button"
+      className={`route-option${selected ? ' selected' : ''}`}
+      data-testid={`route-option-${option.metric}`}
+      aria-pressed={selected}
+      onClick={onSelect}
+    >
+      <span className="route-option-label">{option.label}</span>
+      <span className="route-option-stats">
+        <span>{km(option.distance_m)}</span>
+        <span>{min(option.duration_s)}</span>
+        <span>fuel {liters(option.fuel_consumed_l)}</span>
+        <span>left {liters(option.fuel_remaining_l)}</span>
+        <span>threat {option.threat_max}</span>
+      </span>
+      {!option.sufficient_fuel && (
+        <span className="route-option-warning" data-testid={`route-low-fuel-${option.metric}`}>
+          ⚠ insufficient fuel
+        </span>
+      )}
+    </button>
+  )
+}
+
+export function MoveRoutesPanel({
+  unitName,
+  loading,
+  error,
+  options,
+  selectedMetric,
+  confirming,
+  onSelectOption,
+  onConfirm,
+  onCancel,
+}: MoveRoutesPanelProps) {
+  return (
+    <aside className="move-panel" data-testid="move-panel">
+      <button className="inspect-close" onClick={onCancel} aria-label="Close planning">
+        ×
+      </button>
+      <h2>Plan move</h2>
+      <div className="move-panel-unit">{unitName}</div>
+
+      {loading && <div className="status">Planning route…</div>}
+      {error && <div className="status error" data-testid="move-error">{error}</div>}
+
+      {!loading && !error && options.length === 0 && (
+        <div className="move-hint">Click a destination on the map.</div>
+      )}
+
+      {options.map((o) => (
+        <OptionCard
+          key={o.metric}
+          option={o}
+          selected={o.metric === selectedMetric}
+          onSelect={() => onSelectOption(o.metric)}
+        />
+      ))}
+
+      {options.length > 0 && (
+        <button
+          type="button"
+          className="move-confirm"
+          data-testid="confirm-move"
+          disabled={selectedMetric === null || confirming}
+          onClick={onConfirm}
+        >
+          {confirming ? 'Confirming…' : 'Confirm move order'}
+        </button>
+      )}
+    </aside>
+  )
+}

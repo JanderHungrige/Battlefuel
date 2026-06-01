@@ -77,3 +77,63 @@ export interface UnitType {
   endurance_hours_combat: number | null
   description: string | null
 }
+
+// --- Routing & movement (Wave 3) ---
+
+/** Which cost the route was optimised for. */
+export type RouteMetric = 'fast' | 'safe'
+
+export type MoveOrderStatus = 'pending' | 'active' | 'complete' | 'cancelled'
+
+/** One planning option returned by POST /routes/plan. geometry is [lon, lat] pairs. */
+export interface RouteOption {
+  label: 'fastest' | 'safest'
+  metric: RouteMetric
+  geometry: number[][]
+  distance_m: number
+  duration_s: number
+  threat_max: number
+  threat_avg: number
+  fuel_consumed_l: number
+  fuel_remaining_l: number
+  sufficient_fuel: boolean
+}
+
+export interface PlanRouteRequest {
+  instance_id: string
+  dest_lat: number
+  dest_lon: number
+}
+
+/** A persisted, server-authoritative move order. geometry is [lon, lat] pairs. */
+export interface MoveOrder {
+  id: string
+  instance_id: string
+  status: MoveOrderStatus
+  metric: RouteMetric
+  distance_m: number
+  duration_s: number
+  fuel_consumed_l: number
+  progress_m: number
+  geometry: number[][]
+}
+
+export interface CreateMoveOrderRequest {
+  instance_id: string
+  dest_lat: number
+  dest_lon: number
+  metric: RouteMetric
+}
+
+/** A live per-unit frame broadcast by the sim engine over the WebSocket (server→client). */
+export interface UnitUpdate {
+  type: 'unit_update'
+  instance_id: string
+  order_id: string
+  lat: number
+  lon: number
+  fuel_l: number
+  status: MoveOrderStatus
+  progress_m: number
+  distance_m: number
+}

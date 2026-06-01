@@ -34,4 +34,57 @@ describe('api client', () => {
     mockFetch(500, { detail: 'boom' })
     await expect(api.getUnitInstances()).rejects.toBeInstanceOf(ApiError)
   })
+
+  it('planRoute POSTs the request body and returns options', async () => {
+    const options = [{ metric: 'fast' }, { metric: 'safe' }]
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => options })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await api.planRoute({ instance_id: 'inst-1', dest_lat: 49.2, dest_lon: 11.8 })
+
+    expect(result).toHaveLength(2)
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toMatch(/\/routes\/plan$/)
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(init.body)).toEqual({ instance_id: 'inst-1', dest_lat: 49.2, dest_lon: 11.8 })
+  })
+
+  it('createMoveOrder POSTs the chosen metric', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, status: 201, json: async () => ({ id: 'o1', status: 'pending' }) })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const order = await api.createMoveOrder({
+      instance_id: 'inst-1',
+      dest_lat: 49.2,
+      dest_lon: 11.8,
+      metric: 'safe',
+    })
+
+    expect(order.id).toBe('o1')
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).metric).toBe('safe')
+  })
+
+  it('confirmMoveOrder POSTs to the confirm path with no body', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, status: 200, json: async () => ({ id: 'o1', status: 'active' }) })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const order = await api.confirmMoveOrder('o1')
+
+    expect(order.status).toBe('active')
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toMatch(/\/move-orders\/o1\/confirm$/)
+    expect(init.method).toBe('POST')
+    expect(init.body).toBeUndefined()
+  })
+
+  it('throws ApiError when the planner reports no route', async () => {
+    mockFetch(422, { detail: 'unroutable' })
+    await expect(
+      api.planRoute({ instance_id: 'inst-1', dest_lat: 0, dest_lon: 0 }),
+    ).rejects.toBeInstanceOf(ApiError)
+  })
 })

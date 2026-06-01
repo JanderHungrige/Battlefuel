@@ -1,11 +1,19 @@
 // Side panel showing details of the selected tile or unit instance.
 
-import type { Tile, UnitInstance, UnitType } from '../api/types'
+import type { MoveOrderStatus, Tile, UnitInstance, UnitType } from '../api/types'
+
+export interface LiveUnitState {
+  fuel_l: number
+  progress_m: number
+  distance_m: number
+  status: MoveOrderStatus
+}
 
 interface InspectPanelProps {
   tile?: Tile
   unit?: UnitInstance
   unitType?: UnitType
+  live?: LiveUnitState
   onClose: () => void
 }
 
@@ -18,7 +26,7 @@ function Row({ label, value }: { label: string; value: string | number }) {
   )
 }
 
-export function InspectPanel({ tile, unit, unitType, onClose }: InspectPanelProps) {
+export function InspectPanel({ tile, unit, unitType, live, onClose }: InspectPanelProps) {
   if (!tile && !unit) return null
 
   return (
@@ -66,6 +74,19 @@ export function InspectPanel({ tile, unit, unitType, onClose }: InspectPanelProp
                 }
               />
             </>
+          )}
+          {live && (
+            <div className="inspect-live" data-testid="inspect-live">
+              <h3>Live</h3>
+              <Row label="Live fuel" value={`${Math.round(live.fuel_l).toLocaleString()} L`} />
+              <Row
+                label="Progress"
+                value={`${Math.round(live.progress_m).toLocaleString()} / ${Math.round(
+                  live.distance_m,
+                ).toLocaleString()} m`}
+              />
+              <Row label="Order" value={live.status} />
+            </div>
           )}
         </>
       )}

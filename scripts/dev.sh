@@ -49,6 +49,19 @@ info "Applying migrations and seed data…"
 (cd backend && .venv/bin/python scripts/generate_tiles.py >/dev/null)
 (cd backend && .venv/bin/python scripts/seed_unit_instances.py >/dev/null)
 
+# 4b. Routing graph (Wave 3) — build once if the `ways` table is empty/absent.
+ways_ready() {
+  docker exec battlefuel-db psql -U battlefuel -d battlefuel -tAc \
+    "SELECT count(*) FROM ways" 2>/dev/null | grep -qE '^[1-9]'
+}
+if ways_ready; then
+  info "Routing graph present — skipping build."
+else
+  info "Building routing graph (Wave 3; first run — osm2pgrouting in the DB image)…"
+  bash backend/scripts/build_routing_graph.sh ||
+    die "Routing graph build failed. Check osm2pgrouting is in the DB image and data/hohenfels-roads.osm exists (or the network is up for the OSM extract)."
+fi
+
 # 5. Frontend deps + basemap
 [ -d frontend/node_modules ] || (info "Installing frontend deps (first run)…" && cd frontend && npm install)
 [ -f data/hohenfels.pmtiles ] || die "Missing data/hohenfels.pmtiles — run: bash backend/scripts/build_basemap.sh"

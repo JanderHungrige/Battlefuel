@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { Tile, UnitInstance } from '../api/types'
-import { TERRAIN_COLORS, tilesToGeoJSON, unitsToGeoJSON } from './overlays'
+import {
+  TERRAIN_COLORS,
+  activeRoutesToGeoJSON,
+  destinationToGeoJSON,
+  routeToGeoJSON,
+  tilesToGeoJSON,
+  unitsToGeoJSON,
+} from './overlays'
 
 const tile: Tile = {
   h3_index: '8811aa',
@@ -53,5 +60,61 @@ describe('unitsToGeoJSON', () => {
   it('falls back to empty sidc for unknown type', () => {
     const fc = unitsToGeoJSON([unit], {})
     expect(fc.features[0].properties?.sidc).toBe('')
+  })
+
+  it('overrides position with the live simulated coordinates and flags it moving', () => {
+    const fc = unitsToGeoJSON([unit], {}, { 'inst-1': { lat: 49.3, lon: 11.9 } })
+    expect(fc.features[0].geometry).toEqual({ type: 'Point', coordinates: [11.9, 49.3] })
+    expect(fc.features[0].properties?.moving).toBe(true)
+  })
+
+  it('keeps the seeded position and moving=false when no live update exists', () => {
+    const fc = unitsToGeoJSON([unit], {}, { other: { lat: 0, lon: 0 } })
+    expect(fc.features[0].geometry).toEqual({ type: 'Point', coordinates: [11.86, 49.23] })
+    expect(fc.features[0].properties?.moving).toBe(false)
+  })
+})
+
+describe('activeRoutesToGeoJSON', () => {
+  it('builds one LineString per route and drops degenerate ones', () => {
+    const fc = activeRoutesToGeoJSON([
+      [
+        [11.84, 49.22],
+        [11.86, 49.24],
+      ],
+      [[11.0, 49.0]], // too short — dropped
+    ])
+    expect(fc.features).toHaveLength(1)
+    expect(fc.features[0].geometry.type).toBe('LineString')
+  })
+})
+
+describe('routeToGeoJSON', () => {
+  it('builds a LineString from [lon,lat] pairs', () => {
+    const fc = routeToGeoJSON([
+      [11.84, 49.22],
+      [11.85, 49.23],
+    ])
+    expect(fc.features).toHaveLength(1)
+    const geom = fc.features[0].geometry
+    expect(geom.type).toBe('LineString')
+    expect(geom.type === 'LineString' ? geom.coordinates[1] : []).toEqual([11.85, 49.23])
+  })
+
+  it('returns an empty collection for null or single-point geometry', () => {
+    expect(routeToGeoJSON(null).features).toHaveLength(0)
+    expect(routeToGeoJSON([[11.84, 49.22]]).features).toHaveLength(0)
+  })
+})
+
+describe('destinationToGeoJSON', () => {
+  it('builds a single Point at [lon,lat]', () => {
+    const fc = destinationToGeoJSON({ lat: 49.23, lon: 11.86 })
+    expect(fc.features).toHaveLength(1)
+    expect(fc.features[0].geometry).toEqual({ type: 'Point', coordinates: [11.86, 49.23] })
+  })
+
+  it('returns an empty collection when null', () => {
+    expect(destinationToGeoJSON(null).features).toHaveLength(0)
   })
 })
