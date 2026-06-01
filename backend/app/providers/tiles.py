@@ -21,6 +21,7 @@ from app.domain.tile import (
     RoadCondition,
     TerrainType,
     Tile,
+    TileMutation,
     Weather,
 )
 from app.models.tile import TileRow
@@ -36,6 +37,12 @@ class TileDataProvider(ABC):
     @abstractmethod
     async def get_tile(self, session: AsyncSession, h3_index: str) -> Tile | None:
         """Return a single tile by H3 index, or ``None``."""
+
+    @abstractmethod
+    async def update_tile(
+        self, session: AsyncSession, h3_index: str, mutation: TileMutation
+    ) -> Tile | None:
+        """Apply a partial mutation to a tile and return the updated tile, or ``None``."""
 
 
 def _to_tile(row: TileRow) -> Tile:
@@ -72,6 +79,18 @@ class DbTileProvider(TileDataProvider):
     async def get_tile(self, session: AsyncSession, h3_index: str) -> Tile | None:
         row = await session.get(TileRow, h3_index)
         return _to_tile(row) if row is not None else None
+
+    async def update_tile(
+        self, session: AsyncSession, h3_index: str, mutation: TileMutation
+    ) -> Tile | None:
+        row = await session.get(TileRow, h3_index)
+        if row is None:
+            return None
+        for column, value in mutation.changes().items():
+            setattr(row, column, value)
+        await session.commit()
+        await session.refresh(row)
+        return _to_tile(row)
 
 
 TileProviderBuilder = Callable[[], TileDataProvider]

@@ -18,8 +18,11 @@ from app.config import Settings, get_settings
 from app.domain.route import RouteMetric, RoutePath
 
 # Cost / reverse-cost columns per metric (roads treated as bidirectional for the game).
-_COST_COLUMN = {RouteMetric.FAST: "length_m", RouteMetric.SAFE: "safe_cost"}
-_RCOST_COLUMN = {RouteMetric.FAST: "length_m", RouteMetric.SAFE: "safe_reverse_cost"}
+# FAST minimizes the terrain-aware time-proxy cost; SAFE the threat-weighted safe cost.
+_COST_COLUMN = {RouteMetric.FAST: "time_cost", RouteMetric.SAFE: "safe_cost"}
+_RCOST_COLUMN = {RouteMetric.FAST: "time_reverse_cost", RouteMetric.SAFE: "safe_reverse_cost"}
+# Edges at/above this cost are impassable (blocked roads) and excluded from the graph.
+_BLOCKED_COST = 1.0e12
 
 
 def _coords_from_geojson(geom: str | None) -> list[list[float]]:
@@ -59,7 +62,8 @@ class PgRoutingProvider(RoutingProvider):
     ) -> RoutePath | None:
         edges_sql = (
             f"SELECT gid AS id, source, target, {_COST_COLUMN[metric]} AS cost, "
-            f"{_RCOST_COLUMN[metric]} AS reverse_cost FROM ways"
+            f"{_RCOST_COLUMN[metric]} AS reverse_cost FROM ways "
+            f"WHERE COALESCE(time_cost, length_m) < {_BLOCKED_COST}"
         )
         query = text(
             """
@@ -79,6 +83,9 @@ class PgRoutingProvider(RoutingProvider):
             SELECT
                 ST_AsGeoJSON(ST_LineMerge(ST_Collect(w.the_geom ORDER BY p.seq))) AS geom,
                 COALESCE(SUM(w.length_m), 0) AS distance_m,
+                COALESCE(SUM(COALESCE(w.time_cost, w.length_m)), 0) AS effective_distance_m,
+                COALESCE(SUM(COALESCE(w.fuel_factor, 1.0) * COALESCE(w.time_cost, w.length_m)), 0)
+                    AS fuel_distance_m,
                 COALESCE(MAX(w.threat_level), 0) AS threat_max,
                 COALESCE(AVG(w.threat_level), 0)::float AS threat_avg
             FROM path p JOIN ways w ON w.gid = p.edge
@@ -104,6 +111,8 @@ class PgRoutingProvider(RoutingProvider):
             metric=metric,
             geometry=coords,
             distance_m=float(row.distance_m),
+            effective_distance_m=float(row.effective_distance_m),
+            fuel_distance_m=float(row.fuel_distance_m),
             threat_max=int(row.threat_max),
             threat_avg=float(row.threat_avg),
         )

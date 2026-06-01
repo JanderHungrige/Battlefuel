@@ -76,3 +76,25 @@ class Tile(BaseModel):
     def boundary_for(h3_index: str) -> list[list[float]]:
         """Return the cell boundary as [lon, lat] pairs (H3 yields lat, lng)."""
         return [[lng, lat] for lat, lng in h3.cell_to_boundary(h3_index)]
+
+
+class TileMutation(BaseModel):
+    """A partial, runtime change to a tile's game attributes (Wave 4 dynamic-tile-updates).
+
+    Geographic fields (terrain, geometry) are immutable; only game state can change.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    threat_level: int | None = Field(default=None, ge=0, le=5)
+    road_condition: RoadCondition | None = None
+    intel_level: IntelLevel | None = None
+    weather: Weather | None = None
+    cover: Cover | None = None
+
+    def changes(self) -> dict[str, object]:
+        """Column → stored value for the set fields (enums stored as their string value)."""
+        out: dict[str, object] = {}
+        for field, value in self.model_dump(exclude_none=True).items():
+            out[field] = value.value if isinstance(value, StrEnum) else value
+        return out

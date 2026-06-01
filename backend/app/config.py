@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     # Provider the factory builds for move orders (Wave 3 ships "db").
     move_order_provider: str = "db"
 
+    # Scripted "incoming sector info" tile feed (Wave 4): "scripted" or "none".
+    tile_feed_provider: str = "scripted"
+
     # Simulation game-time scale (1 real second = sim_time_scale game seconds).
     sim_time_scale: float = 60.0
     # Simulation tick interval in real seconds.

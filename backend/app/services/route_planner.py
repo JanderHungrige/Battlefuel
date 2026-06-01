@@ -27,10 +27,20 @@ def build_option(
     consumption_normal_lph: float,
     start_fuel_l: float,
 ) -> RouteOption:
-    """Layer duration + fuel onto a path. Pure (no I/O)."""
-    distance_km = path.distance_m / 1000.0
-    duration_h = distance_km / speed_road_kph if speed_road_kph > 0 else 0.0
-    fuel_consumed = consumption_normal_lph * duration_h
+    """Layer duration + fuel onto a path. Pure (no I/O).
+
+    Duration uses the terrain-aware ``effective_distance_m`` (Σ time_cost) and fuel uses
+    ``fuel_distance_m`` (Σ fuel_factor·time_cost), so the estimate matches the sim's live burn.
+    Paths computed before annotation (sums == 0) fall back to real distance.
+    """
+    effective_m = path.effective_distance_m if path.effective_distance_m > 0 else path.distance_m
+    fuel_basis_m = path.fuel_distance_m if path.fuel_distance_m > 0 else path.distance_m
+    duration_h = (effective_m / 1000.0) / speed_road_kph if speed_road_kph > 0 else 0.0
+    fuel_consumed = (
+        consumption_normal_lph * (fuel_basis_m / 1000.0) / speed_road_kph
+        if speed_road_kph > 0
+        else 0.0
+    )
     remaining = start_fuel_l - fuel_consumed
     return RouteOption(
         label=label,
