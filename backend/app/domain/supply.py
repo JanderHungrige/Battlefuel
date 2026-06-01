@@ -35,3 +35,40 @@ class FuelStock(BaseModel):
     fuel_type: FuelType
     quantity_liters: float = Field(ge=0)
     capacity_liters: float = Field(ge=0)
+
+
+class DepotFuel(BaseModel):
+    """A depot together with its current per-fuel-type stock (overview aggregate)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    depot: FuelDepot
+    stocks: list[FuelStock]
+
+
+class TruckFuel(BaseModel):
+    """A mobile fuel truck's carried fuel (a ``UnitInstance`` of a FUEL_SUPPLY unit type)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    instance_id: str
+    name: str
+    unit_type_id: str
+    fuel_type: FuelType
+    # None = no telemetry (excluded from the truck total, per the missing-telemetry model).
+    current_fuel_liters: float | None = Field(default=None, ge=0)
+    capacity_liters: float = Field(ge=0)
+    lat: float
+    lon: float
+    h3_index: str
+
+
+class SupplyOverview(BaseModel):
+    """The OF-8 distribution picture: fixed-depot stock + mobile-truck fuel + totals."""
+
+    model_config = ConfigDict(frozen=True)
+
+    depots: list[DepotFuel]
+    trucks: list[TruckFuel]
+    total_depot_liters_by_type: dict[str, float]
+    total_truck_liters: float
