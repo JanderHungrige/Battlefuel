@@ -24,3 +24,5 @@ class TileRow(Base):
     weather: Mapped[str] = mapped_column(default="clear")
     road_condition: Mapped[str] = mapped_column(default="clear")
     cover: Mapped[str] = mapped_column(default="none")
+    situation: Mapped[str | None] = mapped_column(default=None)  # Wave 4: operator sector status
+    note: Mapped[str | None] = mapped_column(default=None)  # Wave 4: free-text sector note

@@ -54,6 +54,18 @@ class Cover(StrEnum):
     HEAVY = "heavy"
 
 
+class SectorSituation(StrEnum):
+    """Operator-set "what is happening" status for a sector (Wave 4)."""
+
+    QUIET = "quiet"
+    ENEMY_CONTACT = "enemy_contact"
+    UNDER_FIRE = "under_fire"
+    COMBAT = "combat"
+    SECURED = "secured"
+    SUPPLY_POINT = "supply_point"
+    MEDEVAC = "medevac"
+
+
 class Tile(BaseModel):
     """A single hex tile with its game attributes (API representation)."""
 
@@ -69,6 +81,8 @@ class Tile(BaseModel):
     weather: Weather
     road_condition: RoadCondition
     cover: Cover
+    situation: SectorSituation | None = None
+    note: str | None = None
     # Hex boundary as a closed ring of [lon, lat] pairs (GeoJSON order), derived from H3.
     boundary: list[list[float]]
 
@@ -91,6 +105,8 @@ class TileMutation(BaseModel):
     intel_level: IntelLevel | None = None
     weather: Weather | None = None
     cover: Cover | None = None
+    situation: SectorSituation | None = None
+    note: str | None = Field(default=None, max_length=280)
 
     def changes(self) -> dict[str, object]:
         """Column → stored value for the set fields (enums stored as their string value)."""

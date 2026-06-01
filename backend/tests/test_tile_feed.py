@@ -24,6 +24,12 @@ class TestTileMutation:
     def test_empty_mutation_has_no_changes(self) -> None:
         assert TileMutation().changes() == {}
 
+    def test_situation_and_note_changes(self) -> None:
+        from app.domain.tile import SectorSituation
+
+        m = TileMutation(situation=SectorSituation.UNDER_FIRE, note="taking fire from ridge")
+        assert m.changes() == {"situation": "under_fire", "note": "taking fire from ridge"}
+
     def test_threat_out_of_range_rejected(self) -> None:
         with pytest.raises(ValidationError):
             TileMutation(threat_level=9)

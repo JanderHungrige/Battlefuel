@@ -19,6 +19,7 @@ from app.domain.tile import (
     Cover,
     IntelLevel,
     RoadCondition,
+    SectorSituation,
     TerrainType,
     Tile,
     TileMutation,
@@ -57,6 +58,8 @@ def _to_tile(row: TileRow) -> Tile:
         weather=Weather(row.weather),
         road_condition=RoadCondition(row.road_condition),
         cover=Cover(row.cover),
+        situation=SectorSituation(row.situation) if row.situation else None,
+        note=row.note,
         boundary=Tile.boundary_for(row.h3_index),
     )
 

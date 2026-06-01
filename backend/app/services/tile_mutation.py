@@ -40,4 +40,6 @@ def tile_update_frame(tile: Tile) -> dict[str, object]:
         "intel_level": tile.intel_level.value,
         "weather": tile.weather.value,
         "cover": tile.cover.value,
+        "situation": tile.situation.value if tile.situation else None,
+        "note": tile.note,
     }
