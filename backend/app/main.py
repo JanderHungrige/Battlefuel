@@ -14,6 +14,7 @@ from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.advice import router as advice_router
+from app.api.advice_movement import router as advice_movement_router
 from app.api.advice_redistribution import router as advice_redistribution_router
 from app.api.advice_refuel import router as advice_refuel_router
 from app.api.buy_orders import router as buy_orders_router
@@ -76,6 +77,7 @@ def create_app(enable_sim: bool = False) -> FastAPI:
     api_v1.include_router(advice_router)
     api_v1.include_router(advice_refuel_router)
     api_v1.include_router(advice_redistribution_router)
+    api_v1.include_router(advice_movement_router)
     api_v1.include_router(ws_router)
     app.include_router(api_v1)
     return app
