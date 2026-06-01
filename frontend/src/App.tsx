@@ -6,8 +6,10 @@ import { InspectPanel } from './components/InspectPanel'
 import { MoveRoutesPanel } from './components/MoveRoutesPanel'
 import { ObstacleKindPicker } from './components/ObstacleKindPicker'
 import type { ObstacleKind } from './components/obstacleKinds'
+import { RoleToggle } from './components/RoleToggle'
 import { TerrainLegend } from './components/TerrainLegend'
 import { OSM_ATTRIBUTION } from './config'
+import { canShow, type Role } from './roles'
 import { useObstacleOps } from './hooks/useObstacleOps'
 import { useSimSocket } from './hooks/useSimSocket'
 import { MapView } from './map/MapView'
@@ -23,6 +25,7 @@ function errorMessage(e: unknown): string {
 }
 
 export default function App() {
+  const [role, setRole] = useState<Role>('OF4')
   const [theater, setTheater] = useState<Theater | null>(null)
   const [tiles, setTiles] = useState<Tile[]>([])
   const [units, setUnits] = useState<UnitInstance[]>([])
@@ -170,13 +173,16 @@ export default function App() {
   }, [selectedUnitId, selectedUnit, destination, selectedMetric, clear, pushChatter])
 
   const ready = theater !== null
+  // Obstacle placement is an OF-4 tactical tool; never active in the OF-8 supply view.
+  const obstacleActive = canShow(role, 'obstacleMode') && obstacleMode
 
   return (
     <div className="app">
       <header className="topbar">
         <span className="brand">BattleFuel</span>
         {theater && <span className="theater">{theater.name}</span>}
-        {theater && (
+        {theater && <RoleToggle role={role} onChange={setRole} />}
+        {theater && canShow(role, 'obstacleMode') && (
           <button
             className={`mode-toggle${obstacleMode ? ' active' : ''}`}
             data-testid="obstacle-mode-toggle"
@@ -204,7 +210,7 @@ export default function App() {
               livePositions={livePositions}
               activeRoutes={activeRouteGeometries}
               obstacles={obstacles}
-              obstacleMode={obstacleMode}
+              obstacleMode={obstacleActive}
               highlightH3={highlightH3}
               onPlaceObstacle={(lat, lon) => placeObstacle(lat, lon, obstacleKind)}
               onRemoveObstacle={removeObstacle}
@@ -221,12 +227,17 @@ export default function App() {
               onPickDestination={pickDestination}
               onClearSelection={clear}
             />
-            <TerrainLegend />
+            {canShow(role, 'terrainLegend') && <TerrainLegend />}
             <ChatterLog messages={chatter} onSelect={setHighlightH3} />
-            {obstacleMode && (
+            {role === 'OF8' && (
+              <aside className="of8-placeholder" data-testid="of8-placeholder">
+                OF-8 Joint-Force supply view
+              </aside>
+            )}
+            {obstacleActive && (
               <ObstacleKindPicker selected={obstacleKind} onSelect={setObstacleKind} />
             )}
-            {selectedUnit && (
+            {canShow(role, 'moveRoutes') && selectedUnit && (
               <MoveRoutesPanel
                 unitName={selectedUnit.name}
                 loading={planLoading}
