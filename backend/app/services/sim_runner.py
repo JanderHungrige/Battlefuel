@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+from random import Random
 
 import h3
 from sqlalchemy import update
@@ -23,6 +24,7 @@ from app.providers.move_orders import build_move_order_provider
 from app.providers.tile_feed import TileFeedProvider, build_tile_feed_provider, due_events
 from app.providers.tiles import build_tile_provider
 from app.services.cost_model import TileFactors, tile_factors
+from app.services.event_engine import EventEngine
 from app.services.sim import advance
 from app.services.tile_grid import DEFAULT_RESOLUTION
 from app.services.tile_mutation import apply_tile_mutation, tile_update_frame
@@ -54,6 +56,11 @@ class SimEngine:
         settings = get_settings()
         maker = get_session_maker()
         feed = build_tile_feed_provider()
+        events = EventEngine(
+            Random(),
+            mean_interval_game_s=settings.event_mean_interval_game_s,
+            enabled=settings.game_mode,
+        )
         dt_game = settings.sim_tick_seconds * settings.sim_time_scale
         while not self._stop.is_set():
             try:
@@ -62,6 +69,9 @@ class SimEngine:
                     self._game_s += dt_game
                     await self.tick(session, dt_game)
                     await self.apply_feed(session, feed, prev_game_s, self._game_s)
+                    await events.step(
+                        session, build_tile_provider(), self._manager, self._game_s, dt_game
+                    )
             except Exception:
                 pass
             with contextlib.suppress(asyncio.TimeoutError):
