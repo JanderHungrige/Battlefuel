@@ -41,8 +41,26 @@ class Settings(BaseSettings):
     # Scripted "incoming sector info" tile feed (Wave 4): "scripted" or "none".
     tile_feed_provider: str = "scripted"
 
+    # Scripted OF-8 strategic-support message feed (Wave 5): "scripted" or "none".
+    strategic_feed_provider: str = "scripted"
+
     # Provider the factory builds for manual obstacles (Wave 4 ships "db").
     obstacle_provider: str = "db"
+
+    # Provider the factory builds for fuel depots + stock (Wave 5 ships "db").
+    supply_provider: str = "db"
+
+    # Provider the factory builds for refuel orders (Wave 5 ships "db").
+    refuel_order_provider: str = "db"
+
+    # Refuel truck-selection strategy (Wave 5 ships "nearest"; "ortools" arrives in Wave 6).
+    refuel_recommender: str = "nearest"
+
+    # Provider the factory builds for buy orders (Wave 5 ships "db").
+    buy_order_provider: str = "db"
+
+    # Default fuel-procurement lead time in game-seconds (overridable per buy order).
+    buy_order_lead_time_game_s: float = 600.0
 
     # Random event engine (Wave 4): master toggle + mean interval between events in game-seconds.
     game_mode: bool = True

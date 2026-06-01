@@ -173,6 +173,116 @@ export interface TileMutationRequest {
   note?: string
 }
 
+// --- Fuel supply (Wave 5) ---
+
+export interface FuelDepot {
+  id: string
+  name: string
+  h3_index: string
+  lat: number
+  lon: number
+}
+
+export interface FuelStock {
+  depot_id: string
+  fuel_type: string
+  quantity_liters: number
+  capacity_liters: number
+}
+
+export interface DepotFuel {
+  depot: FuelDepot
+  stocks: FuelStock[]
+}
+
+export interface TruckFuel {
+  instance_id: string
+  name: string
+  unit_type_id: string
+  fuel_type: string
+  current_fuel_liters: number | null
+  capacity_liters: number
+  lat: number
+  lon: number
+  h3_index: string
+}
+
+export interface SupplyOverview {
+  depots: DepotFuel[]
+  trucks: TruckFuel[]
+  total_depot_liters_by_type: Record<string, number>
+  total_truck_liters: number
+}
+
+export type BuyOrderStatus = 'pending' | 'active' | 'delivered' | 'cancelled'
+
+export interface BuyOrder {
+  id: string
+  depot_id: string
+  fuel_type: string
+  quantity_liters: number
+  status: BuyOrderStatus
+  lead_time_game_s: number
+  remaining_game_s: number
+}
+
+export interface CreateBuyOrderRequest {
+  depot_id: string
+  fuel_type: string
+  quantity_liters: number
+  lead_time_game_s?: number
+}
+
+export type RefuelOrderStatus = 'pending' | 'active' | 'complete' | 'cancelled'
+
+export interface RefuelOrder {
+  id: string
+  unit_id: string
+  truck_id: string
+  fuel_type: string
+  status: RefuelOrderStatus
+  rendezvous_lat: number
+  rendezvous_lon: number
+  rendezvous_h3: string
+  requested_liters: number | null
+  transferred_liters: number
+}
+
+export interface CreateRefuelOrderRequest {
+  unit_id: string
+  requested_liters?: number
+}
+
+/** Live frame broadcast when a buy order is delivered (Wave 5 buy-orders). */
+export interface BuyOrderUpdate {
+  type: 'buy_order_update'
+  order_id: string
+  depot_id: string
+  fuel_type: string
+  quantity_liters: number
+  status: BuyOrderStatus
+  remaining_game_s: number
+}
+
+/** Live frame broadcast when a refuel transfer completes (Wave 5 refuel-orders). */
+export interface RefuelOrderUpdate {
+  type: 'refuel_order_update'
+  order_id: string
+  unit_id: string
+  truck_id: string
+  status: RefuelOrderStatus
+  fuel_type: string
+  transferred_liters: number
+}
+
+/** A scripted OF-8 strategic-support message broadcast over the WebSocket (Wave 5). */
+export interface StrategicMessage {
+  type: 'strategic_message'
+  text: string
+  category: string
+  game_s: number
+}
+
 /** A live tile-change frame broadcast when a tile is mutated (Wave 4 dynamic-tile-updates). */
 export interface TileUpdate {
   type: 'tile_update'

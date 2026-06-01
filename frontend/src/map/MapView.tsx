@@ -7,11 +7,12 @@ import maplibregl from 'maplibre-gl'
 import { Protocol } from 'pmtiles'
 import { useEffect, useRef } from 'react'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import type { Obstacle, Theater, Tile, UnitInstance, UnitType } from '../api/types'
+import type { FuelDepot, Obstacle, Theater, Tile, UnitInstance, UnitType } from '../api/types'
 import { PMTILES_PATH } from '../config'
 import { buildBasemapStyle } from './basemapStyle'
 import {
   activeRoutesToGeoJSON,
+  depotsToGeoJSON,
   destinationToGeoJSON,
   obstaclesToGeoJSON,
   routeToGeoJSON,
@@ -39,6 +40,8 @@ export interface MapViewProps {
   activeRoutes: number[][][]
   obstacles: Obstacle[]
   obstacleMode: boolean
+  depots: FuelDepot[]
+  rendezvous: { lat: number; lon: number } | null
   highlightH3: string | null
   onSelectTile: (h3Index: string) => void
   onSelectUnit: (id: string) => void
@@ -139,6 +142,35 @@ function initLayers(map: maplibregl.Map): void {
       'circle-opacity': 0.85,
       'circle-stroke-width': 2,
       'circle-stroke-color': '#0e1116',
+    },
+  })
+
+  // Fuel depots (OF-8 supply overlay): amber diamonds.
+  map.addSource('depots', { type: 'geojson', data: EMPTY })
+  map.addLayer({
+    id: 'depots',
+    type: 'circle',
+    source: 'depots',
+    paint: {
+      'circle-radius': 9,
+      'circle-color': '#ffb020',
+      'circle-opacity': 0.9,
+      'circle-stroke-width': 2,
+      'circle-stroke-color': '#0e1116',
+    },
+  })
+
+  // Refuel rendezvous marker: amber ring.
+  map.addSource('rendezvous', { type: 'geojson', data: EMPTY })
+  map.addLayer({
+    id: 'rendezvous-point',
+    type: 'circle',
+    source: 'rendezvous',
+    paint: {
+      'circle-radius': 11,
+      'circle-color': 'rgba(255,176,32,0.15)',
+      'circle-stroke-width': 3,
+      'circle-stroke-color': '#ffb020',
     },
   })
 }
@@ -245,6 +277,8 @@ export function MapView(props: MapViewProps) {
       setData(map, 'route', routeToGeoJSON(p.routeGeometry))
       setData(map, 'destination', destinationToGeoJSON(p.destination))
       setData(map, 'obstacles', obstaclesToGeoJSON(p.obstacles))
+      setData(map, 'depots', depotsToGeoJSON(p.depots))
+      setData(map, 'rendezvous', destinationToGeoJSON(p.rendezvous))
       wireInteraction(map, propsRef)
       wireHover(map)
       readyRef.current = true
@@ -281,6 +315,14 @@ export function MapView(props: MapViewProps) {
     if (readyRef.current && mapRef.current)
       setData(mapRef.current, 'obstacles', obstaclesToGeoJSON(props.obstacles))
   }, [props.obstacles])
+  useEffect(() => {
+    if (readyRef.current && mapRef.current)
+      setData(mapRef.current, 'depots', depotsToGeoJSON(props.depots))
+  }, [props.depots])
+  useEffect(() => {
+    if (readyRef.current && mapRef.current)
+      setData(mapRef.current, 'rendezvous', destinationToGeoJSON(props.rendezvous))
+  }, [props.rendezvous])
   useEffect(() => {
     if (!readyRef.current || !mapRef.current) return
     const map = mapRef.current

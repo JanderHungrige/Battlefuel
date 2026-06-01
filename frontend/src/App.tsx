@@ -1,33 +1,29 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ApiError, api } from './api/client'
-import type { RouteMetric, RouteOption, Theater, Tile, UnitInstance, UnitType } from './api/types'
+import { useCallback, useMemo, useState } from 'react'
+import { api } from './api/client'
+import { errorMessage } from './api/errors'
+import type { RouteMetric, RouteOption } from './api/types'
 import { ChatterLog } from './components/ChatterLog'
 import { InspectPanel } from './components/InspectPanel'
 import { MoveRoutesPanel } from './components/MoveRoutesPanel'
 import { ObstacleKindPicker } from './components/ObstacleKindPicker'
 import type { ObstacleKind } from './components/obstacleKinds'
+import { RoleToggle } from './components/RoleToggle'
+import { SupplyPanel } from './components/SupplyPanel'
 import { TerrainLegend } from './components/TerrainLegend'
+import { UnitOverview } from './components/UnitOverview'
 import { OSM_ATTRIBUTION } from './config'
+import { canShow, type Role } from './roles'
 import { useObstacleOps } from './hooks/useObstacleOps'
 import { useSimSocket } from './hooks/useSimSocket'
+import { useSupply } from './hooks/useSupply'
+import { useSupplyOrders } from './hooks/useSupplyOrders'
+import { useTheaterData } from './hooks/useTheaterData'
+import { useUnitOverview } from './hooks/useUnitOverview'
 import { MapView } from './map/MapView'
 
-function errorMessage(e: unknown): string {
-  if (e instanceof ApiError) {
-    if (e.status === 422) return 'No route to that destination.'
-    if (e.status === 404) return 'Unit not found.'
-    if (e.status === 409) return 'Unit type not in catalog.'
-    return e.message
-  }
-  return e instanceof Error ? e.message : String(e)
-}
-
 export default function App() {
-  const [theater, setTheater] = useState<Theater | null>(null)
-  const [tiles, setTiles] = useState<Tile[]>([])
-  const [units, setUnits] = useState<UnitInstance[]>([])
-  const [unitTypes, setUnitTypes] = useState<UnitType[]>([])
-  const [error, setError] = useState<string | null>(null)
+  const [role, setRole] = useState<Role>('OF4')
+  const { theater, tiles, units, setUnits, unitTypes, error } = useTheaterData()
 
   const [selectedTileH3, setSelectedTileH3] = useState<string | null>(null)
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null)
@@ -42,30 +38,18 @@ export default function App() {
   const [confirming, setConfirming] = useState(false)
 
   const [activeRoutes, setActiveRoutes] = useState<Record<string, number[][]>>({})
-  const { positions: live, tileUpdates, chatter, pushChatter } = useSimSocket()
+  const { positions: live, tileUpdates, chatter, strategic, pushChatter, supplyTick } =
+    useSimSocket()
+
+  // OF-8 supply: distribution data + order actions.
+  const supply = useSupply(role === 'OF8', supplyTick)
+  const supplyOrders = useSupplyOrders(units, unitTypes, pushChatter, supply.refetch)
+  const roster = useUnitOverview(setUnits)
 
   // Operator ops: obstacles + tile edits + the obstacle-placement mode and chosen kind.
   const { obstacles, placeObstacle, removeObstacle, mutateTile } = useObstacleOps()
   const [obstacleMode, setObstacleMode] = useState(false)
   const [obstacleKind, setObstacleKind] = useState<ObstacleKind>('minefield')
-
-  useEffect(() => {
-    let active = true
-    Promise.all([api.getTheater(), api.getTiles(), api.getUnitInstances(), api.getUnitTypes()])
-      .then(([t, ti, u, ut]) => {
-        if (!active) return
-        setTheater(t)
-        setTiles(ti)
-        setUnits(u)
-        setUnitTypes(ut)
-      })
-      .catch((e: unknown) => {
-        if (active) setError(e instanceof Error ? e.message : String(e))
-      })
-    return () => {
-      active = false
-    }
-  }, [])
 
   // Tiles merged with their latest live tile_update (threat/road/situation/etc.).
   const displayedTiles = useMemo(() => {
@@ -170,13 +154,25 @@ export default function App() {
   }, [selectedUnitId, selectedUnit, destination, selectedMetric, clear, pushChatter])
 
   const ready = theater !== null
+  // Obstacle placement is an OF-4 tactical tool; never active in the OF-8 supply view.
+  const obstacleActive = canShow(role, 'obstacleMode') && obstacleMode
 
   return (
     <div className="app">
       <header className="topbar">
         <span className="brand">BattleFuel</span>
         {theater && <span className="theater">{theater.name}</span>}
-        {theater && (
+        {theater && <RoleToggle role={role} onChange={setRole} />}
+        {theater && canShow(role, 'unitOverview') && (
+          <button
+            className={`mode-toggle${roster.open ? ' active' : ''}`}
+            data-testid="unit-overview-toggle"
+            onClick={roster.toggle}
+          >
+            Units
+          </button>
+        )}
+        {theater && canShow(role, 'obstacleMode') && (
           <button
             className={`mode-toggle${obstacleMode ? ' active' : ''}`}
             data-testid="obstacle-mode-toggle"
@@ -204,8 +200,10 @@ export default function App() {
               livePositions={livePositions}
               activeRoutes={activeRouteGeometries}
               obstacles={obstacles}
-              obstacleMode={obstacleMode}
-              highlightH3={highlightH3}
+              obstacleMode={obstacleActive}
+              depots={canShow(role, 'depotOverlay') ? supply.depots : []}
+              rendezvous={canShow(role, 'supplyPanel') ? supplyOrders.rendezvous : null}
+              highlightH3={supplyOrders.truckHighlightH3 ?? highlightH3}
               onPlaceObstacle={(lat, lon) => placeObstacle(lat, lon, obstacleKind)}
               onRemoveObstacle={removeObstacle}
               onSelectTile={(h3) => {
@@ -221,12 +219,35 @@ export default function App() {
               onPickDestination={pickDestination}
               onClearSelection={clear}
             />
-            <TerrainLegend />
+            {canShow(role, 'terrainLegend') && <TerrainLegend />}
             <ChatterLog messages={chatter} onSelect={setHighlightH3} />
-            {obstacleMode && (
+            {canShow(role, 'strategicFeed') && (
+              <ChatterLog
+                messages={strategic}
+                title="Strategic Support"
+                className="chatter strategic-feed"
+                testId="strategic-feed"
+                emptyText="Awaiting strategic traffic…"
+              />
+            )}
+            {canShow(role, 'supplyPanel') && (
+              <SupplyPanel
+                overview={supply.overview}
+                depots={supply.depots}
+                refuelTargets={supplyOrders.refuelTargets}
+                recommendation={supplyOrders.recommendation}
+                busy={supplyOrders.busy}
+                message={supplyOrders.message}
+                onBuy={supplyOrders.placeBuy}
+                onRefuel={supplyOrders.placeRefuel}
+                onConfirmRefuel={supplyOrders.confirmRefuel}
+                onCancelRefuel={supplyOrders.cancelRefuel}
+              />
+            )}
+            {obstacleActive && (
               <ObstacleKindPicker selected={obstacleKind} onSelect={setObstacleKind} />
             )}
-            {selectedUnit && (
+            {canShow(role, 'moveRoutes') && selectedUnit && (
               <MoveRoutesPanel
                 unitName={selectedUnit.name}
                 loading={planLoading}
@@ -237,6 +258,14 @@ export default function App() {
                 onSelectOption={setSelectedMetric}
                 onConfirm={confirmMove}
                 onCancel={clear}
+              />
+            )}
+            {canShow(role, 'unitOverview') && roster.open && (
+              <UnitOverview
+                units={units}
+                unitTypes={unitTypes}
+                onSetTelemetry={roster.setTelemetry}
+                onClose={roster.toggle}
               />
             )}
             <InspectPanel

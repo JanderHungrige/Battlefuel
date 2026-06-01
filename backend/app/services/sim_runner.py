@@ -19,12 +19,23 @@ from app.api.ws import ConnectionManager
 from app.config import get_settings
 from app.db import get_session_maker
 from app.models.unit_instance import UnitInstanceRow
+from app.providers.buy_orders import build_buy_order_provider
 from app.providers.factory import build_unit_provider
 from app.providers.move_orders import build_move_order_provider
+from app.providers.refuel_orders import build_refuel_order_provider
+from app.providers.strategic_feed import (
+    StrategicFeedProvider,
+    build_strategic_feed_provider,
+    due_strategic,
+)
+from app.providers.supply import build_supply_provider
 from app.providers.tile_feed import TileFeedProvider, build_tile_feed_provider, due_events
 from app.providers.tiles import build_tile_provider
+from app.providers.unit_instances import build_unit_instance_provider
+from app.services.buy_service import deliver_due_buy_orders
 from app.services.cost_model import TileFactors, tile_factors
 from app.services.event_engine import EventEngine
+from app.services.refuel_service import try_complete_refuel
 from app.services.sim import advance
 from app.services.tile_grid import DEFAULT_RESOLUTION
 from app.services.tile_mutation import apply_tile_mutation, tile_update_frame
@@ -56,6 +67,7 @@ class SimEngine:
         settings = get_settings()
         maker = get_session_maker()
         feed = build_tile_feed_provider()
+        strategic = build_strategic_feed_provider()
         events = EventEngine(
             Random(),
             mean_interval_game_s=settings.event_mean_interval_game_s,
@@ -68,7 +80,10 @@ class SimEngine:
                     prev_game_s = self._game_s
                     self._game_s += dt_game
                     await self.tick(session, dt_game)
+                    await self.complete_refuels(session)
+                    await self.advance_buy_orders(session, dt_game)
                     await self.apply_feed(session, feed, prev_game_s, self._game_s)
+                    await self.apply_strategic_feed(strategic, prev_game_s, self._game_s)
                     await events.step(
                         session, build_tile_provider(), self._manager, self._game_s, dt_game
                     )
@@ -91,6 +106,70 @@ class SimEngine:
                 await self._manager.broadcast(tile_update_frame(tile))
                 applied += 1
         return applied
+
+    async def apply_strategic_feed(
+        self, strategic: StrategicFeedProvider, prev_s: float, now_s: float
+    ) -> int:
+        """Broadcast scripted strategic messages that came due in (prev_s, now_s]. Public for
+        testing. Returns the number sent."""
+        sent = 0
+        for ev in due_strategic(strategic.events(), prev_s, now_s):
+            await self._manager.broadcast(
+                {
+                    "type": "strategic_message",
+                    "text": ev.text,
+                    "category": ev.category,
+                    "game_s": round(now_s, 1),
+                }
+            )
+            sent += 1
+        return sent
+
+    async def complete_refuels(self, session: AsyncSession) -> int:
+        """Complete any active refuel order whose unit + truck are co-located. Public for testing.
+
+        Returns the number of transfers completed; broadcasts a ``refuel_order_update`` per one.
+        """
+        orders = build_refuel_order_provider()
+        instances = build_unit_instance_provider()
+        units = build_unit_provider()
+        completed = 0
+        for order in await orders.list_active(session):
+            done = await try_complete_refuel(session, instances, units, orders, order)
+            if done is not None:
+                await self._manager.broadcast(
+                    {
+                        "type": "refuel_order_update",
+                        "order_id": done.id,
+                        "unit_id": done.unit_id,
+                        "truck_id": done.truck_id,
+                        "status": done.status.value,
+                        "fuel_type": done.fuel_type.value,
+                        "transferred_liters": round(done.transferred_liters, 1),
+                    }
+                )
+                completed += 1
+        return completed
+
+    async def advance_buy_orders(self, session: AsyncSession, dt_game_s: float) -> int:
+        """Count down active buy orders; deliver + broadcast those that come due. Public for
+        testing. Returns the number delivered this step."""
+        supply = build_supply_provider()
+        orders = build_buy_order_provider()
+        delivered = await deliver_due_buy_orders(session, supply, orders, dt_game_s)
+        for order in delivered:
+            await self._manager.broadcast(
+                {
+                    "type": "buy_order_update",
+                    "order_id": order.id,
+                    "depot_id": order.depot_id,
+                    "fuel_type": order.fuel_type.value,
+                    "quantity_liters": round(order.quantity_liters, 1),
+                    "status": order.status.value,
+                    "remaining_game_s": round(order.remaining_game_s, 1),
+                }
+            )
+        return len(delivered)
 
     async def tick(self, session: AsyncSession, dt_game_s: float) -> None:
         """Advance every active order by one game-time step. Public for testing."""

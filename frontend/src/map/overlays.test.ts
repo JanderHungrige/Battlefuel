@@ -4,6 +4,7 @@ import { latLngToCell } from 'h3-js'
 import {
   TERRAIN_COLORS,
   activeRoutesToGeoJSON,
+  depotsToGeoJSON,
   destinationToGeoJSON,
   obstaclesToGeoJSON,
   routeToGeoJSON,
@@ -142,5 +143,16 @@ describe('destinationToGeoJSON', () => {
 
   it('returns an empty collection when null', () => {
     expect(destinationToGeoJSON(null).features).toHaveLength(0)
+  })
+})
+
+describe('depotsToGeoJSON', () => {
+  it('emits one point feature per depot at [lon, lat] with id + name', () => {
+    const fc = depotsToGeoJSON([
+      { id: 'depot-main', name: 'Main Supply Point', h3_index: 'x', lat: 49.2, lon: 11.8 },
+    ])
+    expect(fc.features).toHaveLength(1)
+    expect(fc.features[0].geometry).toEqual({ type: 'Point', coordinates: [11.8, 49.2] })
+    expect(fc.features[0].properties).toMatchObject({ id: 'depot-main', name: 'Main Supply Point' })
   })
 })

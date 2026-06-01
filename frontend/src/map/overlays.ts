@@ -3,7 +3,7 @@
 
 import type { FeatureCollection } from 'geojson'
 import { cellToLatLng } from 'h3-js'
-import type { Obstacle, TerrainType, Tile, UnitInstance } from '../api/types'
+import type { FuelDepot, Obstacle, TerrainType, Tile, UnitInstance } from '../api/types'
 
 export const TERRAIN_COLORS: Record<TerrainType, string> = {
   open: '#3c4a30',
@@ -80,6 +80,18 @@ export function obstaclesToGeoJSON(obstacles: Obstacle[]): FeatureCollection {
         properties: { id: o.id },
       }
     }),
+  }
+}
+
+/** Fuel depots → point FeatureCollection at each depot's location. */
+export function depotsToGeoJSON(depots: FuelDepot[]): FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: depots.map((d) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [d.lon, d.lat] },
+      properties: { id: d.id, name: d.name },
+    })),
   }
 }
 

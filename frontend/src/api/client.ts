@@ -2,11 +2,18 @@
 
 import { API_BASE } from '../config'
 import type {
+  BuyOrder,
+  CreateBuyOrderRequest,
   CreateMoveOrderRequest,
+  CreateRefuelOrderRequest,
+  FuelDepot,
+  FuelStock,
   MoveOrder,
   Obstacle,
   PlanRouteRequest,
+  RefuelOrder,
   RouteOption,
+  SupplyOverview,
   Theater,
   Tile,
   TileMutationRequest,
@@ -52,6 +59,10 @@ export const api = {
   getTheater: (): Promise<Theater> => getJson<Theater>('/theater'),
   getTiles: (): Promise<Tile[]> => getJson<Tile[]>('/tiles'),
   getUnitInstances: (): Promise<UnitInstance[]> => getJson<UnitInstance[]>('/unit-instances'),
+  setTelemetry: (id: string, currentFuelLiters: number): Promise<UnitInstance> =>
+    postJson<UnitInstance>(`/unit-instances/${id}/telemetry`, {
+      current_fuel_liters: currentFuelLiters,
+    }),
   getUnitTypes: (): Promise<UnitType[]> => getJson<UnitType[]>('/units'),
   getUnitType: (id: string): Promise<UnitType> => getJson<UnitType>(`/units/${id}`),
 
@@ -74,4 +85,19 @@ export const api = {
     deleteJson<{ id: string; status: string }>(`/obstacles/${id}`),
   patchTile: (h3Index: string, mutation: TileMutationRequest): Promise<Tile> =>
     patchJson<Tile>(`/tiles/${h3Index}`, mutation),
+
+  // Fuel supply (Wave 5).
+  getDepots: (): Promise<FuelDepot[]> => getJson<FuelDepot[]>('/depots'),
+  getFuelStocks: (): Promise<FuelStock[]> => getJson<FuelStock[]>('/fuel-stocks'),
+  getSupplyOverview: (): Promise<SupplyOverview> => getJson<SupplyOverview>('/supply/overview'),
+  createBuyOrder: (req: CreateBuyOrderRequest): Promise<BuyOrder> =>
+    postJson<BuyOrder>('/buy-orders', req),
+  confirmBuyOrder: (id: string): Promise<BuyOrder> => postJson<BuyOrder>(`/buy-orders/${id}/confirm`),
+  cancelBuyOrder: (id: string): Promise<BuyOrder> => postJson<BuyOrder>(`/buy-orders/${id}/cancel`),
+  createRefuelOrder: (req: CreateRefuelOrderRequest): Promise<RefuelOrder> =>
+    postJson<RefuelOrder>('/refuel-orders', req),
+  confirmRefuelOrder: (id: string): Promise<RefuelOrder> =>
+    postJson<RefuelOrder>(`/refuel-orders/${id}/confirm`),
+  cancelRefuelOrder: (id: string): Promise<RefuelOrder> =>
+    postJson<RefuelOrder>(`/refuel-orders/${id}/cancel`),
 }

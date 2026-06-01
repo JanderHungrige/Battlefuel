@@ -48,6 +48,7 @@ info "Applying migrations and seed data…"
 (cd backend && .venv/bin/alembic upgrade head >/dev/null)
 (cd backend && .venv/bin/python scripts/generate_tiles.py >/dev/null)
 (cd backend && .venv/bin/python scripts/seed_unit_instances.py >/dev/null)
+(cd backend && .venv/bin/python scripts/seed_supply.py >/dev/null)
 
 # 4b. Routing graph (Wave 3) — build once if the `ways` table is empty/absent.
 ways_ready() {
