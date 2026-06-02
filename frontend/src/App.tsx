@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
+import type { Recommendation } from './api/types'
 import { AdvisorPanel } from './components/AdvisorPanel'
 import { ChatterLog } from './components/ChatterLog'
 import { InspectPanel } from './components/InspectPanel'
@@ -13,6 +14,7 @@ import { OSM_ATTRIBUTION } from './config'
 import { canShow, type Role } from './roles'
 import { useObstacleOps } from './hooks/useObstacleOps'
 import { useSimSocket } from './hooks/useSimSocket'
+import { useAdviceMarker } from './hooks/useAdviceMarker'
 import { useAdvisor } from './hooks/useAdvisor'
 import { useMovePlanning } from './hooks/useMovePlanning'
 import { useSupply } from './hooks/useSupply'
@@ -80,6 +82,10 @@ export default function App() {
   }, [live])
   const selectedLive = selectedUnitId ? live[selectedUnitId] : undefined
 
+  // A clicked advisor recommendation marked on the map: highlight + a movement arrow.
+  const [selectedAdvice, setSelectedAdvice] = useState<Recommendation | null>(null)
+  const adviceMarker = useAdviceMarker(selectedAdvice, units, livePositions, supply.depots)
+
   const clear = useCallback(() => {
     setSelectedTileH3(null)
     setSelectedUnitId(null)
@@ -146,7 +152,9 @@ export default function App() {
               obstacleMode={obstacleActive}
               depots={canShow(role, 'depotOverlay') ? supply.depots : []}
               rendezvous={canShow(role, 'supplyPanel') ? supplyOrders.rendezvous : null}
-              highlightH3={supplyOrders.truckHighlightH3 ?? highlightH3}
+              adviceArrow={adviceMarker.arrow}
+              adviceDest={adviceMarker.dest}
+              highlightH3={supplyOrders.truckHighlightH3 ?? adviceMarker.highlightH3 ?? highlightH3}
               onPlaceObstacle={(lat, lon) => placeObstacle(lat, lon, obstacleKind)}
               onRemoveObstacle={removeObstacle}
               onSelectTile={(h3) => {
@@ -212,7 +220,11 @@ export default function App() {
                 canRoute={selectedUnitId !== null && planning.destination !== null}
                 onRequest={advisor.request}
                 onApply={advisor.apply}
-                onClose={advisor.toggle}
+                onSelect={setSelectedAdvice}
+                onClose={() => {
+                  setSelectedAdvice(null)
+                  advisor.toggle()
+                }}
               />
             )}
             {canShow(role, 'unitOverview') && roster.open && (

@@ -32,10 +32,19 @@ const base = {
   canRoute: false,
   onRequest: vi.fn(),
   onApply: vi.fn(),
+  onSelect: vi.fn(),
   onClose: vi.fn(),
 }
 
 describe('AdvisorPanel', () => {
+  it('selects a recommendation (to mark it on the map) when its row is clicked', () => {
+    const onSelect = vi.fn()
+    render(<AdvisorPanel {...base} onSelect={onSelect} />)
+    const rows = screen.getAllByTestId('advice-rec')
+    fireEvent.click(within(rows[0]).getByTestId('advice-select'))
+    expect(onSelect).toHaveBeenCalledWith(result.recommendations[0])
+  })
+
   it('requests advice when a kind button is clicked', () => {
     const onRequest = vi.fn()
     render(<AdvisorPanel {...base} onRequest={onRequest} />)

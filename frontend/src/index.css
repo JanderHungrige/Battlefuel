@@ -318,6 +318,18 @@ body {
 .advice-rationale {
   flex: 1;
   font-size: 12px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  padding: 0;
+}
+
+.advice-rec.selected {
+  background: rgba(255, 210, 63, 0.14);
+  border-left: 2px solid #ffd23f;
+  padding-left: 6px;
 }
 
 .advice-rec button {

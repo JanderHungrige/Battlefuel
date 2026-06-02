@@ -62,7 +62,7 @@ async def refuel_plan(session: SessionDep, instances: InstanceDep, units: UnitDe
         Recommendation(
             kind=RecommendationKind.REFUEL,
             target=unit_id,
-            action={"endpoint": "refuel-orders", "unit_id": unit_id},
+            action={"endpoint": "refuel-orders", "unit_id": unit_id, "truck_id": truck_id},
             score=cost,
             rationale=f"Assign {truck_id} (cost {cost:.1f}: distance + fuel adequacy)",
         )

@@ -15,6 +15,10 @@ source_files:
   - frontend/src/roles.ts
   - frontend/src/App.tsx
   - frontend/src/index.css
+  - frontend/src/map/overlays.ts
+  - frontend/src/map/MapView.tsx
+  - frontend/src/hooks/useAdviceMarker.ts
+  - backend/app/api/advice_refuel.py
 routes: []
 models: []
 test_files:
@@ -33,7 +37,8 @@ satisfies_contracts:
     when: "The Advisor panel mounts via the role registry (available in both roles)."
     status: done
     verified_at: "frontend/src/App.tsx:206"
-known_issues: []
+known_issues:
+  - "Movement-axis arrow is a custom NATO-style approximation, not a spec-exact APP-6 tactical mission graphic (milsymbol does not render control measures)."
 security_read_sites: []
 sister_projects: []
 ---
@@ -79,6 +84,12 @@ Consumes (no new endpoints): `GET /advice/reposition`, `/advice/refuel-plan`,
   `refuel-orders` → create+confirm refuel order; `buy-orders` → create+confirm buy order. On
   success a chatter line is logged and the supply overview refetched.
 - The panel mounts in both roles via `canShow(role, 'advisor')`.
+- **Map marking (enhancement):** clicking a recommendation row selects it and marks it on the
+  map — a highlighted cell plus a **yellow NATO-style movement-axis arrow** (shaft + arrowhead,
+  `adviceArrowToGeoJSON`) derived per kind by `useAdviceMarker`: route/reposition =
+  unit→destination, **refuel = truck→unit** (the refuel action carries `truck_id`), **transfer =
+  from-depot→to-depot**. Buy recs (no movement) highlight the depot only. milsymbol covers unit
+  icons, not tactical mission graphics, so the arrow is a custom axis-of-advance approximation.
 
 ## Data Flow
 
