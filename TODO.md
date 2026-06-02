@@ -18,3 +18,9 @@ Hetzner Cloud host, TLS/domain, persistent Postgres+PostGIS volume with backups,
 
 > Source: Wave 7 planning (`/mdd plan-wave battlefuel-wave-7`, 2026-06-02).
 > When ready, fold these into a new wave/milestone rather than bolting onto Wave 7.
+
+## Deferred from BattleFuel v2 (initiative battlefuel-v2)
+
+- [ ] **Landing-page login / authentication** — deferred 2026-06-02. Wave 8 ships the landing
+  page + data-integration guide without auth; add a "fun login" / real authentication later
+  (app is currently single-user, no auth). See `.mdd/initiatives/battlefuel-v2.md`.
