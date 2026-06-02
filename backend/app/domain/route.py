@@ -19,6 +19,13 @@ class RouteMetric(StrEnum):
     SAFE = "safe"  # minimize threat-weighted distance
 
 
+class RouteMode(StrEnum):
+    """How the unit travels — selects the router and the speed (v2 Wave 1, terrain-router)."""
+
+    ROAD = "road"  # pgRouting over the road graph at the unit's road speed (default)
+    OFFROAD = "offroad"  # A* over the H3 terrain grid at the unit's off-road / by-foot speed
+
+
 class RoutePath(BaseModel):
     """A computed path through the road graph."""
 

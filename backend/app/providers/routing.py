@@ -27,7 +27,7 @@ from sqlalchemy import Row, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings, get_settings
-from app.domain.route import RouteMetric, RoutePath
+from app.domain.route import RouteMetric, RouteMode, RoutePath
 
 logger = logging.getLogger(__name__)
 
@@ -182,6 +182,32 @@ class PgRoutingProvider(RoutingProvider):
         return (await session.execute(_PATH_SQL, {**params, "edges": edges_sql})).one()
 
 
+class TerrainRoutingProvider(RoutingProvider):
+    """Off-road (by-foot) router: A* over the H3 terrain grid (v2 Wave 1, terrain-router).
+
+    Loads the theater tiles via the tile factory and delegates to the pure ``terrain_path``
+    A*. Ignores the road graph entirely, so it routes cross-country even when every road is
+    blocked. Returns the same ``RoutePath`` shape as the road provider.
+    """
+
+    async def shortest_path(
+        self,
+        session: AsyncSession,
+        start_lat: float,
+        start_lon: float,
+        dest_lat: float,
+        dest_lon: float,
+        metric: RouteMetric,
+    ) -> RoutePath | None:
+        # Imported lazily to avoid a provider/service import cycle at module load.
+        from app.providers.tiles import build_tile_provider
+        from app.services.terrain_router import terrain_path
+
+        tiles = await build_tile_provider().list_tiles(session)
+        tile_map = {t.h3_index: (t.terrain, t.threat_level) for t in tiles}
+        return terrain_path(tile_map, start_lat, start_lon, dest_lat, dest_lon, metric)
+
+
 RoutingProviderBuilder = Callable[[], RoutingProvider]
 _REGISTRY: dict[str, RoutingProviderBuilder] = {}
 
@@ -207,3 +233,14 @@ def build_routing_provider(settings: Settings | None = None) -> RoutingProvider:
 
 
 register_routing_provider("pgrouting", PgRoutingProvider)
+register_routing_provider("terrain", TerrainRoutingProvider)
+
+
+def build_routing_provider_for_mode(
+    mode: RouteMode, settings: Settings | None = None
+) -> RoutingProvider:
+    """Select the router for a travel mode: ``road`` → the configured road provider (pgRouting),
+    ``offroad`` → the terrain A* provider."""
+    if mode is RouteMode.OFFROAD:
+        return _REGISTRY["terrain"]()
+    return build_routing_provider(settings)

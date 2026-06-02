@@ -11,12 +11,14 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import Settings
-from app.domain.route import RouteMetric, RoutePath
+from app.domain.route import RouteMetric, RouteMode, RoutePath
 from app.providers.routing import (
     PgRoutingProvider,
+    TerrainRoutingProvider,
     UnknownRoutingProviderError,
     _coords_from_geojson,
     build_routing_provider,
+    build_routing_provider_for_mode,
 )
 from app.services.sim import haversine_m
 
@@ -48,6 +50,12 @@ class TestFactory:
     def test_unknown_provider_raises(self) -> None:
         with pytest.raises(UnknownRoutingProviderError):
             build_routing_provider(Settings(routing_provider="nope"))
+
+    def test_mode_selects_road_vs_terrain_provider(self) -> None:
+        road = build_routing_provider_for_mode(RouteMode.ROAD)
+        offroad = build_routing_provider_for_mode(RouteMode.OFFROAD)
+        assert isinstance(road, PgRoutingProvider)
+        assert isinstance(offroad, TerrainRoutingProvider)
 
 
 @asynccontextmanager
@@ -183,4 +191,32 @@ class TestRouteOrientation:
             assert haversine_m(last[0], last[1], dest_lon, dest_lat) < haversine_m(
                 first[0], first[1], dest_lon, dest_lat
             )
+            await session.rollback()
+
+
+@pytest.mark.db
+class TestTerrainProvider:
+    """The off-road terrain router routes over the H3 tile grid (no `ways` graph)."""
+
+    async def test_offroad_route_resolves_over_the_theater(self) -> None:
+        async with _session() as session:
+            tiles = (await session.execute(text("SELECT count(*) FROM tiles"))).scalar_one()
+            if not tiles:
+                pytest.skip("no tiles — run scripts/generate_tiles.py")
+            path = await TerrainRoutingProvider().shortest_path(session, *_A, *_B, RouteMetric.FAST)
+            assert path is not None
+            assert path.degraded is False
+            assert len(path.geometry) >= 2
+            assert path.distance_m > 0
+            assert all(len(pt) == 2 for pt in path.geometry)
+
+    async def test_offroad_ignores_blocked_roads(self) -> None:
+        # Off-road movement is not on roads, so even a fully road-blocked theater still routes.
+        async with _session() as session:
+            tiles = (await session.execute(text("SELECT count(*) FROM tiles"))).scalar_one()
+            if not tiles:
+                pytest.skip("no tiles — run scripts/generate_tiles.py")
+            await session.execute(text("UPDATE ways SET time_cost = 1e12, safe_cost = 1e12"))
+            path = await TerrainRoutingProvider().shortest_path(session, *_A, *_B, RouteMetric.FAST)
+            assert path is not None  # terrain router does not consult `ways` at all
             await session.rollback()

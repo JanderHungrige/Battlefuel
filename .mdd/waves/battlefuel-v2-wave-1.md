@@ -42,7 +42,7 @@ cost (Wave-4 cost model), factory-pattern providers, continuous real-time sim. D
 | # | Feature | Doc | Status | Depends on |
 |---|---------|-----|--------|------------|
 | 1 | routing-bug-fix      | docs/43-routing-bug-fix.md | active | — |
-| 2 | terrain-router       | — | planned | routing-bug-fix |
+| 2 | terrain-router       | docs/44-terrain-router.md | active | routing-bug-fix |
 
 Build order: 1 → 2.
 
