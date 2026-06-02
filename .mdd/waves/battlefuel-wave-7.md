@@ -3,11 +3,11 @@ id: battlefuel-wave-7
 title: "Wave 7: Deployment — Dockerized Stack on Hetzner via OpenTofu"
 initiative: battlefuel
 initiative_version: 5
-status: planned
+status: complete
 depends_on: battlefuel-wave-6
 demo_state: "Provision a Hetzner Cloud host with OpenTofu (server, firewall, block volume, floating IP) and run the full BattleFuel stack on it via Docker Compose — Postgres+PostGIS+pgRouting, the FastAPI backend, and the React/MapLibre frontend — behind a reverse proxy with automatic TLS on a real domain (HTTP + WebSocket). Game data lives on a persistent volume with automated backups. A single scripted, explicitly-invoked deploy (tofu apply + ship the stack over SSH; nothing auto-deploys) brings it up; visiting the domain serves the app and the live sim works end-to-end. CI/CD auto-deploy and monitoring are deferred (see TODO.md)."
 created: 2026-06-02
-hash: ce209d46
+hash: ae4e6875
 ---
 
 # Wave 7: Deployment — Dockerized Stack on Hetzner via OpenTofu
