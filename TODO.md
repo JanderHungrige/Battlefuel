@@ -8,10 +8,11 @@ Wave 7 ships **Standard** scope: Dockerized stack + Compose, OpenTofu-provisione
 Hetzner Cloud host, TLS/domain, persistent Postgres+PostGIS volume with backups,
 **scripted manual deploy**. The following were explicitly deferred:
 
-- [ ] **CI/CD auto-deploy pipeline** — GitHub Actions workflow that builds images,
-  runs OpenTofu, and deploys on push/tag (gated by a manual approval step so it
-  still honours the "never auto-deploy without explicit yes" rule). Likely a future
-  wave or post-MVP milestone. Builds on Wave 7's scripted deploy targets.
+- [x] **CI/CD auto-deploy pipeline** — DONE (2026-06-02): GitHub Actions builds images and
+  pushes to GHCR; Watchtower on `159.195.148.193` auto-deploys prod (`main`→:3000) and dev
+  (`dev-deployment`→:3001), fronted by Nginx Proxy Manager for TLS. See
+  `.mdd/ops/cicd-deploy-159.md` and `.mdd/docs/42-cicd-auto-deploy.md`. (Targets 159.x and
+  supersedes the Wave-7 Hetzner/OpenTofu manual deploy, which stays as reference.)
 - [ ] **Health/uptime monitoring + alerting** — container/host health checks,
   uptime monitoring, and alert routing (e.g. on deploy failure or service down).
 

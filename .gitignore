@@ -2,6 +2,9 @@
 .env
 .env.*
 !.env.example
+# Deploy env templates are committed; real per-env files (deploy/.env.prod, .env.dev) stay ignored.
+!deploy/.env.prod.example
+!deploy/.env.dev.example
 
 # Dependencies / build
 node_modules/
