@@ -11,13 +11,16 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import Settings
-from app.domain.route import RouteMetric, RoutePath
+from app.domain.route import RouteMetric, RouteMode, RoutePath
 from app.providers.routing import (
     PgRoutingProvider,
+    TerrainRoutingProvider,
     UnknownRoutingProviderError,
     _coords_from_geojson,
     build_routing_provider,
+    build_routing_provider_for_mode,
 )
+from app.services.sim import haversine_m
 
 # Two points inside the Hohenfels theater, ~5 km apart on the road network.
 _A = (49.20, 11.83)
@@ -47,6 +50,12 @@ class TestFactory:
     def test_unknown_provider_raises(self) -> None:
         with pytest.raises(UnknownRoutingProviderError):
             build_routing_provider(Settings(routing_provider="nope"))
+
+    def test_mode_selects_road_vs_terrain_provider(self) -> None:
+        road = build_routing_provider_for_mode(RouteMode.ROAD)
+        offroad = build_routing_provider_for_mode(RouteMode.OFFROAD)
+        assert isinstance(road, PgRoutingProvider)
+        assert isinstance(offroad, TerrainRoutingProvider)
 
 
 @asynccontextmanager
@@ -103,3 +112,111 @@ class TestPgRouting:
             await _require_graph(session)
             path = await PgRoutingProvider().shortest_path(session, *_A, *_B, RouteMetric.SAFE)
             assert isinstance(path, RoutePath)
+
+
+@pytest.mark.db
+class TestResolveAlways:
+    """Regression for the live 'never a route to that destination' bug (v2 Wave 1).
+
+    When the sim blocks enough tiles, every edge gets the impassable sentinel cost and is
+    excluded from the metric graph, so ``pgr_dijkstra`` finds nothing even though the road
+    network still physically connects start and destination. The provider must fall back to
+    the full graph (real distance) and still return a route, flagged ``degraded``.
+    """
+
+    async def test_falls_back_to_full_graph_when_metric_graph_disconnected(self) -> None:
+        async with _session() as session:
+            await _require_graph(session)
+            # In-session only (rolled back below): make the entire metric graph impassable,
+            # exactly as a fully sim-polluted theater would.
+            await session.execute(
+                text(
+                    "UPDATE ways SET time_cost = 1e12, time_reverse_cost = 1e12, "
+                    "safe_cost = 1e12, safe_reverse_cost = 1e12"
+                )
+            )
+            # The primary (blocked-aware) edge set is now empty → would be 'no route'.
+            primary_edges = (
+                await session.execute(
+                    text("SELECT count(*) FROM ways WHERE COALESCE(time_cost, length_m) < 1e12")
+                )
+            ).scalar_one()
+            assert primary_edges == 0
+
+            path = await PgRoutingProvider().shortest_path(session, *_A, *_B, RouteMetric.FAST)
+            assert path is not None  # fallback resolved a route the primary graph could not
+            assert path.degraded is True
+            assert len(path.geometry) >= 2
+            assert path.distance_m > 0
+            await session.rollback()
+
+    async def test_primary_route_is_not_degraded(self) -> None:
+        async with _session() as session:
+            await _require_graph(session)
+            # In-session: a clean, fully passable graph (no blocks) → primary must resolve.
+            await session.execute(
+                text(
+                    "UPDATE ways SET time_cost = length_m, time_reverse_cost = length_m, "
+                    "safe_cost = length_m, safe_reverse_cost = length_m"
+                )
+            )
+            path = await PgRoutingProvider().shortest_path(session, *_A, *_B, RouteMetric.FAST)
+            assert path is not None
+            assert path.degraded is False
+            await session.rollback()
+
+
+@pytest.mark.db
+class TestRouteOrientation:
+    """Regression for the live 'unit reverses / goes back-and-forth' bug (v2 Wave 1).
+
+    The geometry must run start → destination in travel order: ``geometry[0]`` nearest the
+    unit's start, ``geometry[-1]`` nearest the destination. The old ``ST_LineMerge(ST_Collect())``
+    did not guarantee this and could flip or zig-zag the line.
+    """
+
+    async def test_geometry_runs_from_start_to_destination(self) -> None:
+        async with _session() as session:
+            await _require_graph(session)
+            path = await PgRoutingProvider().shortest_path(session, *_A, *_B, RouteMetric.FAST)
+            assert path is not None
+            first, last = path.geometry[0], path.geometry[-1]
+            start_lon, start_lat = _A[1], _A[0]  # _A is (lat, lon); geometry is [lon, lat]
+            dest_lon, dest_lat = _B[1], _B[0]
+            # First point is nearer the start than the last point is.
+            assert haversine_m(first[0], first[1], start_lon, start_lat) < haversine_m(
+                last[0], last[1], start_lon, start_lat
+            )
+            # Last point is nearer the destination than the first point is.
+            assert haversine_m(last[0], last[1], dest_lon, dest_lat) < haversine_m(
+                first[0], first[1], dest_lon, dest_lat
+            )
+            await session.rollback()
+
+
+@pytest.mark.db
+class TestTerrainProvider:
+    """The off-road terrain router routes over the H3 tile grid (no `ways` graph)."""
+
+    async def test_offroad_route_resolves_over_the_theater(self) -> None:
+        async with _session() as session:
+            tiles = (await session.execute(text("SELECT count(*) FROM tiles"))).scalar_one()
+            if not tiles:
+                pytest.skip("no tiles — run scripts/generate_tiles.py")
+            path = await TerrainRoutingProvider().shortest_path(session, *_A, *_B, RouteMetric.FAST)
+            assert path is not None
+            assert path.degraded is False
+            assert len(path.geometry) >= 2
+            assert path.distance_m > 0
+            assert all(len(pt) == 2 for pt in path.geometry)
+
+    async def test_offroad_ignores_blocked_roads(self) -> None:
+        # Off-road movement is not on roads, so even a fully road-blocked theater still routes.
+        async with _session() as session:
+            tiles = (await session.execute(text("SELECT count(*) FROM tiles"))).scalar_one()
+            if not tiles:
+                pytest.skip("no tiles — run scripts/generate_tiles.py")
+            await session.execute(text("UPDATE ways SET time_cost = 1e12, safe_cost = 1e12"))
+            path = await TerrainRoutingProvider().shortest_path(session, *_A, *_B, RouteMetric.FAST)
+            assert path is not None  # terrain router does not consult `ways` at all
+            await session.rollback()

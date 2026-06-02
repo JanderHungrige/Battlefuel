@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
-from app.domain.route import RouteOption
+from app.domain.route import RouteMode, RouteOption
 from app.providers.factory import build_unit_provider
 from app.providers.routing import RoutingProvider, build_routing_provider
 from app.providers.unit_instances import UnitInstanceProvider, build_unit_instance_provider
@@ -35,6 +35,7 @@ class PlanRouteRequest(BaseModel):
     instance_id: str
     dest_lat: float
     dest_lon: float
+    mode: RouteMode = RouteMode.ROAD
 
 
 @router.post("/routes/plan")
@@ -56,7 +57,9 @@ async def plan_route(
             detail=f"unit type {instance.unit_type_id!r} not in catalog",
         )
 
-    options = await plan_routes(session, routing, instance, unit_type, req.dest_lat, req.dest_lon)
+    options = await plan_routes(
+        session, routing, instance, unit_type, req.dest_lat, req.dest_lon, mode=req.mode
+    )
     if not options:
         raise HTTPException(status_code=422, detail="no route to destination")
     return options

@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
 from app.domain.move_order import MoveOrder, MoveOrderStatus
-from app.domain.route import RouteMetric
+from app.domain.route import RouteMetric, RouteMode
 from app.providers.factory import build_unit_provider
 from app.providers.move_orders import MoveOrderProvider, build_move_order_provider
 from app.providers.routing import RoutingProvider, build_routing_provider
@@ -43,6 +43,7 @@ class CreateMoveOrderRequest(BaseModel):
     dest_lat: float
     dest_lon: float
     metric: RouteMetric = RouteMetric.FAST
+    mode: RouteMode = RouteMode.ROAD
 
 
 @router.post("/move-orders", status_code=201)
@@ -61,7 +62,15 @@ async def create_order(
     if unit_type is None:
         raise HTTPException(status_code=409, detail=f"unit type {instance.unit_type_id!r} missing")
     order = await create_move_order(
-        session, routing, orders, instance, unit_type, req.dest_lat, req.dest_lon, req.metric
+        session,
+        routing,
+        orders,
+        instance,
+        unit_type,
+        req.dest_lat,
+        req.dest_lon,
+        req.metric,
+        mode=req.mode,
     )
     if order is None:
         raise HTTPException(status_code=422, detail="no route to destination")

@@ -8,10 +8,10 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.route import RouteMetric, RouteOption, RoutePath
+from app.domain.route import RouteMetric, RouteMode, RouteOption, RoutePath
 from app.domain.unit import UnitType
 from app.domain.unit_instance import UnitInstance
-from app.providers.routing import RoutingProvider
+from app.providers.routing import RoutingProvider, build_routing_provider_for_mode
 
 _METRICS: tuple[tuple[RouteMetric, str], ...] = (
     (RouteMetric.FAST, "fastest"),
@@ -63,8 +63,20 @@ async def plan_routes(
     unit_type: UnitType,
     dest_lat: float,
     dest_lon: float,
+    *,
+    mode: RouteMode = RouteMode.ROAD,
 ) -> list[RouteOption]:
-    """Compute fastest + safest route options from the unit's position to the destination."""
+    """Compute fastest + safest route options from the unit's position to the destination.
+
+    ``mode`` selects the router and the speed: ``road`` uses the injected (road) provider at the
+    unit's road speed; ``offroad`` uses the terrain A* router at its off-road / by-foot speed.
+    """
+    provider = routing if mode is RouteMode.ROAD else build_routing_provider_for_mode(mode)
+    speed_kph = (
+        unit_type.movement.speed_offroad_kph
+        if mode is RouteMode.OFFROAD
+        else unit_type.movement.speed_road_kph
+    )
     start_fuel = (
         instance.current_fuel_liters
         if instance.current_fuel_liters is not None
@@ -72,7 +84,7 @@ async def plan_routes(
     )
     options: list[RouteOption] = []
     for metric, label in _METRICS:
-        path = await routing.shortest_path(
+        path = await provider.shortest_path(
             session, instance.lat, instance.lon, dest_lat, dest_lon, metric
         )
         if path is None:
@@ -81,7 +93,7 @@ async def plan_routes(
             build_option(
                 path,
                 label=label,
-                speed_road_kph=unit_type.movement.speed_road_kph,
+                speed_road_kph=speed_kph,
                 consumption_normal_lph=unit_type.fuel.consumption_normal_lph,
                 start_fuel_l=start_fuel,
             )

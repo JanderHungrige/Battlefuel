@@ -110,6 +110,32 @@ class TestPlanRouteApi:
             await client.aclose()
             await engine.dispose()
 
+    async def test_offroad_mode_plans_a_terrain_route(self) -> None:
+        try:
+            client, engine = await _client_and_engine()
+        except SQLAlchemyError as exc:
+            pytest.skip(f"database unavailable: {exc}")
+        try:
+            resp = await client.post(
+                "/api/v1/routes/plan",
+                json={
+                    "instance_id": "inst-armor-1",
+                    "dest_lat": 49.20,
+                    "dest_lon": 11.83,
+                    "mode": "offroad",
+                },
+            )
+            assert resp.status_code == 200
+            options = resp.json()
+            assert len(options) >= 1
+            first = options[0]
+            assert first["distance_m"] > 0
+            assert first["duration_s"] > 0
+            assert len(first["geometry"]) >= 2
+        finally:
+            await client.aclose()
+            await engine.dispose()
+
     async def test_unknown_instance_404(self) -> None:
         try:
             client, engine = await _client_and_engine()
