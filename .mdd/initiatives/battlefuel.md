@@ -3,7 +3,7 @@ id: battlefuel
 title: BattleFuel
 status: active
 version: 4
-hash: aea585a2
+hash: 9935f49c
 created: 2026-05-29
 ---
 
@@ -97,5 +97,5 @@ recon ability, operational status, supply requirements, telemetry freshness.
 | Wave 3 | waves/battlefuel-wave-3.md | Plan a unit move offline; see route options with remaining fuel, duration, and threat level; confirm a move order; watch the unit traverse and fuel deplete. | complete |
 | Wave 4 | waves/battlefuel-wave-4.md | Tile attributes alter movement/fuel/threat and feed the graph; move-order pop-ups warn on threat sectors; manual obstacles and game-mode random events fire; incoming orders/sector info mutate tiles. | complete |
 | Wave 5 | waves/battlefuel-wave-5.md | Switch to the OF-8 view: see fuel stocks and distribution, place fuel buy and refuel orders, receive strategic support messages; unit overview handles missing telemetry. | complete |
-| Wave 6 | waves/battlefuel-wave-6.md | Ask the engine for advice: optimal movements, threat-aware routing, best refuel points, and stock-redistribution plans with rationale. | planned |
+| Wave 6 | waves/battlefuel-wave-6.md | Ask the engine for advice: optimal movements, threat-aware routing, best refuel points, and stock-redistribution plans with rationale. | complete |
 | Wave 7 | waves/battlefuel-wave-7.md | Run the full system in Docker, provisioned to a host (e.g. Hetzner) via Terraform. | planned |

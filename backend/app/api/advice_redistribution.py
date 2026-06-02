@@ -1,0 +1,75 @@
+"""Redistribution advice endpoint (Wave 6 Feature 3). Mounted under /api/v1.
+
+Computes a distance-minimising depot rebalancing plan (OR-Tools) plus buy suggestions for any
+uncovered deficit. Read-only; only the buy moves are applyable (no depot→depot order type exists).
+"""
+
+from __future__ import annotations
+
+from typing import Annotated
+
+from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.advice import CAPABILITIES
+from app.db import get_session
+from app.domain.advice import AdviceResult, Recommendation, RecommendationKind
+from app.providers.supply import SupplyProvider, build_supply_provider
+from app.services.redistribution import RedistributionMove, redistribution_plan
+
+router = APIRouter(prefix="/advice", tags=["advice"])
+
+CAPABILITIES.append("redistribution")
+
+
+def get_supply_provider() -> SupplyProvider:
+    return build_supply_provider()
+
+
+SessionDep = Annotated[AsyncSession, Depends(get_session)]
+SupplyDep = Annotated[SupplyProvider, Depends(get_supply_provider)]
+
+
+def _to_recommendation(m: RedistributionMove) -> Recommendation:
+    if m.kind == "buy":
+        return Recommendation(
+            kind=RecommendationKind.REDISTRIBUTION,
+            target=m.to_depot,
+            action={
+                "endpoint": "buy-orders",
+                "depot_id": m.to_depot,
+                "fuel_type": m.fuel_type,
+                "quantity_liters": m.liters,
+            },
+            score=m.cost,
+            rationale=f"Buy {m.liters} L {m.fuel_type} into {m.to_depot} (no surplus to cover)",
+        )
+    return Recommendation(
+        kind=RecommendationKind.REDISTRIBUTION,
+        target=m.to_depot,
+        action={
+            "kind": "transfer",
+            "from_depot": m.from_depot,
+            "to_depot": m.to_depot,
+            "fuel_type": m.fuel_type,
+            "liters": m.liters,
+        },
+        score=m.cost,
+        rationale=f"Move {m.liters} L {m.fuel_type} {m.from_depot}→{m.to_depot} ({m.cost:.0f} km)",
+    )
+
+
+@router.get("/redistribution")
+async def redistribution(session: SessionDep, supply: SupplyDep) -> AdviceResult:
+    """Recommend depot transfers (and buys) to balance fuel toward target fill."""
+    depots = await supply.list_depots(session)
+    stocks = await supply.list_stocks(session)
+    moves = redistribution_plan(depots, stocks)
+    recommendations = [_to_recommendation(m) for m in moves]
+    transfers = sum(1 for m in moves if m.kind == "transfer")
+    buys = sum(1 for m in moves if m.kind == "buy")
+    return AdviceResult(
+        kind=RecommendationKind.REDISTRIBUTION,
+        recommendations=recommendations,
+        summary=f"{transfers} transfer(s), {buys} buy(s) to balance depots",
+    )

@@ -26,6 +26,7 @@ export type PanelKey =
   | 'inspect'
   | 'chatter'
   | 'unitOverview'
+  | 'advisor'
 
 const ROLE_PANELS: Record<Role, ReadonlySet<PanelKey>> = {
   OF4: new Set<PanelKey>([
@@ -36,6 +37,7 @@ const ROLE_PANELS: Record<Role, ReadonlySet<PanelKey>> = {
     'inspect',
     'chatter',
     'unitOverview',
+    'advisor',
   ]),
   OF8: new Set<PanelKey>([
     'supplyPanel',
@@ -44,6 +46,7 @@ const ROLE_PANELS: Record<Role, ReadonlySet<PanelKey>> = {
     'inspect',
     'chatter',
     'unitOverview',
+    'advisor',
   ]),
 }
 
