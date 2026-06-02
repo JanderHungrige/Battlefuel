@@ -57,7 +57,7 @@ auto-execution of advice; multi-host / multi-user scale-out.
 |---|---------|-----|--------|------------|
 | 1 | container-images        | docs/37-container-images.md | complete | — |
 | 2 | production-stack        | docs/38-production-stack.md | complete | container-images |
-| 3 | db-persistence-backups  | docs/39-db-persistence-backups.md | planned | production-stack |
+| 3 | db-persistence-backups  | docs/39-db-persistence-backups.md | complete | production-stack |
 | 4 | opentofu-hetzner        | docs/40-opentofu-hetzner.md | planned | — |
 | 5 | deploy-runbook          | docs/41-deploy-runbook.md | planned | production-stack, db-persistence-backups, opentofu-hetzner |
 

@@ -1,0 +1,6 @@
+# BattleFuel host cron — nightly database backup.
+# Install on the deploy host with:  crontab deploy/crontab.example
+# (adjust the path if you deploy somewhere other than /opt/battlefuel)
+#
+# Runs scripts/backup.sh at 03:17 UTC daily; env comes from the project .env.
+17 3 * * * cd /opt/battlefuel && set -a && . ./.env && set +a && /usr/bin/env bash scripts/backup.sh >> /var/log/battlefuel-backup.log 2>&1

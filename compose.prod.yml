@@ -59,6 +59,31 @@ services:
     restart: unless-stopped
     # Serves the SPA on :80 internally; the Caddy edge proxies to it.
 
+  # One-shot OSM → PostGIS import (osm_points/lines/multipolygons), used by the bootstrap.
+  # Not started by `up` (bootstrap profile); run via `docker compose run --rm osm-import`.
+  # Containerises GDAL/ogr2ogr so the host needs no GDAL install. Reads the shipped
+  # data/hohenfels.osm (mounted read-only).
+  osm-import:
+    profiles: ["bootstrap"]
+    image: ghcr.io/osgeo/gdal:alpine-small-latest
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./data:/data:ro
+    environment:
+      BF_PG: "PG:host=db port=5432 user=${BATTLEFUEL_DB_USER} password=${BATTLEFUEL_DB_PASSWORD} dbname=${BATTLEFUEL_DB_NAME}"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        for layer in points lines multipolygons; do
+          echo "importing osm_$$layer …"
+          ogr2ogr -f PostgreSQL "$$BF_PG" /data/hohenfels.osm $$layer \
+            -nln osm_$$layer -lco GEOMETRY_NAME=geom -nlt PROMOTE_TO_MULTI -overwrite
+        done
+        echo "osm import done"
+
   caddy:
     image: caddy:2-alpine
     container_name: battlefuel-caddy
@@ -78,6 +103,13 @@ services:
       - caddy-config:/config
 
 volumes:
-  battlefuel-db-data:          # feature 39 binds this to the Hetzner block volume mount
+  # DB data lives on the Hetzner block volume (mounted by OpenTofu/cloud-init, feature 40).
+  # BATTLEFUEL_DB_DATA_DIR must exist before `up` (the deploy script / cloud-init mkdir -p it).
+  battlefuel-db-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${BATTLEFUEL_DB_DATA_DIR:?set in .env (e.g. /mnt/battlefuel-data/pgdata)}
   caddy-data:
   caddy-config:
