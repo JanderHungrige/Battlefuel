@@ -24,9 +24,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-    labels:
-      # DB is stable + stateful — never auto-restarted by Watchtower.
-      com.centurylinklabs.watchtower.enable: "false"
 
   backend:
     image: ${REGISTRY:-ghcr.io}/${OWNER:-janderhungrige}/battlefuel-backend:${IMAGE_TAG}
@@ -41,9 +38,6 @@ services:
     command: >
       sh -c "alembic upgrade head &&
              exec uvicorn app.main:app --host 0.0.0.0 --port 8000"
-    labels:
-      com.centurylinklabs.watchtower.enable: "true"
-      com.centurylinklabs.watchtower.scope: ${WATCHTOWER_SCOPE}
 
   frontend:
     image: ${REGISTRY:-ghcr.io}/${OWNER:-janderhungrige}/battlefuel-frontend:${IMAGE_TAG}
@@ -52,9 +46,6 @@ services:
       - backend
     ports:
       - "${APP_PORT:-3000}:80"   # NPM points the domain at 159.195.148.193:APP_PORT (set in env-file)
-    labels:
-      com.centurylinklabs.watchtower.enable: "true"
-      com.centurylinklabs.watchtower.scope: ${WATCHTOWER_SCOPE}
 
   # One-shot OSM -> PostGIS import used by scripts/prod-bootstrap.sh (bootstrap profile;
   # not started by `up`). Containerises GDAL so the host needs none. Reads the seed .osm.
@@ -79,20 +70,7 @@ services:
         done
         echo "osm import done"
 
-  # Auto-deploy: poll GHCR and recreate backend/frontend when a new :IMAGE_TAG is pushed.
-  # Scoped so the prod Watchtower only touches prod containers (and dev only dev).
-  watchtower:
-    image: containrrr/watchtower
-    restart: unless-stopped
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      # GHCR pull credentials for private images (host: `docker login ghcr.io` once).
-      # Absolute path required (Docker does not expand "~"); set DOCKER_CONFIG_JSON in env-file.
-      - ${DOCKER_CONFIG_JSON:-/root/.docker/config.json}:/config.json:ro
-    environment:
-      WATCHTOWER_LABEL_ENABLE: "true"
-      WATCHTOWER_SCOPE: ${WATCHTOWER_SCOPE}
-      WATCHTOWER_CLEANUP: "true"
-      WATCHTOWER_POLL_INTERVAL: ${WATCHTOWER_POLL_INTERVAL:-60}
-    labels:
-      com.centurylinklabs.watchtower.scope: ${WATCHTOWER_SCOPE}
+# Auto-deploy is handled by deploy/auto-deploy.sh on a host cron (see deploy/crontab.example),
+# NOT by an in-stack service — the containrrr/watchtower image is unmaintained and ships a
+# Docker client too old for Docker Engine 24+ ("client version 1.25 is too old"). The cron
+# script uses the host Docker, so there is no client-version mismatch.

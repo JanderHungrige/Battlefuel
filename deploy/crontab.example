@@ -1,6 +1,11 @@
-# BattleFuel host cron — nightly database backup.
-# Install on the deploy host with:  crontab deploy/crontab.example
+# BattleFuel host cron (159.195.148.193). Install with:  crontab deploy/crontab.example
 # (adjust the path if you deploy somewhere other than /opt/battlefuel)
-#
-# Runs scripts/backup.sh at 03:17 UTC daily; backup.sh self-loads the project .env.
-17 3 * * * cd /opt/battlefuel && /usr/bin/env bash scripts/backup.sh >> /var/log/battlefuel-backup.log 2>&1
+
+# --- Auto-deploy (replaces Watchtower) ---------------------------------------------------
+# Poll GHCR every minute and roll out new prod/dev backend+frontend images. Cheap when
+# nothing changed (a digest check + no-op `up`). Uses the host Docker (no client mismatch).
+* * * * * cd /opt/battlefuel && /usr/bin/env bash deploy/auto-deploy.sh deploy/.env.prod >> /var/log/battlefuel-deploy-prod.log 2>&1
+* * * * * cd /opt/battlefuel && /usr/bin/env bash deploy/auto-deploy.sh deploy/.env.dev  >> /var/log/battlefuel-deploy-dev.log 2>&1
+
+# --- Nightly prod DB backup --------------------------------------------------------------
+17 3 * * * cd /opt/battlefuel && COMPOSE_FILE=deploy/compose.app.yml BATTLEFUEL_ENV_FILE=deploy/.env.prod /usr/bin/env bash scripts/backup.sh >> /var/log/battlefuel-backup.log 2>&1

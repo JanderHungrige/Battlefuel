@@ -15,6 +15,13 @@ name: build-and-push
 on:
   push:
     branches: [main, dev-deployment]
+    # Only rebuild images when something that affects them changes — not deploy config/docs.
+    paths-ignore:
+      - '.mdd/**'
+      - 'deploy/**'
+      - 'infra/**'
+      - '**.md'
+      - 'TODO.md'
 
 permissions:
   contents: read

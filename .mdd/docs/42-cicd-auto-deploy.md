@@ -12,6 +12,8 @@ source_files:
   - deploy/compose.app.yml
   - deploy/.env.prod.example
   - deploy/.env.dev.example
+  - deploy/auto-deploy.sh
+  - deploy/crontab.example
   - frontend/nginx.conf
   - frontend/src/config.ts
   - .mdd/ops/cicd-deploy-159.md
@@ -25,19 +27,20 @@ last_synced: 2026-06-02
 status: complete
 phase: all
 mdd_version: 11
-tags: [cicd, github-actions, ghcr, watchtower, docker-compose, nginx-proxy-manager, same-origin, deploy]
+tags: [cicd, github-actions, ghcr, cron, docker-compose, nginx-proxy-manager, same-origin, deploy]
 path: Deploy/CICD
 integration_contracts: []
 satisfies_contracts: []
 known_issues:
   - "Prod deploys fully automatically on merge to main (no approval gate) — by explicit request, overriding the default never-auto-deploy caution."
+  - "Rollout is a host cron (deploy/auto-deploy.sh), NOT Watchtower — containrrr/watchtower is unmaintained and its bundled Docker client (v1.25) is incompatible with Docker Engine 24+ (min API 1.40)."
   - "Supersedes the Wave-7 Hetzner/OpenTofu manual deploy as the active target; infra/ + compose.prod.yml kept as reference."
   - "Local docker compose v2.2.1 mishandled :? in port/volume short-syntax and --env-file; verified via docker run + `docker compose config`. Host runs modern compose."
 security_read_sites: []
 sister_projects: []
 ---
 
-# 42 — CI/CD Auto-Deploy — GitHub Actions + GHCR + Watchtower
+# 42 — CI/CD Auto-Deploy — GitHub Actions + GHCR + host-cron rollout
 
 ## Purpose
 Push-to-deploy BattleFuel to `159.195.148.193`: merges to `main` ship to **prod (:3000)** and
@@ -49,9 +52,11 @@ user's **Nginx Proxy Manager** for TLS/domains.
 - **CI** (`.github/workflows/deploy.yml`): on push to `main`/`dev-deployment`, build + push
   `battlefuel-{backend,frontend,db}` to `ghcr.io/janderhungrige` tagged `:main`/`:dev` (+`:sha`).
   Auth via the built-in `GITHUB_TOKEN` (`packages: write`). No deploy step in CI.
-- **Host** runs two scoped **Watchtower** instances that poll GHCR and recreate `backend` +
-  `frontend` when a new image for their tag appears (db excluded via label). `deploy/compose.app.yml`
-  is one parametrised env, run twice with `deploy/.env.prod` / `deploy/.env.dev`.
+- **Host rollout** — a **cron** runs `deploy/auto-deploy.sh <env-file>` every minute per env:
+  `docker compose pull backend frontend` + `up -d backend frontend` (db left alone). It uses
+  the **host Docker**, so there's no client/API mismatch. (Watchtower was the original plan but
+  `containrrr/watchtower` is unmaintained and ships a Docker client too old for Engine 24+.)
+  `deploy/compose.app.yml` is one parametrised env, run twice with `.env.prod` / `.env.dev`.
 - **Same-origin frontend**: `frontend/nginx.conf` now serves the SPA **and** proxies `/api/v1`
   (+ WebSocket) to `backend:8000`, so a single published port (`:3000`/`:3001`) is the whole
   app. `frontend/src/config.ts` defaults `VITE_API_BASE=/api/v1` and derives the WS scheme/host
@@ -60,7 +65,7 @@ user's **Nginx Proxy Manager** for TLS/domains.
   `battlefuel-dev.jeanquestenterprise.de` → `:3001` (Websockets Support on).
 
 ## Key decisions
-- **GHCR + Watchtower** over SSH-push: no deploy credentials in CI; the host pulls.
+- **GHCR + host-cron pull** over SSH-push: no deploy credentials in CI; the host pulls.
 - **Same-origin relative API**: avoids baking domains into the image and avoids mixed-content
   behind NPM's TLS. (Resolves the Wave-7 "build-time vs runtime frontend URL" open question.)
 - **Per-`sha` image tags** kept for instant rollback to any past build.
