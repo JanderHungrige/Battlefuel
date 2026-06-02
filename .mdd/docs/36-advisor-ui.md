@@ -17,6 +17,8 @@ source_files:
   - frontend/src/index.css
   - frontend/src/map/overlays.ts
   - frontend/src/map/MapView.tsx
+  - frontend/src/hooks/useAdviceMarker.ts
+  - backend/app/api/advice_refuel.py
 routes: []
 models: []
 test_files:
@@ -83,11 +85,11 @@ Consumes (no new endpoints): `GET /advice/reposition`, `/advice/refuel-plan`,
   success a chatter line is logged and the supply overview refetched.
 - The panel mounts in both roles via `canShow(role, 'advisor')`.
 - **Map marking (enhancement):** clicking a recommendation row selects it and marks it on the
-  map — the unit's cell is highlighted and, for movement recommendations (action carries
-  `instance_id` + `dest_lat`/`dest_lon`), a **NATO-style movement-axis arrow** (shaft +
-  arrowhead, `adviceArrowToGeoJSON`) is drawn from the unit to the destination. milsymbol covers
-  unit icons only, not tactical mission graphics, so the arrow is a custom-drawn axis-of-advance
-  approximation. Refuel/redistribution recs (no destination in `action`) highlight only.
+  map — a highlighted cell plus a **yellow NATO-style movement-axis arrow** (shaft + arrowhead,
+  `adviceArrowToGeoJSON`) derived per kind by `useAdviceMarker`: route/reposition =
+  unit→destination, **refuel = truck→unit** (the refuel action carries `truck_id`), **transfer =
+  from-depot→to-depot**. Buy recs (no movement) highlight the depot only. milsymbol covers unit
+  icons, not tactical mission graphics, so the arrow is a custom axis-of-advance approximation.
 
 ## Data Flow
 

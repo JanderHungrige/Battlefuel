@@ -184,14 +184,14 @@ function initLayers(map: maplibregl.Map): void {
     source: 'advice-arrow',
     filter: ['==', ['geometry-type'], 'LineString'],
     layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': '#e879f9', 'line-width': 3.5, 'line-opacity': 0.95 },
+    paint: { 'line-color': '#ffd23f', 'line-width': 3.5, 'line-opacity': 0.95 },
   })
   map.addLayer({
     id: 'advice-arrow-head',
     type: 'fill',
     source: 'advice-arrow',
     filter: ['==', ['geometry-type'], 'Polygon'],
-    paint: { 'fill-color': '#e879f9', 'fill-opacity': 0.95 },
+    paint: { 'fill-color': '#ffd23f', 'fill-opacity': 0.95 },
   })
 }
 

@@ -14,6 +14,7 @@ import { OSM_ATTRIBUTION } from './config'
 import { canShow, type Role } from './roles'
 import { useObstacleOps } from './hooks/useObstacleOps'
 import { useSimSocket } from './hooks/useSimSocket'
+import { useAdviceMarker } from './hooks/useAdviceMarker'
 import { useAdvisor } from './hooks/useAdvisor'
 import { useMovePlanning } from './hooks/useMovePlanning'
 import { useSupply } from './hooks/useSupply'
@@ -81,24 +82,9 @@ export default function App() {
   }, [live])
   const selectedLive = selectedUnitId ? live[selectedUnitId] : undefined
 
-  // A clicked advisor recommendation marked on the map: highlight the unit + a movement arrow.
+  // A clicked advisor recommendation marked on the map: highlight + a movement arrow.
   const [selectedAdvice, setSelectedAdvice] = useState<Recommendation | null>(null)
-  const adviceUnitId =
-    typeof selectedAdvice?.action.instance_id === 'string'
-      ? selectedAdvice.action.instance_id
-      : null
-  const adviceArrow = useMemo(() => {
-    const a = selectedAdvice?.action
-    if (!a || typeof a.instance_id !== 'string') return null
-    if (typeof a.dest_lat !== 'number' || typeof a.dest_lon !== 'number') return null
-    const u = units.find((x) => x.id === a.instance_id)
-    if (!u) return null
-    const from = livePositions[u.id] ?? { lat: u.lat, lon: u.lon }
-    return { from, to: { lat: a.dest_lat, lon: a.dest_lon } }
-  }, [selectedAdvice, units, livePositions])
-  const adviceUnitH3 = adviceUnitId
-    ? (units.find((u) => u.id === adviceUnitId)?.h3_index ?? null)
-    : null
+  const adviceMarker = useAdviceMarker(selectedAdvice, units, livePositions, supply.depots)
 
   const clear = useCallback(() => {
     setSelectedTileH3(null)
@@ -166,8 +152,8 @@ export default function App() {
               obstacleMode={obstacleActive}
               depots={canShow(role, 'depotOverlay') ? supply.depots : []}
               rendezvous={canShow(role, 'supplyPanel') ? supplyOrders.rendezvous : null}
-              adviceArrow={adviceArrow}
-              highlightH3={supplyOrders.truckHighlightH3 ?? adviceUnitH3 ?? highlightH3}
+              adviceArrow={adviceMarker.arrow}
+              highlightH3={supplyOrders.truckHighlightH3 ?? adviceMarker.highlightH3 ?? highlightH3}
               onPlaceObstacle={(lat, lon) => placeObstacle(lat, lon, obstacleKind)}
               onRemoveObstacle={removeObstacle}
               onSelectTile={(h3) => {
