@@ -30,6 +30,14 @@ export function useAdviceMarker(
 
     let arrow: { from: Pt; to: Pt } | null = null
     if (
+      typeof a.from_lat === 'number' &&
+      typeof a.from_lon === 'number' &&
+      typeof a.to_lat === 'number' &&
+      typeof a.to_lon === 'number'
+    ) {
+      // redistribution transfer with embedded coords (no depot lookup needed)
+      arrow = { from: { lat: a.from_lat, lon: a.from_lon }, to: { lat: a.to_lat, lon: a.to_lon } }
+    } else if (
       typeof a.instance_id === 'string' &&
       typeof a.dest_lat === 'number' &&
       typeof a.dest_lon === 'number'
@@ -48,6 +56,9 @@ export function useAdviceMarker(
 
     // Destination point: the arrow endpoint, or — for a no-movement buy — the target depot.
     let dest: Pt | null = arrow ? arrow.to : null
+    if (!dest && typeof a.dest_lat === 'number' && typeof a.dest_lon === 'number') {
+      dest = { lat: a.dest_lat, lon: a.dest_lon }
+    }
     if (!dest && typeof a.depot_id === 'string') {
       const d = depot(a.depot_id)
       dest = d ? { lat: d.lat, lon: d.lon } : null

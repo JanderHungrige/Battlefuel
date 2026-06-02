@@ -30,30 +30,41 @@ SessionDep = Annotated[AsyncSession, Depends(get_session)]
 SupplyDep = Annotated[SupplyProvider, Depends(get_supply_provider)]
 
 
-def _to_recommendation(m: RedistributionMove) -> Recommendation:
+def _to_recommendation(
+    m: RedistributionMove, coords: dict[str, tuple[float, float]]
+) -> Recommendation:
+    to = coords.get(m.to_depot)
     if m.kind == "buy":
+        action: dict[str, object] = {
+            "endpoint": "buy-orders",
+            "depot_id": m.to_depot,
+            "fuel_type": m.fuel_type,
+            "quantity_liters": m.liters,
+        }
+        if to is not None:
+            action["dest_lat"], action["dest_lon"] = to[0], to[1]
         return Recommendation(
             kind=RecommendationKind.REDISTRIBUTION,
             target=m.to_depot,
-            action={
-                "endpoint": "buy-orders",
-                "depot_id": m.to_depot,
-                "fuel_type": m.fuel_type,
-                "quantity_liters": m.liters,
-            },
+            action=action,
             score=m.cost,
             rationale=f"Buy {m.liters} L {m.fuel_type} into {m.to_depot} (no surplus to cover)",
         )
+    frm = coords.get(m.from_depot) if m.from_depot else None
+    action = {
+        "kind": "transfer",
+        "from_depot": m.from_depot,
+        "to_depot": m.to_depot,
+        "fuel_type": m.fuel_type,
+        "liters": m.liters,
+    }
+    if frm is not None and to is not None:
+        action["from_lat"], action["from_lon"] = frm[0], frm[1]
+        action["to_lat"], action["to_lon"] = to[0], to[1]
     return Recommendation(
         kind=RecommendationKind.REDISTRIBUTION,
         target=m.to_depot,
-        action={
-            "kind": "transfer",
-            "from_depot": m.from_depot,
-            "to_depot": m.to_depot,
-            "fuel_type": m.fuel_type,
-            "liters": m.liters,
-        },
+        action=action,
         score=m.cost,
         rationale=f"Move {m.liters} L {m.fuel_type} {m.from_depot}→{m.to_depot} ({m.cost:.0f} km)",
     )
@@ -65,7 +76,8 @@ async def redistribution(session: SessionDep, supply: SupplyDep) -> AdviceResult
     depots = await supply.list_depots(session)
     stocks = await supply.list_stocks(session)
     moves = redistribution_plan(depots, stocks)
-    recommendations = [_to_recommendation(m) for m in moves]
+    coords = {d.id: (d.lat, d.lon) for d in depots}
+    recommendations = [_to_recommendation(m, coords) for m in moves]
     transfers = sum(1 for m in moves if m.kind == "transfer")
     buys = sum(1 for m in moves if m.kind == "buy")
     return AdviceResult(
