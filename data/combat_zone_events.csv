@@ -1,0 +1,121 @@
+Category,Event,Threat Level,Supply Relevant
+Intelligence & Information,New HUMINT report received,2,NO
+Intelligence & Information,SIGINT intercept processed,2,NO
+Intelligence & Information,IMINT/satellite imagery updated,2,NO
+Intelligence & Information,OSINT item flagged,1,NO
+Intelligence & Information,MASINT sensor reading triggered,2,NO
+Intelligence & Information,Intelligence assessment upgraded/downgraded,3,NO
+Intelligence & Information,Source reliability rating changed,2,NO
+Intelligence & Information,New EW emission detected,3,NO
+Intelligence & Information,Cyber intrusion detected / attributed,4,SUPPLY
+Intelligence & Information,Pattern-of-life analysis completed,1,NO
+Threat Events,Hostile unit spotted / identified,3,NO
+Threat Events,IED / mine detected or detonated,4,SUPPLY
+Threat Events,Sniper activity reported,3,NO
+Threat Events,Indirect fire incoming (mortar/arty/rocket),4,SUPPLY
+Threat Events,Air threat detected (drone/fixed-wing/helo),4,SUPPLY
+Threat Events,CBRN contamination detected,5,SUPPLY
+Threat Events,Ambush initiated,5,SUPPLY
+Threat Events,VBIED / suicide attack,5,SUPPLY
+Threat Events,Cyber attack on C2 systems,4,SUPPLY
+Threat Events,Jamming / GPS denial active,3,NO
+Threat Events,Laser designation detected,4,NO
+Movement & Access,Road / bridge destroyed or damaged,4,SUPPLY
+Movement & Access,Route classified RED (under fire / contested),5,SUPPLY
+Movement & Access,Route classified AMBER (threat present),3,SUPPLY
+Movement & Access,Route classified GREEN (passable),1,SUPPLY
+Movement & Access,Chokepoint / bottleneck identified,3,SUPPLY
+Movement & Access,Border crossing opened / closed,3,SUPPLY
+Movement & Access,Ford / crossing point identified or lost,2,SUPPLY
+Movement & Access,Minefield confirmed on MSR,5,SUPPLY
+Movement & Access,Road surface degraded (mud / flood / snow),2,SUPPLY
+Movement & Access,Civilian traffic blocking MSR,2,SUPPLY
+Movement & Access,Curfew / access restriction imposed,2,SUPPLY
+Movement & Access,New alternate route scouted,1,SUPPLY
+Movement & Access,Convoy escort unavailable,3,SUPPLY
+Movement & Access,Air corridor opened / closed,3,SUPPLY
+Movement & Access,Port / airfield operational status changed,4,SUPPLY
+Refueling & Fuel,FARP established,1,SUPPLY
+Refueling & Fuel,FARP attacked or destroyed,5,SUPPLY
+Refueling & Fuel,FARP relocated,2,SUPPLY
+Refueling & Fuel,Fuel resupply convoy departed,1,SUPPLY
+Refueling & Fuel,Fuel resupply convoy delayed / interdicted,4,SUPPLY
+Refueling & Fuel,Fuel depot critically low (<20%),4,SUPPLY
+Refueling & Fuel,Fuel depot destroyed,5,SUPPLY
+Refueling & Fuel,Emergency fuel request submitted,4,SUPPLY
+Refueling & Fuel,Fuel quality issue detected (contamination),3,SUPPLY
+Refueling & Fuel,Unit reports bingo fuel (aircraft),4,SUPPLY
+Refueling & Fuel,Vehicle / platform fuel critical,3,SUPPLY
+Refueling & Fuel,Generator fuel critical at C2 node,3,SUPPLY
+Refueling & Fuel,Bulk fuel tanker destroyed / captured,5,SUPPLY
+Refueling & Fuel,Aerial refueling (AAR) window opened,1,SUPPLY
+Refueling & Fuel,Pipeline / pumping station status changed,3,SUPPLY
+Supply Chain & Rearming,Ammunition resupply arrived at forward position,1,SUPPLY
+Supply Chain & Rearming,Ammunition critically low (unit level),4,SUPPLY
+Supply Chain & Rearming,Ammunition depot destroyed / captured,5,SUPPLY
+Supply Chain & Rearming,Resupply airdrop completed,1,SUPPLY
+Supply Chain & Rearming,Resupply airdrop failed / intercepted,4,SUPPLY
+Supply Chain & Rearming,Spare parts shortage reported,3,SUPPLY
+Supply Chain & Rearming,Medical supply critically low,4,SUPPLY
+Supply Chain & Rearming,Water supply disrupted,4,SUPPLY
+Supply Chain & Rearming,Food supply disrupted,3,SUPPLY
+Supply Chain & Rearming,Supply convoy ambushed,5,SUPPLY
+Supply Chain & Rearming,LOC (Line of Communication) severed,5,SUPPLY
+Supply Chain & Rearming,LOC re-established,1,SUPPLY
+Supply Chain & Rearming,Class III/V stockpile updated,1,SUPPLY
+Supply Chain & Rearming,Maintenance parts request escalated,2,SUPPLY
+Supply Chain & Rearming,Captured enemy supply cache located,1,SUPPLY
+Friendly Force Events,Unit arrived at new position / waypoint,1,SUPPLY
+Friendly Force Events,Unit departed AO,1,SUPPLY
+Friendly Force Events,FLOT updated,2,NO
+Friendly Force Events,Combat power report submitted (PERSTAT/LOGSTAT),1,SUPPLY
+Friendly Force Events,Unit established new OP / COP / FOB,2,SUPPLY
+Friendly Force Events,Medevac request initiated,3,NO
+Friendly Force Events,Casualty report (CASEVAC / MEDEVAC),3,NO
+Friendly Force Events,Unit requests fire support,4,SUPPLY
+Friendly Force Events,CAS request submitted,4,SUPPLY
+Friendly Force Events,Unit reports ammo / fuel critical,4,SUPPLY
+Friendly Force Events,Reinforcements linked up,2,SUPPLY
+Friendly Force Events,Unit crossed phase line,2,SUPPLY
+Engagements & Fires,Contact initiated (TIC),4,SUPPLY
+Engagements & Fires,Fire mission requested,3,SUPPLY
+Engagements & Fires,Artillery / mortar fire mission executed,3,SUPPLY
+Engagements & Fires,Air strike delivered,4,SUPPLY
+Engagements & Fires,Naval gunfire support delivered,3,SUPPLY
+Engagements & Fires,Engagement ended / contact broken,2,NO
+Engagements & Fires,BDA completed,1,NO
+Engagements & Fires,CIVCAS reported,3,NO
+Engagements & Fires,Fratricide / blue-on-blue incident,5,NO
+Logistics & Support,Resupply convoy departed / arrived,1,SUPPLY
+Logistics & Support,Resupply airdrop completed,1,SUPPLY
+Logistics & Support,Medical facility status changed,3,SUPPLY
+Logistics & Support,Fuel / ammo depot status updated,2,SUPPLY
+Logistics & Support,Equipment breakdown / maintenance request,2,SUPPLY
+Logistics & Support,CASEVAC / MEDEVAC completed,2,NO
+Logistics & Support,EPW captured / transferred,2,NO
+Logistics & Support,Captured materiel / documents logged,1,SUPPLY
+Command & Control,OPORD / FRAGO issued,1,NO
+Command & Control,ROE change communicated,2,NO
+Command & Control,Commander's intent updated,1,NO
+Command & Control,New task force / coalition element joined AO,2,SUPPLY
+Command & Control,C2 node relocated,2,SUPPLY
+Command & Control,Communication outage / blackout,4,NO
+Command & Control,LNO assigned / departed,1,NO
+Command & Control,SITREP submitted,1,NO
+Command & Control,Mission complete reported,1,NO
+Environment & Civil,Weather update (VFR/IFR / storm / dust),2,SUPPLY
+Environment & Civil,NBC / CBRN weather report,4,SUPPLY
+Environment & Civil,Civilian population movement detected,2,SUPPLY
+Environment & Civil,Protest / civil unrest in AO,3,SUPPLY
+Environment & Civil,KLE completed,1,NO
+Environment & Civil,Infrastructure damage reported,3,SUPPLY
+Environment & Civil,Refugee / IDP flow reported,2,SUPPLY
+Environment & Civil,Local authority contact established,1,NO
+Adversary Activity,Enemy COA assessed,3,NO
+Adversary Activity,Enemy ORBAT updated,3,NO
+Adversary Activity,Enemy logistics node identified,2,SUPPLY
+Adversary Activity,Enemy C2 node identified or disrupted,3,NO
+Adversary Activity,Enemy retreat / withdrawal observed,2,SUPPLY
+Adversary Activity,Defector / deserter surrendered,1,NO
+Adversary Activity,Propaganda / info ops activity detected,2,NO
+Adversary Activity,Foreign fighter presence confirmed,3,NO

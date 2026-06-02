@@ -7,11 +7,11 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.move_order import MoveOrder, MoveOrderStatus
-from app.domain.route import RouteMetric
+from app.domain.route import RouteMetric, RouteMode
 from app.domain.unit import UnitType
 from app.domain.unit_instance import UnitInstance
 from app.providers.move_orders import MoveOrderProvider
-from app.providers.routing import RoutingProvider
+from app.providers.routing import RoutingProvider, build_routing_provider_for_mode
 from app.services.route_planner import build_option
 
 
@@ -24,14 +24,26 @@ async def create_move_order(
     dest_lat: float,
     dest_lon: float,
     metric: RouteMetric,
+    *,
+    mode: RouteMode = RouteMode.ROAD,
 ) -> MoveOrder | None:
-    """Plan the chosen-metric route and persist a pending move order. None if unroutable."""
+    """Plan the chosen-metric route and persist a pending move order. None if unroutable.
+
+    ``mode`` selects the router and speed: ``road`` (default) uses the injected road provider at
+    road speed; ``offroad`` uses the terrain A* router at the unit's off-road / by-foot speed.
+    """
+    provider = routing if mode is RouteMode.ROAD else build_routing_provider_for_mode(mode)
+    speed_kph = (
+        unit_type.movement.speed_offroad_kph
+        if mode is RouteMode.OFFROAD
+        else unit_type.movement.speed_road_kph
+    )
     start_fuel = (
         instance.current_fuel_liters
         if instance.current_fuel_liters is not None
         else unit_type.fuel.capacity_liters
     )
-    path = await routing.shortest_path(
+    path = await provider.shortest_path(
         session, instance.lat, instance.lon, dest_lat, dest_lon, metric
     )
     if path is None:
@@ -39,7 +51,7 @@ async def create_move_order(
     option = build_option(
         path,
         label=metric.value,
-        speed_road_kph=unit_type.movement.speed_road_kph,
+        speed_road_kph=speed_kph,
         consumption_normal_lph=unit_type.fuel.consumption_normal_lph,
         start_fuel_l=start_fuel,
     )
