@@ -1,0 +1,25 @@
+# BattleFuel edge: automatic TLS (Let's Encrypt) + routing.
+# Domain and ACME email come from the environment (set in .env, passed by compose.prod.yml).
+#
+# - /api/v1/*  -> FastAPI backend (includes the WebSocket sim/event channel; Caddy proxies
+#                 the Upgrade handshake transparently, so no special WS config is needed).
+# - everything else -> the nginx-served React SPA.
+#
+# For a local smoke test without a public domain, set BATTLEFUEL_DOMAIN=localhost — Caddy
+# serves an internal self-signed cert (browser will warn; fine for a local check).
+{$BATTLEFUEL_DOMAIN} {
+	encode zstd gzip
+
+	# API + WebSocket: anything under /api/v1 goes to the backend.
+	@api path /api/v1/*
+	handle @api {
+		reverse_proxy backend:8000
+	}
+
+	# Static SPA (and the offline basemap) for everything else.
+	handle {
+		reverse_proxy frontend:80
+	}
+
+	tls {$BATTLEFUEL_ACME_EMAIL}
+}

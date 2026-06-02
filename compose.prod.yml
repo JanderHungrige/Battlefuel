@@ -1,0 +1,83 @@
+# Production stack for BattleFuel — db + backend + frontend behind a Caddy TLS edge.
+# Separate from the dev `docker-compose.yml` (which is DB-only). Bring up with:
+#   docker compose -f compose.prod.yml --env-file .env up -d
+# All secrets/config come from the root .env (see .env.example) — never hard-coded here.
+#
+# Persistent DB storage + first-boot bootstrap (migrate/seed/routing graph) + backups are
+# layered on by feature 39 (db-persistence-backups). This file establishes the topology,
+# healthchecks, restart policies, TLS, and routing (incl. WebSocket passthrough).
+services:
+  db:
+    build: ./db
+    image: battlefuel-db:16-3.4-pgrouting
+    container_name: battlefuel-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${BATTLEFUEL_DB_USER:?set in .env}
+      POSTGRES_PASSWORD: ${BATTLEFUEL_DB_PASSWORD:?set in .env}
+      POSTGRES_DB: ${BATTLEFUEL_DB_NAME:?set in .env}
+    volumes:
+      - battlefuel-db-data:/var/lib/postgresql/data
+      - ./data:/data:ro          # OSM roads extract for osm2pgrouting (bootstrap, feature 39)
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${BATTLEFUEL_DB_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # No published ports: only reachable on the internal compose network.
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: battlefuel-backend:prod
+    container_name: battlefuel-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      BATTLEFUEL_DATABASE_URL: ${BATTLEFUEL_DATABASE_URL:?set in .env}
+      BATTLEFUEL_CORS_ORIGINS: ${BATTLEFUEL_CORS_ORIGINS:?set in .env}
+      BATTLEFUEL_REFUEL_RECOMMENDER: ${BATTLEFUEL_REFUEL_RECOMMENDER:-ortools}
+    # Apply migrations (idempotent) before serving. Seed + routing-graph build are a
+    # deliberate one-time bootstrap (feature 39 / deploy script), not run on every boot.
+    command: >
+      sh -c "alembic upgrade head &&
+             exec uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    # HEALTHCHECK is defined in the image (GET /api/v1/health).
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_BASE: ${VITE_API_BASE:?set in .env (e.g. https://your.domain/api/v1)}
+        VITE_WS_BASE: ${VITE_WS_BASE:?set in .env (e.g. wss://your.domain/api/v1)}
+    image: battlefuel-frontend:prod
+    container_name: battlefuel-frontend
+    restart: unless-stopped
+    # Serves the SPA on :80 internally; the Caddy edge proxies to it.
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: battlefuel-caddy
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      BATTLEFUEL_DOMAIN: ${BATTLEFUEL_DOMAIN:?set in .env (e.g. battlefuel.example.com)}
+      BATTLEFUEL_ACME_EMAIL: ${BATTLEFUEL_ACME_EMAIL:?set in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data       # ACME certs / account — must persist across restarts
+      - caddy-config:/config
+
+volumes:
+  battlefuel-db-data:          # feature 39 binds this to the Hetzner block volume mount
+  caddy-data:
+  caddy-config:
