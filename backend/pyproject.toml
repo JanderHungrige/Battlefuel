@@ -16,6 +16,7 @@ dependencies = [
     "asyncpg>=0.30",
     "alembic>=1.13",
     "geoalchemy2>=0.15",
+    "h3>=4.4",
     "ortools>=9.10",
 ]
 

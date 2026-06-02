@@ -1,0 +1,10 @@
+# OpenTofu / Terraform — never commit state or secret vars.
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+# Secret var files (real values). The *.example template IS committed.
+*.tfvars
+*.auto.tfvars
+!*.tfvars.example

@@ -1,0 +1,14 @@
+# Keep the backend build context small and free of host/dev artifacts.
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.coverage
+tests/
+.env
+.env.*
+!.env.example

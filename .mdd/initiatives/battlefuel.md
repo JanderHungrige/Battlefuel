@@ -1,10 +1,12 @@
 ---
 id: battlefuel
 title: BattleFuel
-status: active
-version: 4
-hash: 9935f49c
+status: complete
+version: 5
+hash: f9f2c9c6
 created: 2026-05-29
+last_synced: 2026-06-02
+mdd_version: 11
 ---
 
 # BattleFuel
@@ -98,4 +100,4 @@ recon ability, operational status, supply requirements, telemetry freshness.
 | Wave 4 | waves/battlefuel-wave-4.md | Tile attributes alter movement/fuel/threat and feed the graph; move-order pop-ups warn on threat sectors; manual obstacles and game-mode random events fire; incoming orders/sector info mutate tiles. | complete |
 | Wave 5 | waves/battlefuel-wave-5.md | Switch to the OF-8 view: see fuel stocks and distribution, place fuel buy and refuel orders, receive strategic support messages; unit overview handles missing telemetry. | complete |
 | Wave 6 | waves/battlefuel-wave-6.md | Ask the engine for advice: optimal movements, threat-aware routing, best refuel points, and stock-redistribution plans with rationale. | complete |
-| Wave 7 | waves/battlefuel-wave-7.md | Run the full system in Docker, provisioned to a host (e.g. Hetzner) via Terraform. | planned |
+| Wave 7 | waves/battlefuel-wave-7.md | Run the full system in Docker, provisioned to a host (e.g. Hetzner) via OpenTofu. | complete |

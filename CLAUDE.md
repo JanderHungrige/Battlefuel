@@ -34,7 +34,7 @@ streams without rewrites.
 | Scope | **Single-user, server-authoritative** (designed to allow multi-user later) |
 | Optimizer | Rule-based/heuristic + **OR-Tools** (ML predictions deferred) |
 | State | Persistent game state from day one |
-| Deploy (Wave 7) | Docker → Hetzner via Terraform |
+| Deploy (Wave 7) | Docker → Hetzner via OpenTofu |
 
 ---
 

@@ -46,6 +46,22 @@ fi
 # 4. Migrations + seed data (all idempotent)
 info "Applying migrations and seed data…"
 (cd backend && .venv/bin/alembic upgrade head >/dev/null)
+
+# 4a. OSM geometry in PostGIS (osm_points/lines/multipolygons) — the terrain source for
+# tile seeding. Import once if absent (e.g. a fresh/recreated DB volume); otherwise skip.
+# Needs GDAL/ogr2ogr on the host (same prerequisite as build_basemap.sh).
+osm_ready() {
+  docker exec battlefuel-db psql -U battlefuel -d battlefuel -tAc \
+    "SELECT to_regclass('osm_multipolygons')" 2>/dev/null | grep -q osm_multipolygons
+}
+if osm_ready; then
+  info "OSM PostGIS tables present — skipping import."
+else
+  info "Importing OSM geometry into PostGIS (first run / fresh volume)…"
+  bash backend/scripts/import_osm_to_postgis.sh >/dev/null ||
+    die "OSM import failed. Need ogr2ogr (GDAL) installed and data/hohenfels.osm present (run backend/scripts/build_basemap.sh)."
+fi
+
 (cd backend && .venv/bin/python scripts/generate_tiles.py >/dev/null)
 (cd backend && .venv/bin/python scripts/seed_unit_instances.py >/dev/null)
 (cd backend && .venv/bin/python scripts/seed_supply.py >/dev/null)

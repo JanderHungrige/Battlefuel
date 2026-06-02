@@ -1,0 +1,18 @@
+# Copy to `secrets.auto.tfvars` (gitignored, auto-loaded by OpenTofu) and fill real values.
+# NEVER commit the real file — it holds the Hetzner API token.
+
+# Hetzner Cloud API token (project -> Security -> API Tokens, read/write).
+hcloud_token = "REPLACE_WITH_HCLOUD_TOKEN"
+
+# SSH public key for host access (contents of e.g. ~/.ssh/id_ed25519.pub).
+ssh_public_key = "ssh-ed25519 AAAA... you@host"
+
+# Lock SSH to your address, e.g. "203.0.113.7/32". Default is open to the world.
+ssh_admin_cidr = "0.0.0.0/0"
+
+# Optional overrides:
+# name        = "battlefuel"
+# location    = "nbg1"
+# server_type = "cpx31"
+# volume_size = 20
+# domain      = "battlefuel.example.com"

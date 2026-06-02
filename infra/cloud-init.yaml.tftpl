@@ -1,0 +1,27 @@
+#cloud-config
+# Bootstrap a fresh Hetzner host for the BattleFuel stack:
+#   - install Docker Engine + compose plugin
+#   - format (first time only) + mount the block volume at /mnt/battlefuel-data
+#   - create the pgdata / backups / deploy directories the compose stack expects
+package_update: true
+package_upgrade: true
+
+write_files:
+  - path: /etc/battlefuel/volume-device
+    content: "${volume_device}"
+    permissions: "0644"
+
+runcmd:
+  # --- Docker Engine + compose plugin (official convenience script) ---
+  - curl -fsSL https://get.docker.com | sh
+  - systemctl enable --now docker
+
+  # --- Mount the block volume (idempotent: only mkfs an unformatted device) ---
+  - DEV="${volume_device}"
+  - mkdir -p /mnt/battlefuel-data
+  - if ! blkid "$DEV"; then mkfs.ext4 -F "$DEV"; fi
+  - grep -q "/mnt/battlefuel-data" /etc/fstab || echo "$DEV /mnt/battlefuel-data ext4 discard,nofail,defaults 0 0" >> /etc/fstab
+  - mount -a
+
+  # --- Directories the production stack + backups use ---
+  - mkdir -p /mnt/battlefuel-data/pgdata /mnt/battlefuel-data/backups /opt/battlefuel

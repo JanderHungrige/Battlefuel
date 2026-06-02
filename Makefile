@@ -1,7 +1,8 @@
 # BattleFuel developer tasks. Run `make` or `make help` to list targets.
 
 .DEFAULT_GOAL := help
-.PHONY: help dev stop setup migrate seed test test-backend test-frontend lint clean
+.PHONY: help dev stop setup migrate seed test test-backend test-frontend lint clean \
+        provision deploy prod-bootstrap backup restore prod-logs prod-down
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*## "}{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -36,3 +37,26 @@ lint: ## Lint + type-check backend and frontend
 
 clean: ## Stop and remove the database container + volume (DESTROYS data)
 	docker compose down -v
+
+# --- Production / deployment (Wave 7) -----------------------------------------------------
+
+provision: ## Provision the Hetzner host with OpenTofu (tofu apply in infra/)
+	cd infra && tofu init && tofu apply
+
+deploy: ## Deploy the stack to the provisioned host (explicit; never auto-runs)
+	@bash scripts/deploy.sh
+
+prod-bootstrap: ## One-time data bootstrap on the prod stack (migrate + seed + routing graph)
+	@bash scripts/prod-bootstrap.sh
+
+backup: ## Run an on-demand production DB backup (pg_dump + retention)
+	@bash scripts/backup.sh
+
+restore: ## Restore the prod DB from a dump: make restore FILE=/path/to/backup.sql.gz
+	@bash scripts/restore.sh "$(FILE)"
+
+prod-logs: ## Tail logs of the production stack
+	docker compose -f compose.prod.yml --env-file .env logs -f --tail=100
+
+prod-down: ## Stop the production stack (data volume preserved)
+	docker compose -f compose.prod.yml --env-file .env down
