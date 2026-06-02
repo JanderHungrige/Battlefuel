@@ -44,6 +44,7 @@ export interface MapViewProps {
   depots: FuelDepot[]
   rendezvous: { lat: number; lon: number } | null
   adviceArrow: { from: { lat: number; lon: number }; to: { lat: number; lon: number } } | null
+  adviceDest: { lat: number; lon: number } | null
   highlightH3: string | null
   onSelectTile: (h3Index: string) => void
   onSelectUnit: (id: string) => void
@@ -193,6 +194,20 @@ function initLayers(map: maplibregl.Map): void {
     filter: ['==', ['geometry-type'], 'Polygon'],
     paint: { 'fill-color': '#ffd23f', 'fill-opacity': 0.95 },
   })
+
+  // Advice destination marker (also the only indicator for no-movement buy recommendations).
+  map.addSource('advice-dest', { type: 'geojson', data: EMPTY })
+  map.addLayer({
+    id: 'advice-dest-point',
+    type: 'circle',
+    source: 'advice-dest',
+    paint: {
+      'circle-radius': 7,
+      'circle-color': '#ffd23f',
+      'circle-stroke-width': 2,
+      'circle-stroke-color': '#0e1116',
+    },
+  })
 }
 
 function syncUnits(
@@ -300,6 +315,7 @@ export function MapView(props: MapViewProps) {
       setData(map, 'depots', depotsToGeoJSON(p.depots))
       setData(map, 'rendezvous', destinationToGeoJSON(p.rendezvous))
       setData(map, 'advice-arrow', adviceArrowToGeoJSON(p.adviceArrow?.from, p.adviceArrow?.to))
+      setData(map, 'advice-dest', destinationToGeoJSON(p.adviceDest))
       wireInteraction(map, propsRef)
       wireHover(map)
       readyRef.current = true
@@ -352,6 +368,10 @@ export function MapView(props: MapViewProps) {
         adviceArrowToGeoJSON(props.adviceArrow?.from, props.adviceArrow?.to),
       )
   }, [props.adviceArrow])
+  useEffect(() => {
+    if (readyRef.current && mapRef.current)
+      setData(mapRef.current, 'advice-dest', destinationToGeoJSON(props.adviceDest))
+  }, [props.adviceDest])
   useEffect(() => {
     if (!readyRef.current || !mapRef.current) return
     const map = mapRef.current

@@ -153,6 +153,7 @@ export default function App() {
               depots={canShow(role, 'depotOverlay') ? supply.depots : []}
               rendezvous={canShow(role, 'supplyPanel') ? supplyOrders.rendezvous : null}
               adviceArrow={adviceMarker.arrow}
+              adviceDest={adviceMarker.dest}
               highlightH3={supplyOrders.truckHighlightH3 ?? adviceMarker.highlightH3 ?? highlightH3}
               onPlaceObstacle={(lat, lon) => placeObstacle(lat, lon, obstacleKind)}
               onRemoveObstacle={removeObstacle}

@@ -9,6 +9,7 @@ type Pt = { lat: number; lon: number }
 
 export interface AdviceMarker {
   arrow: { from: Pt; to: Pt } | null
+  dest: Pt | null // destination point: the arrow endpoint, or the depot for a no-movement buy
   highlightH3: string | null
 }
 
@@ -20,7 +21,7 @@ export function useAdviceMarker(
 ): AdviceMarker {
   return useMemo(() => {
     const a = rec?.action
-    if (!a) return { arrow: null, highlightH3: null }
+    if (!a) return { arrow: null, dest: null, highlightH3: null }
     const unitPos = (id: string): Pt | null => {
       const u = units.find((x) => x.id === id)
       return u ? (livePositions[u.id] ?? { lat: u.lat, lon: u.lon }) : null
@@ -45,6 +46,13 @@ export function useAdviceMarker(
       arrow = f && t ? { from: { lat: f.lat, lon: f.lon }, to: { lat: t.lat, lon: t.lon } } : null
     }
 
+    // Destination point: the arrow endpoint, or — for a no-movement buy — the target depot.
+    let dest: Pt | null = arrow ? arrow.to : null
+    if (!dest && typeof a.depot_id === 'string') {
+      const d = depot(a.depot_id)
+      dest = d ? { lat: d.lat, lon: d.lon } : null
+    }
+
     const highlightH3 =
       typeof a.to_depot === 'string'
         ? (depot(a.to_depot)?.h3_index ?? null)
@@ -52,6 +60,6 @@ export function useAdviceMarker(
           ? (depot(a.depot_id)?.h3_index ?? null)
           : (units.find((u) => u.id === rec.target)?.h3_index ?? null)
 
-    return { arrow, highlightH3 }
+    return { arrow, dest, highlightH3 }
   }, [rec, units, livePositions, depots])
 }
