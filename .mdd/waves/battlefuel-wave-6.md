@@ -3,11 +3,11 @@ id: battlefuel-wave-6
 title: "Wave 6: Optimization Engine — Advice with Rationale"
 initiative: battlefuel
 initiative_version: 4
-status: planned
+status: complete
 depends_on: battlefuel-wave-5
 demo_state: "Ask the engine for advice and get recommendations with rationale: rank the best route for a chosen move and suggest unit repositioning; recommend the best refuel point / truck assignment; and compute an OR-Tools stock-redistribution plan across depots and trucks. Every recommendation is advisory — the operator clicks 'apply' to turn it into a real move / refuel / buy order (server stays authoritative; nothing auto-executes)."
 created: 2026-06-01
-hash: c1b313b8
+hash: 3d378048
 ---
 
 # Wave 6: Optimization Engine — Advice with Rationale
