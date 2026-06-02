@@ -1,0 +1,30 @@
+# Root build context (.dockerignore) — used by the frontend image build (context = repo root).
+# Keep the context lean: exclude deps, build output, VCS, secrets, and large regenerable data.
+.git/
+**/node_modules/
+**/dist/
+**/.venv/
+**/venv/
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/*.egg-info/
+
+# Secrets — never into an image.
+.env
+.env.*
+!.env.example
+**/*.tfvars
+!**/*.tfvars.example
+
+# Large map intermediates; only data/hohenfels.pmtiles is explicitly COPYed by the frontend image.
+data/*.osm
+data/*.osm.pbf
+data/*.geojson
+
+# Office temp / docs not needed in any image.
+*.docx
+~$*
+.mdd/
