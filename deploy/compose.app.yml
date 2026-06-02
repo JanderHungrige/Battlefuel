@@ -1,0 +1,98 @@
+# One BattleFuel environment, deployed from prebuilt GHCR images and kept up to date by
+# Watchtower. Used twice on 159.195.148.193 — once per env, each with its own --env-file:
+#
+#   docker compose --env-file deploy/.env.prod -f deploy/compose.app.yml up -d   # :3000
+#   docker compose --env-file deploy/.env.dev  -f deploy/compose.app.yml up -d   # :3001
+#
+# The frontend publishes a single HTTP port (APP_PORT) and serves the SPA + proxies /api/v1
+# (+ WebSocket) to the backend, so http://159.195.148.193:APP_PORT is the whole app. TLS +
+# domains are handled in front by Nginx Proxy Manager. COMPOSE_PROJECT_NAME (set in the
+# env-file) keeps the prod/dev stacks isolated.
+services:
+  db:
+    image: ${REGISTRY:-ghcr.io}/${OWNER:-janderhungrige}/battlefuel-db:${IMAGE_TAG}
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${BATTLEFUEL_DB_USER:?set in env-file}
+      POSTGRES_PASSWORD: ${BATTLEFUEL_DB_PASSWORD:?set in env-file}
+      POSTGRES_DB: ${BATTLEFUEL_DB_NAME:?set in env-file}
+    volumes:
+      - ${BATTLEFUEL_DB_DATA_DIR:-/opt/battlefuel/pgdata}:/var/lib/postgresql/data
+      - ${BATTLEFUEL_SEED_DATA_DIR:-/opt/battlefuel/data}:/data:ro   # .osm extracts for bootstrap
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${BATTLEFUEL_DB_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    labels:
+      # DB is stable + stateful — never auto-restarted by Watchtower.
+      com.centurylinklabs.watchtower.enable: "false"
+
+  backend:
+    image: ${REGISTRY:-ghcr.io}/${OWNER:-janderhungrige}/battlefuel-backend:${IMAGE_TAG}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      BATTLEFUEL_DATABASE_URL: ${BATTLEFUEL_DATABASE_URL:?set in env-file}
+      BATTLEFUEL_CORS_ORIGINS: ${BATTLEFUEL_CORS_ORIGINS:?set in env-file}
+      BATTLEFUEL_REFUEL_RECOMMENDER: ${BATTLEFUEL_REFUEL_RECOMMENDER:-ortools}
+    command: >
+      sh -c "alembic upgrade head &&
+             exec uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+      com.centurylinklabs.watchtower.scope: ${WATCHTOWER_SCOPE}
+
+  frontend:
+    image: ${REGISTRY:-ghcr.io}/${OWNER:-janderhungrige}/battlefuel-frontend:${IMAGE_TAG}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${APP_PORT:-3000}:80"   # NPM points the domain at 159.195.148.193:APP_PORT (set in env-file)
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+      com.centurylinklabs.watchtower.scope: ${WATCHTOWER_SCOPE}
+
+  # One-shot OSM -> PostGIS import used by scripts/prod-bootstrap.sh (bootstrap profile;
+  # not started by `up`). Containerises GDAL so the host needs none. Reads the seed .osm.
+  osm-import:
+    profiles: ["bootstrap"]
+    image: ghcr.io/osgeo/gdal:alpine-small-latest
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ${BATTLEFUEL_SEED_DATA_DIR:-/opt/battlefuel/data}:/data:ro
+    environment:
+      BF_PG: "PG:host=db port=5432 user=${BATTLEFUEL_DB_USER} password=${BATTLEFUEL_DB_PASSWORD} dbname=${BATTLEFUEL_DB_NAME}"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        for layer in points lines multipolygons; do
+          echo "importing osm_$$layer …"
+          ogr2ogr -f PostgreSQL "$$BF_PG" /data/hohenfels.osm $$layer \
+            -nln osm_$$layer -lco GEOMETRY_NAME=geom -nlt PROMOTE_TO_MULTI -overwrite
+        done
+        echo "osm import done"
+
+  # Auto-deploy: poll GHCR and recreate backend/frontend when a new :IMAGE_TAG is pushed.
+  # Scoped so the prod Watchtower only touches prod containers (and dev only dev).
+  watchtower:
+    image: containrrr/watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # GHCR pull credentials for private images (host: `docker login ghcr.io` once).
+      # Absolute path required (Docker does not expand "~"); set DOCKER_CONFIG_JSON in env-file.
+      - ${DOCKER_CONFIG_JSON:-/root/.docker/config.json}:/config.json:ro
+    environment:
+      WATCHTOWER_LABEL_ENABLE: "true"
+      WATCHTOWER_SCOPE: ${WATCHTOWER_SCOPE}
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_POLL_INTERVAL: ${WATCHTOWER_POLL_INTERVAL:-60}
+    labels:
+      com.centurylinklabs.watchtower.scope: ${WATCHTOWER_SCOPE}
