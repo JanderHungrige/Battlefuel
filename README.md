@@ -20,7 +20,7 @@ supply)** view.
 | 4 | Tiles, Events & Pop-ups | ⬜ planned |
 | 5 | Supply Chain & OF-8 View | ⬜ planned |
 | 6 | Optimization & Decision Support | ⬜ planned |
-| 7 | Deployment (Docker → Hetzner via Terraform) | ⬜ planned |
+| 7 | Deployment (Docker → Hetzner via OpenTofu) | ⬜ planned |
 
 ## Stack
 
