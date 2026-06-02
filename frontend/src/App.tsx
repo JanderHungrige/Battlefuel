@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
+import type { Recommendation } from './api/types'
 import { AdvisorPanel } from './components/AdvisorPanel'
 import { ChatterLog } from './components/ChatterLog'
 import { InspectPanel } from './components/InspectPanel'
@@ -80,6 +81,25 @@ export default function App() {
   }, [live])
   const selectedLive = selectedUnitId ? live[selectedUnitId] : undefined
 
+  // A clicked advisor recommendation marked on the map: highlight the unit + a movement arrow.
+  const [selectedAdvice, setSelectedAdvice] = useState<Recommendation | null>(null)
+  const adviceUnitId =
+    typeof selectedAdvice?.action.instance_id === 'string'
+      ? selectedAdvice.action.instance_id
+      : null
+  const adviceArrow = useMemo(() => {
+    const a = selectedAdvice?.action
+    if (!a || typeof a.instance_id !== 'string') return null
+    if (typeof a.dest_lat !== 'number' || typeof a.dest_lon !== 'number') return null
+    const u = units.find((x) => x.id === a.instance_id)
+    if (!u) return null
+    const from = livePositions[u.id] ?? { lat: u.lat, lon: u.lon }
+    return { from, to: { lat: a.dest_lat, lon: a.dest_lon } }
+  }, [selectedAdvice, units, livePositions])
+  const adviceUnitH3 = adviceUnitId
+    ? (units.find((u) => u.id === adviceUnitId)?.h3_index ?? null)
+    : null
+
   const clear = useCallback(() => {
     setSelectedTileH3(null)
     setSelectedUnitId(null)
@@ -146,7 +166,8 @@ export default function App() {
               obstacleMode={obstacleActive}
               depots={canShow(role, 'depotOverlay') ? supply.depots : []}
               rendezvous={canShow(role, 'supplyPanel') ? supplyOrders.rendezvous : null}
-              highlightH3={supplyOrders.truckHighlightH3 ?? highlightH3}
+              adviceArrow={adviceArrow}
+              highlightH3={supplyOrders.truckHighlightH3 ?? adviceUnitH3 ?? highlightH3}
               onPlaceObstacle={(lat, lon) => placeObstacle(lat, lon, obstacleKind)}
               onRemoveObstacle={removeObstacle}
               onSelectTile={(h3) => {
@@ -212,7 +233,11 @@ export default function App() {
                 canRoute={selectedUnitId !== null && planning.destination !== null}
                 onRequest={advisor.request}
                 onApply={advisor.apply}
-                onClose={advisor.toggle}
+                onSelect={setSelectedAdvice}
+                onClose={() => {
+                  setSelectedAdvice(null)
+                  advisor.toggle()
+                }}
               />
             )}
             {canShow(role, 'unitOverview') && roster.open && (

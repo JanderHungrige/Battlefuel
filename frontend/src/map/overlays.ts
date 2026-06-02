@@ -95,6 +95,50 @@ export function depotsToGeoJSON(depots: FuelDepot[]): FeatureCollection {
   }
 }
 
+/**
+ * A proposed-movement indicator (advice): a straight "axis of advance" arrow from a unit's
+ * position to the suggested destination — a shaft LineString plus an arrowhead Polygon at the
+ * destination, oriented along the bearing. Approximates the NATO movement-axis convention
+ * (milsymbol covers unit icons, not tactical mission graphics). Empty collection when null.
+ */
+export function adviceArrowToGeoJSON(
+  from: { lat: number; lon: number } | null | undefined,
+  to: { lat: number; lon: number } | null | undefined,
+): FeatureCollection {
+  if (!from || !to) return { type: 'FeatureCollection', features: [] }
+
+  // Work in a locally lon-scaled space so the arrowhead looks right at this latitude.
+  const k = Math.cos((to.lat * Math.PI) / 180) || 1
+  const dx = (to.lon - from.lon) * k
+  const dy = to.lat - from.lat
+  const len = Math.hypot(dx, dy) || 1
+  const ux = dx / len
+  const uy = dy / len
+  const size = 0.004 // arrowhead length in latitude-degrees (~440 m)
+  const baseX = to.lon * k - ux * size
+  const baseY = to.lat - uy * size
+  const px = -uy
+  const py = ux
+  const left: [number, number] = [(baseX + px * size * 0.5) / k, baseY + py * size * 0.5]
+  const right: [number, number] = [(baseX - px * size * 0.5) / k, baseY - py * size * 0.5]
+
+  return {
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates: [[from.lon, from.lat], [to.lon, to.lat]] },
+        properties: { part: 'shaft' },
+      },
+      {
+        type: 'Feature',
+        geometry: { type: 'Polygon', coordinates: [[[to.lon, to.lat], left, right, [to.lon, to.lat]]] },
+        properties: { part: 'head' },
+      },
+    ],
+  }
+}
+
 /** Multiple active-route geometries → a LineString FeatureCollection. */
 export function activeRoutesToGeoJSON(geometries: number[][][]): FeatureCollection {
   return {

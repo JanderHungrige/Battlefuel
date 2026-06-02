@@ -1,5 +1,7 @@
-// Advisor panel (Wave 6 advisor-ui): request advice and apply recommendations.
+// Advisor panel (Wave 6 advisor-ui): request advice, select a recommendation to mark it on the
+// map, and apply applyable ones.
 
+import { useState } from 'react'
 import type { AdviceResult, Recommendation, RecommendationKind } from '../api/types'
 
 const KINDS: { kind: RecommendationKind; label: string; needsRoute?: boolean }[] = [
@@ -17,6 +19,7 @@ export interface AdvisorPanelProps {
   canRoute: boolean
   onRequest: (kind: RecommendationKind) => void
   onApply: (rec: Recommendation) => void
+  onSelect: (rec: Recommendation | null) => void
   onClose: () => void
 }
 
@@ -32,8 +35,23 @@ export function AdvisorPanel({
   canRoute,
   onRequest,
   onApply,
+  onSelect,
   onClose,
 }: AdvisorPanelProps) {
+  const [selected, setSelected] = useState<number | null>(null)
+
+  const request = (kind: RecommendationKind): void => {
+    setSelected(null)
+    onSelect(null)
+    onRequest(kind)
+  }
+
+  const select = (rec: Recommendation, i: number): void => {
+    const next = selected === i ? null : i
+    setSelected(next)
+    onSelect(next === null ? null : rec)
+  }
+
   return (
     <aside className="advisor-panel" data-testid="advisor-panel">
       <header className="advisor-head">
@@ -50,7 +68,7 @@ export function AdvisorPanel({
             type="button"
             data-testid={`advice-${k.kind}`}
             disabled={loading || (k.needsRoute ? !canRoute : false)}
-            onClick={() => onRequest(k.kind)}
+            onClick={() => request(k.kind)}
           >
             {k.label}
           </button>
@@ -66,8 +84,19 @@ export function AdvisorPanel({
             <div className="advisor-msg">No recommendations.</div>
           )}
           {result.recommendations.map((rec, i) => (
-            <div key={i} className="advice-rec" data-testid="advice-rec">
-              <span className="advice-rationale">{rec.rationale}</span>
+            <div
+              key={i}
+              className={`advice-rec${selected === i ? ' selected' : ''}`}
+              data-testid="advice-rec"
+            >
+              <button
+                type="button"
+                className="advice-rationale"
+                data-testid="advice-select"
+                onClick={() => select(rec, i)}
+              >
+                {rec.rationale}
+              </button>
               {applyable(rec) && (
                 <button
                   type="button"

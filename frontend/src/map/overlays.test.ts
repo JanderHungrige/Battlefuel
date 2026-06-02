@@ -4,6 +4,7 @@ import { latLngToCell } from 'h3-js'
 import {
   TERRAIN_COLORS,
   activeRoutesToGeoJSON,
+  adviceArrowToGeoJSON,
   depotsToGeoJSON,
   destinationToGeoJSON,
   obstaclesToGeoJSON,
@@ -154,5 +155,30 @@ describe('depotsToGeoJSON', () => {
     expect(fc.features).toHaveLength(1)
     expect(fc.features[0].geometry).toEqual({ type: 'Point', coordinates: [11.8, 49.2] })
     expect(fc.features[0].properties).toMatchObject({ id: 'depot-main', name: 'Main Supply Point' })
+  })
+})
+
+describe('adviceArrowToGeoJSON', () => {
+  it('is empty when either endpoint is missing', () => {
+    expect(adviceArrowToGeoJSON(null, { lat: 49.2, lon: 11.8 }).features).toHaveLength(0)
+    expect(adviceArrowToGeoJSON({ lat: 49.2, lon: 11.8 }, null).features).toHaveLength(0)
+  })
+
+  it('emits a shaft line and an arrowhead polygon tipped at the destination', () => {
+    const from = { lat: 49.20, lon: 11.80 }
+    const to = { lat: 49.25, lon: 11.90 }
+    const fc = adviceArrowToGeoJSON(from, to)
+    const shaft = fc.features.find((f) => f.properties?.part === 'shaft')
+    const head = fc.features.find((f) => f.properties?.part === 'head')
+    expect(shaft?.geometry.type).toBe('LineString')
+    expect(head?.geometry.type).toBe('Polygon')
+    // Shaft runs from the unit to the destination.
+    const line = shaft!.geometry as { coordinates: number[][] }
+    expect(line.coordinates[0]).toEqual([11.80, 49.20])
+    expect(line.coordinates[1]).toEqual([11.90, 49.25])
+    // Arrowhead tip sits on the destination (first ring point).
+    const poly = head!.geometry as { coordinates: number[][][] }
+    expect(poly.coordinates[0][0]).toEqual([11.90, 49.25])
+    expect(poly.coordinates[0]).toHaveLength(4) // closed triangle
   })
 })
