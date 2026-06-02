@@ -36,8 +36,8 @@ satisfies_contracts:
   - from: 41-deploy-runbook
     function: "provisioned host + outputs (floating_ipv4, ssh_command) for the deploy script"
     when: "deploy runs `tofu apply` then ships the stack to the host IP."
-    status: pending
-    verified_at: ""
+    status: done
+    verified_at: "scripts/deploy.sh"
 known_issues:
   - "`tofu apply` against real Hetzner needs a valid token + DNS and was not run here; config was verified with `tofu init`/`validate`/`fmt`, and apply happens at deploy time (feature 41)."
   - "State is local by default and may contain sensitive values — gitignored; remote backend is a commented stub in versions.tf."

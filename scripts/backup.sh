@@ -7,6 +7,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+ENV_FILE="${BATTLEFUEL_ENV_FILE:-.env}"
+[ -f "$ENV_FILE" ] && { set -a; . "$ENV_FILE"; set +a; }
+
 export COMPOSE_FILE="${COMPOSE_FILE:-compose.prod.yml}"
 COMPOSE=(docker compose)
 DB_NAME="${BATTLEFUEL_DB_NAME:-battlefuel}"

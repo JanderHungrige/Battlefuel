@@ -37,8 +37,8 @@ satisfies_contracts:
   - from: 40-opentofu-hetzner
     function: "BATTLEFUEL_DB_DATA_DIR / BATTLEFUEL_BACKUP_DIR live under the mounted block volume"
     when: "OpenTofu provisions + mounts the block volume at /mnt/battlefuel-data and cloud-init mkdir -p the pgdata/backups dirs."
-    status: pending
-    verified_at: ""
+    status: done
+    verified_at: "infra/cloud-init.yaml.tftpl"
 known_issues:
   - "The type=none,o=bind named volume mounts on a Linux host (Hetzner) but NOT on Docker Desktop (device path resolves inside the VM). Local testing uses a named-volume override via COMPOSE_FILE."
   - "Bootstrap needs data/hohenfels.osm and data/hohenfels-roads.osm on the host; both are gitignored, so the deploy must ship data/ (feature 41). If absent, the underlying dev scripts can re-fetch from Overpass (needs internet during bootstrap)."

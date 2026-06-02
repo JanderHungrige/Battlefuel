@@ -11,6 +11,11 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+# Load config from .env (CORS is single-quoted so sourcing is safe). Override with
+# BATTLEFUEL_ENV_FILE for testing against a different env file.
+ENV_FILE="${BATTLEFUEL_ENV_FILE:-.env}"
+[ -f "$ENV_FILE" ] && { set -a; . "$ENV_FILE"; set +a; }
+
 # Uses Docker's native COMPOSE_FILE (defaults to the prod file). Override to inject extra
 # files (e.g. a local test override): COMPOSE_FILE=compose.prod.yml:compose.test.yml
 export COMPOSE_FILE="${COMPOSE_FILE:-compose.prod.yml}"

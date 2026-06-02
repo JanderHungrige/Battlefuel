@@ -37,8 +37,8 @@ satisfies_contracts:
   - from: 41-deploy-runbook
     function: "compose.prod.yml as the deploy unit (docker compose -f compose.prod.yml up -d)"
     when: "the deploy script ships this file + .env to the host and runs it."
-    status: pending
-    verified_at: ""
+    status: done
+    verified_at: "scripts/deploy.sh"
 known_issues:
   - "Public TLS requires a real domain with DNS pointing at the host; localhost cannot obtain a Let's Encrypt cert (Caddy uses its internal CA for non-public names)."
   - "Frontend URLs are build-time args, so the image is domain-specific (rebuild per environment)."
