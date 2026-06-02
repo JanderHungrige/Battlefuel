@@ -3,11 +3,11 @@ id: battlefuel-v2-wave-1
 title: "Wave 1: Routing Engine — Fix + Full Terrain (Off-Road) Router"
 initiative: battlefuel-v2
 initiative_version: 2
-status: planned
+status: complete
 depends_on: none
 demo_state: "A unit reliably routes to a chosen destination and traverses it end-to-end — no 'no route to destination', no back-and-forth, no stall. AND units can move cross-country off-road (by foot) over the terrain grid with terrain-aware cost, not only on roads; both road and off-road routes return the same RouteOption shape (duration + fuel-on-arrival + threat) and the unit actually follows them in the live sim."
 created: 2026-06-02
-hash: e2631d66
+hash: 2c3af443
 ---
 
 # Wave 1: Routing Engine — Fix + Full Terrain (Off-Road) Router
