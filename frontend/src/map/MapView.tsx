@@ -22,6 +22,7 @@ import { formatMgrs, gridLabels, gridLines, toMgrs } from './mgrsGrid'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type {
   CombatEvent,
+  EnemyUnit,
   FuelDepot,
   Obstacle,
   Theater,
@@ -36,6 +37,7 @@ import {
   adviceArrowToGeoJSON,
   combatEventsToGeoJSON,
   depotsToGeoJSON,
+  enemyUnitsToGeoJSON,
   destinationToGeoJSON,
   obstaclesToGeoJSON,
   paddedBounds,
@@ -66,6 +68,7 @@ export interface MapViewProps {
   obstacleMode: boolean
   combatEvents: CombatEvent[]
   highlightEventId: string | null
+  enemyUnits: EnemyUnit[]
   depots: FuelDepot[]
   rendezvous: { lat: number; lon: number } | null
   adviceArrow: { from: { lat: number; lon: number }; to: { lat: number; lon: number } } | null
@@ -279,6 +282,16 @@ function initLayers(map: maplibregl.Map): void {
     layout: { 'icon-image': ['get', 'sidc'], 'icon-size': 1, 'icon-allow-overlap': true },
   })
 
+  // Enemy units (v2 Wave 3): red APP-6 hostile symbols, rendered through the same SIDC pipeline
+  // but on a separate, non-orderable layer.
+  map.addSource('enemy-units', { type: 'geojson', data: EMPTY })
+  map.addLayer({
+    id: 'enemy-units',
+    type: 'symbol',
+    source: 'enemy-units',
+    layout: { 'icon-image': ['get', 'sidc'], 'icon-size': 1, 'icon-allow-overlap': true },
+  })
+
   map.addSource('obstacles', { type: 'geojson', data: EMPTY })
   map.addLayer({
     id: 'obstacles',
@@ -370,6 +383,17 @@ function syncUnits(
     }
   }
   setData(map, 'units', unitsToGeoJSON(units, sidcByType, live))
+}
+
+/** Register each hostile SIDC image (red milsymbol) and push the enemy-unit points. */
+function syncEnemyUnits(map: maplibregl.Map, enemies: EnemyUnit[]): void {
+  for (const sidc of new Set(enemies.map((e) => e.sidc))) {
+    if (sidc && !map.hasImage(sidc)) {
+      const img = sidcToImage(sidc)
+      if (img) map.addImage(sidc, img.data)
+    }
+  }
+  setData(map, 'enemy-units', enemyUnitsToGeoJSON(enemies))
 }
 
 /** Rasterise a short label to a small pill image (offline — same technique as unit icons). */
@@ -566,6 +590,7 @@ export function MapView(props: MapViewProps) {
       initLayers(map)
       setData(map, 'tiles', tilesToGeoJSON(p.tiles))
       syncUnits(map, p.units, p.unitTypes, p.livePositions)
+      syncEnemyUnits(map, p.enemyUnits)
       setData(map, 'active-routes', activeRoutesToGeoJSON(p.activeRoutes))
       setData(map, 'route', routeToGeoJSON(p.routeGeometry))
       setData(map, 'destination', destinationToGeoJSON(p.destination))
@@ -614,6 +639,9 @@ export function MapView(props: MapViewProps) {
     if (readyRef.current && mapRef.current)
       setData(mapRef.current, 'obstacles', obstaclesToGeoJSON(props.obstacles))
   }, [props.obstacles])
+  useEffect(() => {
+    if (readyRef.current && mapRef.current) syncEnemyUnits(mapRef.current, props.enemyUnits)
+  }, [props.enemyUnits])
   useEffect(() => {
     if (readyRef.current && mapRef.current)
       setData(mapRef.current, 'combat-events', combatEventsToGeoJSON(props.combatEvents))

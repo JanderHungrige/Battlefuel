@@ -7,6 +7,7 @@ import type {
   CreateBuyOrderRequest,
   CreateMoveOrderRequest,
   CreateRefuelOrderRequest,
+  EnemyUnit,
   FuelDepot,
   FuelStock,
   MoveOrder,
@@ -64,6 +65,7 @@ export const api = {
     postJson<UnitInstance>(`/unit-instances/${id}/telemetry`, {
       current_fuel_liters: currentFuelLiters,
     }),
+  getEnemyUnits: (): Promise<EnemyUnit[]> => getJson<EnemyUnit[]>('/enemy-units'),
   getUnitTypes: (): Promise<UnitType[]> => getJson<UnitType[]>('/units'),
   getUnitType: (id: string): Promise<UnitType> => getJson<UnitType>(`/units/${id}`),
 

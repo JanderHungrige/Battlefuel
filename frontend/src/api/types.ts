@@ -82,6 +82,16 @@ export interface UnitInstance {
   current_fuel_liters: number | null
 }
 
+/** A placed enemy unit, rendered as a red APP-6 hostile symbol (v2 Wave 3). Render-only. */
+export interface EnemyUnit {
+  id: string
+  name: string
+  sidc: string
+  lat: number
+  lon: number
+  echelon: string | null
+}
+
 export interface FuelProfile {
   fuel_type: string
   capacity_liters: number

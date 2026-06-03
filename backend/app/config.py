@@ -47,6 +47,9 @@ class Settings(BaseSettings):
     # Scripted located-combat-event feed (v2 Wave 3): "scripted" or "none".
     combat_event_feed_provider: str = "scripted"
 
+    # Enemy-unit provider (v2 Wave 3): "seed" (Hohenfels stub) or "none".
+    enemy_unit_provider: str = "seed"
+
     # Provider the factory builds for manual obstacles (Wave 4 ships "db").
     obstacle_provider: str = "db"
 

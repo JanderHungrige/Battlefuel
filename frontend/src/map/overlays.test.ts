@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { CombatEvent, Tile, UnitInstance } from '../api/types'
+import type { CombatEvent, EnemyUnit, Tile, UnitInstance } from '../api/types'
 import { latLngToCell } from 'h3-js'
 import {
   TERRAIN_COLORS,
@@ -7,6 +7,7 @@ import {
   adviceArrowToGeoJSON,
   combatEventsToGeoJSON,
   depotsToGeoJSON,
+  enemyUnitsToGeoJSON,
   destinationToGeoJSON,
   obstaclesToGeoJSON,
   paddedBounds,
@@ -235,5 +236,27 @@ describe('combatEventsToGeoJSON', () => {
 
   it('returns an empty collection for no events', () => {
     expect(combatEventsToGeoJSON([]).features).toEqual([])
+  })
+})
+
+describe('enemyUnitsToGeoJSON', () => {
+  const enemy: EnemyUnit = {
+    id: 'enemy-mech-1',
+    name: 'OPFOR MECH 1',
+    sidc: '10061000151211020000',
+    lat: 49.236,
+    lon: 11.872,
+    echelon: 'company',
+  }
+
+  it('emits one point per enemy carrying the hostile SIDC at [lon,lat]', () => {
+    const fc = enemyUnitsToGeoJSON([enemy])
+    expect(fc.features).toHaveLength(1)
+    expect(fc.features[0].geometry).toEqual({ type: 'Point', coordinates: [11.872, 49.236] })
+    expect(fc.features[0].properties).toMatchObject({ id: 'enemy-mech-1', sidc: '10061000151211020000' })
+  })
+
+  it('is empty when there are no enemy units', () => {
+    expect(enemyUnitsToGeoJSON([]).features).toEqual([])
   })
 })

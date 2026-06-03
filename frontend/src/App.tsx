@@ -26,7 +26,7 @@ import { DEFAULT_PRECISION_M, GRID_PRECISIONS } from './map/mgrsGrid'
 
 export default function App() {
   const [role, setRole] = useState<Role>('OF4')
-  const { theater, tiles, units, setUnits, unitTypes, error } = useTheaterData()
+  const { theater, tiles, units, setUnits, unitTypes, enemyUnits, error } = useTheaterData()
 
   const [selectedTileH3, setSelectedTileH3] = useState<string | null>(null)
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null)
@@ -164,6 +164,7 @@ export default function App() {
               obstacleMode={obstacleActive}
               combatEvents={Object.values(combatEvents)}
               highlightEventId={highlightEventId}
+              enemyUnits={enemyUnits}
               depots={canShow(role, 'depotOverlay') ? supply.depots : []}
               rendezvous={canShow(role, 'supplyPanel') ? supplyOrders.rendezvous : null}
               adviceArrow={adviceMarker.arrow}

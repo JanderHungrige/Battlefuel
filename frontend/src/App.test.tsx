@@ -17,6 +17,7 @@ vi.mock('./api/client', () => ({
     getTiles: () => Promise.resolve([]),
     getUnitInstances: () => Promise.resolve([]),
     getUnitTypes: () => Promise.resolve([]),
+    getEnemyUnits: () => Promise.resolve([]),
     listObstacles: () => Promise.resolve([]),
   },
 }))

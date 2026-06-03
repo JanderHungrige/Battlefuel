@@ -6,6 +6,7 @@ import { cellToLatLng } from 'h3-js'
 import type {
   BBox,
   CombatEvent,
+  EnemyUnit,
   FuelDepot,
   Obstacle,
   TerrainType,
@@ -115,6 +116,21 @@ export function combatEventsToGeoJSON(events: CombatEvent[]): FeatureCollection 
         precision_m: ev.precision_m,
         icon: iconForEvent(ev.category, ev.event).key,
       },
+    })),
+  }
+}
+
+/**
+ * Enemy units → point FeatureCollection carrying the hostile APP-6 SIDC (v2 Wave 3). Rendered red
+ * by milsymbol via the same icon pipeline as friendly units, on a separate (non-orderable) layer.
+ */
+export function enemyUnitsToGeoJSON(enemies: EnemyUnit[]): FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: enemies.map((e) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [e.lon, e.lat] },
+      properties: { id: e.id, name: e.name, sidc: e.sidc, echelon: e.echelon },
     })),
   }
 }
