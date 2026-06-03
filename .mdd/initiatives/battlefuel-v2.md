@@ -3,7 +3,7 @@ id: battlefuel-v2
 title: BattleFuel v2 — Combat UX, Routing, Scenarios & Onboarding
 status: planned
 version: 2
-hash: 3db4431a
+hash: 811958ab
 created: 2026-06-02
 ---
 
@@ -53,11 +53,11 @@ Per wave/feature: work on a **feature branch** → test locally with `make dev` 
 
 ## Wave Definition of Done (per requester, 2026-06-03)
 A wave is **NOT complete after a localhost demo**. Mark it `complete` only after all three gates
-pass — track them in each wave doc:
+pass — track them as a checklist **in each wave doc** (not here — this is the template):
 
-- [ ] **tested local** — `make dev`, demoed on localhost
-- [ ] **tested online** — merged to `dev-deployment`, deployed to `:3001`, verified there
-- [ ] **merged into main / deployed in prod** — on `main`, live `:3000` → **then close the wave**
+1. **tested local** — `make dev`, demoed on localhost
+2. **tested online** — merged to `dev-deployment`, deployed to `:3001`, verified there
+3. **merged into main / deployed in prod** — on `main`, live `:3000` → then close the wave
 
 (Merging to `main`/prod always needs explicit approval first.)
 
@@ -65,7 +65,7 @@ pass — track them in each wave doc:
 | Wave | File | Demo-state | Status |
 |------|------|------------|--------|
 | Wave 1 | waves/battlefuel-v2-wave-1.md | Routing engine fixed + extended: a unit reliably routes to a destination and traverses it (no "no route" / no back-and-forth / no stall), AND a new full terrain (off-road / by-foot) router lets units move cross-country with terrain cost, not just on roads. | complete |
-| Wave 2 | waves/battlefuel-v2-wave-2.md | Map foundations: a lighter classic offline style (no legend), the whole map in a frame with non-overlapping hexes, sector coordinate labels (A1…), indicator accent recoloured cyan→#FFD9BD, selected unit shown in a darker blue. | planned |
+| Wave 2 | waves/battlefuel-v2-wave-2.md | Map foundations: a lighter classic offline style (no legend), the whole map framed in the viewport with crisp non-overlapping hexes, accent recoloured cyan→#FFD9BD, selected unit in a darker blue, and a selectable grid layout — MGRS grid (default, drawn 100km–100m / 1km default, readout to 1m) ↔ H3 hex grid. | planned |
 | Wave 3 | waves/battlefuel-v2-wave-3.md | Threat & symbology: red reserved for combat zones, blocked areas light-yellow, hover icons for other indicators (drone/checkpoint/enemy-near…); enemy units rendered with red NATO symbols; OF-8 depots use the correct NATO symbol + 4 diesel/4 JP8 colour-coded fuel bars. | planned |
 | Wave 4 | waves/battlefuel-v2-wave-4.md | Events/chatter overhaul: catalog from combat_zone_events.csv; messages as "location – headline"; configurable arrival rate (default ≤1/15s); click-to-expand detail (heading, sector, est. threat, sender); supply/threat highlight toggles (yellow/red/adjustable threshold); supply events → advisor → create order; obstacle mode uses the same list via dropdown+search. | planned |
 | Wave 5 | waves/battlefuel-v2-wave-5.md | Tiles & panels: tile click shows last+highest threat, intel button (all tile messages), units-in-tile; tile panel persistent + updates on route-point click; Unit Overview tab (area, threat, fuel, orders) with click-to-locate; unit-overview and advisor panels no longer overlap; the request-data flow rebuilt (fix the dead button → manual entry + request → async values via chatter → apply, status "update requested: <ts>" + re-request). | planned |
