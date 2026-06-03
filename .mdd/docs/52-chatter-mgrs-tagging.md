@@ -76,7 +76,10 @@ None — consumes the existing `combat_event` WS frame.
 - A line is clickable if it has `event_id` **or** `h3_index`; `event_id` takes precedence and routes
   to `onSelectEvent` (combat-square locate), else `onSelect` (sector hex locate).
 - Click-to-locate: `highlightEventId` filters `combat-events-highlight` to that square and the map
-  eases to the event centre.
+  eases to the event centre **only when the selection changes** (the recentre effect keys on
+  `highlightEventId`, not on the combat-event stream — otherwise every incoming frame would re-focus).
+- The highlight is **clearable**: clicking the same chatter line toggles it off; selecting a tile/unit,
+  clicking the empty map (`clear`), or closing any inspect panel (`onClose={clear}`) also clears it.
 - Malformed frames are still dropped with a logged warning (the socket is never torn down).
 
 ## Data Flow

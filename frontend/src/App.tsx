@@ -102,8 +102,23 @@ export default function App() {
     setSelectedTileH3(null)
     setSelectedUnitId(null)
     setHighlightH3(null)
+    setHighlightEventId(null)
     planning.resetPlanning()
   }, [planning])
+
+  // Click a tagged combat chatter line: focus its MGRS square (clearing any other selection), and
+  // clicking the same line again toggles the highlight off. Clearing also happens via `clear`
+  // (map-background click or closing any inspect panel).
+  const locateEvent = useCallback(
+    (id: string) => {
+      setSelectedTileH3(null)
+      setSelectedUnitId(null)
+      setHighlightH3(null)
+      planning.resetPlanning()
+      setHighlightEventId((prev) => (prev === id ? null : id))
+    },
+    [planning],
+  )
 
   const ready = theater !== null
   // Obstacle placement is an OF-4 tactical tool; never active in the OF-8 supply view.
@@ -177,11 +192,13 @@ export default function App() {
               onRemoveObstacle={removeObstacle}
               onSelectTile={(h3) => {
                 setSelectedUnitId(null)
+                setHighlightEventId(null)
                 planning.resetPlanning()
                 setSelectedTileH3(h3)
               }}
               onSelectUnit={(id) => {
                 setSelectedTileH3(null)
+                setHighlightEventId(null)
                 planning.resetPlanning()
                 setSelectedUnitId(id)
               }}
@@ -189,11 +206,7 @@ export default function App() {
               onClearSelection={clear}
             />
             <GridLayoutControl precisionM={gridPrecisionM} onPrecision={setGridPrecisionM} />
-            <ChatterLog
-              messages={chatter}
-              onSelect={setHighlightH3}
-              onSelectEvent={setHighlightEventId}
-            />
+            <ChatterLog messages={chatter} onSelect={setHighlightH3} onSelectEvent={locateEvent} />
             {canShow(role, 'strategicFeed') && (
               <ChatterLog
                 messages={strategic}

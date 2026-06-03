@@ -702,13 +702,17 @@ export function MapView(props: MapViewProps) {
     if (readyRef.current && mapRef.current)
       setData(mapRef.current, 'combat-events', combatEventsToGeoJSON(props.combatEvents))
   }, [props.combatEvents])
+  // Highlight + recentre only when the *selected event* changes — NOT on every combat_event frame
+  // (combatEvents is a fresh array each render, so depending on it would re-focus on every tick).
   useEffect(() => {
     if (!readyRef.current || !mapRef.current) return
     const map = mapRef.current
     map.setFilter('combat-events-highlight', ['==', ['get', 'id'], props.highlightEventId ?? ''])
-    const ev = props.combatEvents.find((e) => e.id === props.highlightEventId)
-    if (ev) map.easeTo({ center: [ev.lon, ev.lat], duration: 600 })
-  }, [props.highlightEventId, props.combatEvents])
+    if (props.highlightEventId) {
+      const ev = propsRef.current.combatEvents.find((e) => e.id === props.highlightEventId)
+      if (ev) map.easeTo({ center: [ev.lon, ev.lat], duration: 600 })
+    }
+  }, [props.highlightEventId])
   useEffect(() => {
     if (readyRef.current && mapRef.current) syncDepots(mapRef.current, props.depots)
   }, [props.depots])
