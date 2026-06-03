@@ -1,12 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { TileUpdate, UnitUpdate } from '../api/types'
+import type { CombatEvent, TileUpdate, UnitUpdate } from '../api/types'
 import {
+  applyCombatEvent,
   applyTileUpdate,
   applyUnitUpdate,
   describeBuyOrderUpdate,
   describeRefuelOrderUpdate,
   describeTileUpdate,
   parseBuyOrderUpdate,
+  parseCombatEvent,
   parseRefuelOrderUpdate,
   parseStrategicMessage,
   parseTileUpdate,
@@ -179,5 +181,47 @@ describe('parseStrategicMessage', () => {
     expect(ok?.text).toBe('convoy inbound')
     expect(parseStrategicMessage(JSON.stringify({ type: 'unit_update' }))).toBeNull()
     expect(parseStrategicMessage('nope')).toBeNull()
+  })
+})
+
+const combatFrame: CombatEvent = {
+  type: 'combat_event',
+  id: 'ied-msr-7',
+  category: 'Threat Events',
+  event: 'IED / mine detected or detonated',
+  lat: 49.215,
+  lon: 11.835,
+  precision_m: 100,
+  estimated_threat: 4,
+  sender: 'EOD 4-1 (52nd EOD)',
+  zone: 'blocked',
+  game_s: 20,
+}
+
+describe('parseCombatEvent', () => {
+  it('parses a valid combat_event frame', () => {
+    const parsed = parseCombatEvent(JSON.stringify(combatFrame))
+    expect(parsed?.id).toBe('ied-msr-7')
+    expect(parsed?.precision_m).toBe(100)
+    expect(parsed?.zone).toBe('blocked')
+  })
+
+  it('rejects wrong-type, missing-id, non-numeric-coord, and malformed frames', () => {
+    expect(parseCombatEvent(JSON.stringify({ type: 'tile_update' }))).toBeNull()
+    expect(parseCombatEvent(JSON.stringify({ ...combatFrame, id: undefined }))).toBeNull()
+    expect(parseCombatEvent(JSON.stringify({ ...combatFrame, lat: 'x' }))).toBeNull()
+    expect(parseCombatEvent('not json')).toBeNull()
+  })
+})
+
+describe('applyCombatEvent', () => {
+  it('keeps the latest frame per id and does not mutate the input', () => {
+    const prev = {}
+    const s1 = applyCombatEvent(prev, combatFrame)
+    expect(s1['ied-msr-7'].estimated_threat).toBe(4)
+    expect(prev).toEqual({})
+    const s2 = applyCombatEvent(s1, { ...combatFrame, estimated_threat: 5, zone: 'combat' })
+    expect(s2['ied-msr-7'].estimated_threat).toBe(5)
+    expect(s2['ied-msr-7'].zone).toBe('combat')
   })
 })

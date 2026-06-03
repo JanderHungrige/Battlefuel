@@ -3,6 +3,7 @@
 
 import type {
   BuyOrderUpdate,
+  CombatEvent,
   RefuelOrderUpdate,
   StrategicMessage,
   TileUpdate,
@@ -69,6 +70,29 @@ export function parseRefuelOrderUpdate(raw: string): RefuelOrderUpdate | null {
     return msg as unknown as RefuelOrderUpdate
   }
   return null
+}
+
+/** Parse a raw WS frame into a CombatEvent, or null if it is not a valid combat_event. */
+export function parseCombatEvent(raw: string): CombatEvent | null {
+  const msg = parse(raw)
+  if (
+    msg &&
+    msg.type === 'combat_event' &&
+    typeof msg.id === 'string' &&
+    typeof msg.lat === 'number' &&
+    typeof msg.lon === 'number'
+  ) {
+    return msg as unknown as CombatEvent
+  }
+  return null
+}
+
+/** Latest combat-event frame per id wins. Returns a new map (never mutates the input). */
+export function applyCombatEvent(
+  state: Record<string, CombatEvent>,
+  event: CombatEvent,
+): Record<string, CombatEvent> {
+  return { ...state, [event.id]: event }
 }
 
 /** Parse a raw WS frame into a StrategicMessage, or null if not a valid strategic_message. */

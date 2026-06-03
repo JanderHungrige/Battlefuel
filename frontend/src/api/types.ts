@@ -314,3 +314,25 @@ export interface TileUpdate {
   situation: SectorSituation | null
   note: string | null
 }
+
+/** Colour semantics for a located combat event (v2 Wave 3). */
+export type CombatEventZone = 'combat' | 'blocked' | 'threat'
+
+/**
+ * A located, categorised, precision-tagged combat event (v2 Wave 3 located-event-model).
+ * `precision_m` is the drawn MGRS-square side in metres; `zone` drives the colour
+ * (combat → red, blocked → light-yellow, threat → graded by `estimated_threat`).
+ */
+export interface CombatEvent {
+  type: 'combat_event'
+  id: string
+  category: string
+  event: string
+  lat: number
+  lon: number
+  precision_m: number
+  estimated_threat: number
+  sender: string
+  zone: CombatEventZone
+  game_s: number
+}

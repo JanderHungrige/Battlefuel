@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     # Scripted OF-8 strategic-support message feed (Wave 5): "scripted" or "none".
     strategic_feed_provider: str = "scripted"
 
+    # Scripted located-combat-event feed (v2 Wave 3): "scripted" or "none".
+    combat_event_feed_provider: str = "scripted"
+
     # Provider the factory builds for manual obstacles (Wave 4 ships "db").
     obstacle_provider: str = "db"
 
