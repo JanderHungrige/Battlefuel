@@ -124,6 +124,11 @@ describe('useSimSocket', () => {
     expect(line?.sender).toBe('EOD 4-1 (52nd EOD)')
     expect(line?.mgrs).toMatch(/^32U /)
     expect(line?.text).toContain('IED')
+
+    // The on-connect snapshot + timed feed can send the same event twice — only one chatter line.
+    act(() => ws?.onmessage?.({ data: combat }))
+    expect(result.current.chatter.filter((m) => m.event_id === 'ied-msr-7')).toHaveLength(1)
+    expect(result.current.combatEvents['ied-msr-7'].zone).toBe('blocked')
   })
 
   it('pushChatter adds an order line', () => {

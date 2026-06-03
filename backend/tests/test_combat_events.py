@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from typing import Any
 
 import pytest
+from fastapi.testclient import TestClient
 
 from app.api.ws import ConnectionManager
 from app.config import Settings
@@ -14,6 +16,7 @@ from app.domain.combat_event import (
     classify,
     combat_event_frame,
 )
+from app.main import create_app
 from app.providers.combat_events import (
     NoneCombatEventFeedProvider,
     ScriptedCombatEventFeedProvider,
@@ -183,3 +186,21 @@ class TestApplyCombatFeed:
         )
         assert sent == 0
         assert ws.messages == []
+
+
+@pytest.fixture
+def client() -> Iterator[TestClient]:
+    with TestClient(create_app()) as c:
+        yield c
+
+
+class TestCombatSnapshotOnConnect:
+    def test_ws_sends_full_threat_laydown_on_connect(self, client: TestClient) -> None:
+        # A client that connects after the timed feed has fired must still get the squares.
+        expected = len(ScriptedCombatEventFeedProvider().events())
+        with client.websocket_connect("/api/v1/ws") as ws:
+            frames = [ws.receive_json() for _ in range(expected)]
+        assert len(frames) == expected
+        assert all(f["type"] == "combat_event" for f in frames)
+        # Every zone is represented so all three colours are testable immediately.
+        assert {f["zone"] for f in frames} == {"combat", "blocked", "threat"}

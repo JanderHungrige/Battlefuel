@@ -46,6 +46,9 @@ export function useSimSocket(enabled = true): SimSocketState {
   const [connected, setConnected] = useState(false)
   const [supplyTick, setSupplyTick] = useState(0)
   const seq = useRef(0)
+  // Combat-event ids already logged to chatter — so the on-connect snapshot + the timed feed
+  // don't produce duplicate radio lines for the same event.
+  const loggedCombat = useRef<Set<string>>(new Set())
 
   const pushChatter = useCallback(
     (text: string, kind: ChatterMessage['kind'] = 'status', h3Index?: string) => {
@@ -98,17 +101,20 @@ export function useSimSocket(enabled = true): SimSocketState {
         const combat = parseCombatEvent(raw)
         if (combat) {
           setCombatEvents((prev) => applyCombatEvent(prev, combat))
-          const msg: ChatterMessage = {
-            id: (seq.current += 1),
-            kind: 'status',
-            text: combat.event,
-            mgrs: combatEventMgrs(combat),
-            sender: combat.sender,
-            event_id: combat.id,
-            lat: combat.lat,
-            lon: combat.lon,
+          if (!loggedCombat.current.has(combat.id)) {
+            loggedCombat.current.add(combat.id)
+            const msg: ChatterMessage = {
+              id: (seq.current += 1),
+              kind: 'status',
+              text: combat.event,
+              mgrs: combatEventMgrs(combat),
+              sender: combat.sender,
+              event_id: combat.id,
+              lat: combat.lat,
+              lon: combat.lon,
+            }
+            setChatter((prev) => [...prev, msg].slice(-MAX_CHATTER))
           }
-          setChatter((prev) => [...prev, msg].slice(-MAX_CHATTER))
           return
         }
         const strat = parseStrategicMessage(raw)

@@ -12,6 +12,7 @@ source_files:
   - backend/app/providers/combat_events.py
   - backend/app/config.py
   - backend/app/services/sim_runner.py
+  - backend/app/api/ws.py
   - frontend/src/api/types.ts
   - frontend/src/hooks/simSocket.ts
   - frontend/src/hooks/useSimSocket.ts
@@ -132,8 +133,12 @@ None. Transport is the existing WebSocket (`/ws`). New frame:
   three zones (IED→blocked/100 m, RED route→combat/1 km, hostile/air→threat/2 km, chokepoint→
   blocked/1 km, air strike→combat/1 km).
 - **Emit:** `SimEngine.apply_combat_feed()` runs each tick after `apply_strategic_feed`, broadcasting
-  `combat_event_frame()` for every event due in `(prev_s, now_s]`.
-- **Transport:** `ConnectionManager.broadcast(dict)` → `/ws`.
+  `combat_event_frame()` for every event due in `(prev_s, now_s]` (live arrivals).
+- **Snapshot on connect:** combat events are a **persistent threat laydown**, so `ws_endpoint` sends
+  the full set (`send_combat_snapshot`) to each newly-connected client — without it, a client that
+  connects after the timed feed has fired (e.g. a browser reload mid-sim) would see no squares. The
+  frontend dedups chatter by event id so the snapshot + live broadcast never double a radio line.
+- **Transport:** `ConnectionManager.broadcast(dict)` → `/ws` (live); per-socket send on connect (snapshot).
 - **Consume:** `parseCombatEvent()` validates `type==='combat_event'` + string `id` + numeric `lat`;
   `applyCombatEvent()` keeps the latest frame per `id`; `useSimSocket` exposes `combatEvents`.
   Malformed frames are dropped with a logged warning (existing WS rule) — the socket is never torn
