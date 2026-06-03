@@ -3,7 +3,7 @@ id: battlefuel-v2
 title: BattleFuel v2 — Combat UX, Routing, Scenarios & Onboarding
 status: planned
 version: 3
-hash: 2b62f99e
+hash: 25883b0a
 created: 2026-06-02
 ---
 
@@ -72,7 +72,7 @@ pass — track them as a checklist **in each wave doc** (not here — this is th
 | Wave 6 | waves/battlefuel-v2-wave-6.md | Routing/movement UX (engine from Wave 1): Esc exits the current mode; smaller movement ticks; multiple routes (primary bold + lighter alternatives); manual route planning with fuel results; precise free-waypoint vs move-to-area modes; on/off road choice surfaced in the UI; remove manually-added obstacles; manually add fuel depots. | planned |
 | Wave 7 | waves/battlefuel-v2-wave-7.md | Scenario builder: build and save a custom start setting — place units, set their attributes, and reload the saved scenario. | planned |
 | Wave 8 | waves/battlefuel-v2-wave-8.md | Landing page (Eraneos + World Fuel branding from `company Logos/`, product pitch) plus a technical data-integration section explaining the DB/data model, expected columns/types, and how to add a new source (Excel connector / mapping table). Login deferred to TODO.md. | planned |
-| Wave 9 | waves/battlefuel-v2-wave-9.md | MGRS-native inspection (retire the hex tile from the UX): clicking selects the MGRS cell at the current precision and the panel shows its MGRS coordinate + aggregated situation (highest/last threat, terrain mix, road, intel, units-in-cell), with no hex/H3 vocabulary in the UI; a read-only backend MGRS-cell aggregation endpoint begins the hybrid data migration (threat-first); terrain routing stays on H3 for the routing wave. | planned |
+| Wave 9 | waves/battlefuel-v2-wave-9.md | MGRS-native inspection (retire the hex tile from the UX): clicking selects the MGRS cell at the current precision and the panel shows its MGRS coordinate + aggregated situation (highest/last threat, terrain mix, road, intel, units-in-cell), with no hex/H3 vocabulary in the UI; aggregation runs client-side from live tile data; the backend MGRS-cell data layer is deferred to a future data wave; terrain routing stays on H3. | planned |
 | Advanced | waves/battlefuel-v2-advanced.md | 3D terrain elevation on the map with an on/off switch (offline DEM). | planned |
 
 > Item→wave traceability for every line of the original request is kept in

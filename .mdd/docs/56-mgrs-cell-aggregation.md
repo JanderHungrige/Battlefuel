@@ -22,8 +22,8 @@ tags: [mgrs, cell, aggregation, threat, inspection, pure]
 path: Map/Inspect
 integration_contracts:
   - function: aggregateCell(tiles)
-    consumers: [57-mgrs-cell-endpoint, 58-mgrs-inspect-panel]
-    contract: "The single aggregation rule for an MGRS cell's situation; the backend endpoint mirrors it. Keep the rule here (frontend) authoritative; if the backend re-implements it, the two must agree."
+    consumers: [57-mgrs-inspect-panel]
+    contract: "The single aggregation rule for an MGRS cell's situation, consumed by the inspect panel. A future backend MGRS-cell endpoint (deferred) must mirror this rule."
 satisfies_contracts: []
 known_issues:
   - "'Most-recent threat' is deferred: tiles carry no per-tile update timestamp yet, so the cell shows highest threat + count only. A last-updated timestamp is a Wave-5 tiles/panels data concern."
