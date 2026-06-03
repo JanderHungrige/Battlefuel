@@ -35,3 +35,5 @@ Hetzner Cloud host, TLS/domain, persistent Postgres+PostGIS volume with backups,
   hex vocabulary) is being built now; only the **backend data-model migration** part is deferred (see
   the `/api/v1/mgrs-cells` entry above). Original note: Wave 2 made MGRS the default grid; the data
   layer was still H3 and the inspect window showed hex attributes.
+
+- [ ] **Sim base-speed by travel mode (v2 W10 F2 follow-up).** The sim traverses every move order at `speed_road_kph × tile_factor` regardless of mode. Persist `mode` on the move order (alembic column) and have `sim.advance` use `speed_offroad_kph` for offroad/direct so the off-road speed penalty is real in live movement, not just in the plan. See `.mdd/docs/61-hybrid-direct-routing-modes.md`.
