@@ -1,8 +1,8 @@
 ---
 generated: 2026-06-03
-doc_count: 45
-connection_count: 122
-overlap_count: 42
+doc_count: 49
+connection_count: 125
+overlap_count: 44
 ---
 
 # Connections
@@ -39,12 +39,18 @@ Map/Events/
 Map/Frontend/
   ├── 09-frontend-map-shell  complete
   └── 10-map-overlays-inspect  complete
+Map/Grid/
+  ├── 46-framed-map-and-hexes  complete
+  └── 47-mgrs-grid-layout  complete
 Map/Movement/
   ├── 15-move-planning-ui  complete
   ├── 16-live-movement-ui  complete
   ├── 21-threat-planning-ui  complete
   ├── 22-obstacle-tile-ops-ui  complete
   └── 23-ops-chatter-sectors  complete
+Map/Style/
+  ├── 45-classic-map-style  complete
+  └── 48-accent-and-selection-restyle  complete
 Map/Theater/
   └── 06-osm-theater-data  complete
 Map/Tiles/
@@ -144,6 +150,10 @@ graph LR
   42_cicd_auto_deploy["42-cicd-auto-deploy"]:::complete
   43_routing_bug_fix["43-routing-bug-fix"]:::complete
   44_terrain_router["44-terrain-router"]:::complete
+  45_classic_map_style["45-classic-map-style"]:::complete
+  46_framed_map_and_hexes["46-framed-map-and-hexes"]:::complete
+  47_mgrs_grid_layout["47-mgrs-grid-layout"]:::complete
+  48_accent_and_selection_restyle["48-accent-and-selection-restyle"]:::complete
   01_unit_stats_model --> 02_data_source_factory
   02_data_source_factory --> 03_seed_unit_catalog
   01_unit_stats_model --> 03_seed_unit_catalog
@@ -266,6 +276,9 @@ graph LR
   17_tile_cost_model --> 44_terrain_router
   07_hex_tile_model_api --> 44_terrain_router
   13_move_orders --> 44_terrain_router
+  45_classic_map_style --> 46_framed_map_and_hexes
+  46_framed_map_and_hexes --> 47_mgrs_grid_layout
+  45_classic_map_style --> 48_accent_and_selection_restyle
   classDef complete fill:#00e5cc,color:#000
   classDef in_progress fill:#ffaa00,color:#000
   classDef draft fill:#888,color:#fff
@@ -387,6 +400,9 @@ graph LR
 - `frontend/nginx.conf`
   - 37-container-images
   - 42-cicd-auto-deploy
+- `frontend/package.json`
+  - 09-frontend-map-shell
+  - 47-mgrs-grid-layout
 - `frontend/src/App.tsx`
   - 09-frontend-map-shell
   - 10-map-overlays-inspect
@@ -400,6 +416,9 @@ graph LR
   - 30-strategic-support-chatter
   - 31-unit-overview-telemetry
   - 36-advisor-ui
+  - 45-classic-map-style
+  - 47-mgrs-grid-layout
+  - 48-accent-and-selection-restyle
 - `frontend/src/api/client.ts`
   - 09-frontend-map-shell
   - 15-move-planning-ui
@@ -459,6 +478,10 @@ graph LR
   - 30-strategic-support-chatter
   - 31-unit-overview-telemetry
   - 36-advisor-ui
+  - 45-classic-map-style
+  - 46-framed-map-and-hexes
+  - 47-mgrs-grid-layout
+  - 48-accent-and-selection-restyle
 - `frontend/src/map/MapView.tsx`
   - 09-frontend-map-shell
   - 10-map-overlays-inspect
@@ -469,6 +492,12 @@ graph LR
   - 23-ops-chatter-sectors
   - 29-of8-supply-ui
   - 36-advisor-ui
+  - 46-framed-map-and-hexes
+  - 47-mgrs-grid-layout
+  - 48-accent-and-selection-restyle
+- `frontend/src/map/basemapStyle.ts`
+  - 09-frontend-map-shell
+  - 45-classic-map-style
 - `frontend/src/map/overlays.ts`
   - 10-map-overlays-inspect
   - 15-move-planning-ui
@@ -478,9 +507,11 @@ graph LR
   - 23-ops-chatter-sectors
   - 29-of8-supply-ui
   - 36-advisor-ui
+  - 46-framed-map-and-hexes
 - `frontend/src/roles.ts`
   - 28-role-view-switch
   - 36-advisor-ui
+  - 45-classic-map-style
 - `scripts/backup.sh`
   - 39-db-persistence-backups
   - 41-deploy-runbook
