@@ -1,20 +1,20 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import type { Tile, UnitInstance, UnitType } from '../api/types'
-import { InspectPanel } from './InspectPanel'
+import type { UnitInstance, UnitType } from '../api/types'
+import { InspectPanel, type InspectCell } from './InspectPanel'
 
-const tile: Tile = {
-  h3_index: '8811aa',
-  resolution: 8,
-  center_lat: 49.22,
-  center_lon: 11.85,
-  terrain: 'forest',
-  threat_level: 3,
-  intel_level: 'low',
-  weather: 'clear',
-  road_condition: 'clear',
-  cover: 'none',
-  boundary: [],
+const cell: InspectCell = {
+  mgrs: '32U QV 12345 67890',
+  situation: {
+    count: 3,
+    maxThreat: 3,
+    worstRoad: 'damaged',
+    maxIntel: 'low',
+    dominantTerrain: 'forest',
+    terrainMix: { forest: 2, urban: 1 },
+  },
+  h3Indexes: ['8811aa', '8811ab'],
+  units: [{ id: 'inst-1', name: 'TIGER' }],
 }
 
 const unitType: UnitType = {
@@ -56,11 +56,14 @@ describe('InspectPanel', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
-  it('shows tile attributes', () => {
-    render(<InspectPanel tile={tile} onClose={() => {}} />)
-    expect(screen.getByText('Tile')).toBeInTheDocument()
-    expect(screen.getByText('forest')).toBeInTheDocument()
+  it('shows the MGRS cell coordinate + aggregated situation (no hex/H3)', () => {
+    render(<InspectPanel cell={cell} onClose={() => {}} />)
+    expect(screen.getByText('MGRS Cell')).toBeInTheDocument()
+    expect(screen.getByText('32U QV 12345 67890')).toBeInTheDocument()
     expect(screen.getByText('3 / 5')).toBeInTheDocument()
+    expect(screen.getByText('forest')).toBeInTheDocument()
+    expect(screen.getByText('TIGER')).toBeInTheDocument() // units in cell
+    expect(screen.queryByText(/H3/)).not.toBeInTheDocument() // no hex vocabulary
   })
 
   it('shows unit fuel and type when telemetry present', () => {
@@ -82,9 +85,9 @@ describe('InspectPanel', () => {
     expect(screen.getByText('Request manual update')).toBeInTheDocument()
   })
 
-  it('calls onClose when the close button is clicked', async () => {
+  it('calls onClose when the close button is clicked', () => {
     const onClose = vi.fn()
-    render(<InspectPanel tile={tile} onClose={onClose} />)
+    render(<InspectPanel cell={cell} onClose={onClose} />)
     screen.getByLabelText('Close').click()
     expect(onClose).toHaveBeenCalledOnce()
   })
@@ -109,16 +112,16 @@ describe('InspectPanel', () => {
     expect(screen.queryByTestId('inspect-live')).not.toBeInTheDocument()
   })
 
-  it('shows tile-edit controls and emits a threat mutation on click', () => {
-    const onMutateTile = vi.fn()
-    render(<InspectPanel tile={tile} onMutateTile={onMutateTile} onClose={() => {}} />)
+  it('shows cell-edit controls and emits a cell-wide threat mutation on click', () => {
+    const onMutateCell = vi.fn()
+    render(<InspectPanel cell={cell} onMutateCell={onMutateCell} onClose={() => {}} />)
     expect(screen.getByTestId('tile-edit')).toBeInTheDocument()
     screen.getByTestId('set-threat-4').click()
-    expect(onMutateTile).toHaveBeenCalledWith('8811aa', { threat_level: 4 })
+    expect(onMutateCell).toHaveBeenCalledWith(['8811aa', '8811ab'], { threat_level: 4 })
   })
 
-  it('omits tile-edit controls when onMutateTile is not provided', () => {
-    render(<InspectPanel tile={tile} onClose={() => {}} />)
+  it('omits cell-edit controls when onMutateCell is not provided', () => {
+    render(<InspectPanel cell={cell} onClose={() => {}} />)
     expect(screen.queryByTestId('tile-edit')).not.toBeInTheDocument()
   })
 })

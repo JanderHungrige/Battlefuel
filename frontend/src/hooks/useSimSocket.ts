@@ -2,15 +2,18 @@
 // per-instance position map, builds a chatter log from tile_update frames, and auto-reconnects.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ChatterMessage, TileUpdate, UnitUpdate } from '../api/types'
+import type { ChatterMessage, CombatEvent, TileUpdate, UnitUpdate } from '../api/types'
 import { WS_BASE } from '../config'
 import {
+  applyCombatEvent,
   applyTileUpdate,
   applyUnitUpdate,
+  combatEventMgrs,
   describeBuyOrderUpdate,
   describeRefuelOrderUpdate,
   describeTileUpdate,
   parseBuyOrderUpdate,
+  parseCombatEvent,
   parseRefuelOrderUpdate,
   parseStrategicMessage,
   parseTileUpdate,
@@ -23,6 +26,8 @@ const MAX_CHATTER = 10 // FIFO: keep only the 10 most recent radio lines (oldest
 export interface SimSocketState {
   positions: Record<string, UnitUpdate>
   tileUpdates: Record<string, TileUpdate>
+  /** Located combat events keyed by id (latest frame wins) — drives Wave-3 threat squares. */
+  combatEvents: Record<string, CombatEvent>
   chatter: ChatterMessage[]
   /** OF-8 strategic-support feed: scripted strategic messages + supply-order notifications. */
   strategic: ChatterMessage[]
@@ -35,11 +40,15 @@ export interface SimSocketState {
 export function useSimSocket(enabled = true): SimSocketState {
   const [positions, setPositions] = useState<Record<string, UnitUpdate>>({})
   const [tileUpdates, setTileUpdates] = useState<Record<string, TileUpdate>>({})
+  const [combatEvents, setCombatEvents] = useState<Record<string, CombatEvent>>({})
   const [chatter, setChatter] = useState<ChatterMessage[]>([])
   const [strategic, setStrategic] = useState<ChatterMessage[]>([])
   const [connected, setConnected] = useState(false)
   const [supplyTick, setSupplyTick] = useState(0)
   const seq = useRef(0)
+  // Combat-event ids already logged to chatter — so the on-connect snapshot + the timed feed
+  // don't produce duplicate radio lines for the same event.
+  const loggedCombat = useRef<Set<string>>(new Set())
 
   const pushChatter = useCallback(
     (text: string, kind: ChatterMessage['kind'] = 'status', h3Index?: string) => {
@@ -89,6 +98,25 @@ export function useSimSocket(enabled = true): SimSocketState {
           pushStrategic(describeRefuelOrderUpdate(refuel), 'order')
           return
         }
+        const combat = parseCombatEvent(raw)
+        if (combat) {
+          setCombatEvents((prev) => applyCombatEvent(prev, combat))
+          if (!loggedCombat.current.has(combat.id)) {
+            loggedCombat.current.add(combat.id)
+            const msg: ChatterMessage = {
+              id: (seq.current += 1),
+              kind: 'status',
+              text: combat.event,
+              mgrs: combatEventMgrs(combat),
+              sender: combat.sender,
+              event_id: combat.id,
+              lat: combat.lat,
+              lon: combat.lon,
+            }
+            setChatter((prev) => [...prev, msg].slice(-MAX_CHATTER))
+          }
+          return
+        }
         const strat = parseStrategicMessage(raw)
         if (strat) {
           pushStrategic(strat.text, 'status')
@@ -109,5 +137,14 @@ export function useSimSocket(enabled = true): SimSocketState {
     }
   }, [enabled, pushChatter, pushStrategic])
 
-  return { positions, tileUpdates, chatter, strategic, pushChatter, connected, supplyTick }
+  return {
+    positions,
+    tileUpdates,
+    combatEvents,
+    chatter,
+    strategic,
+    pushChatter,
+    connected,
+    supplyTick,
+  }
 }

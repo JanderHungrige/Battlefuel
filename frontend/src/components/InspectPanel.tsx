@@ -8,6 +8,7 @@ import type {
   UnitInstance,
   UnitType,
 } from '../api/types'
+import type { CellSituation } from '../map/cellSituation'
 
 const SITUATIONS: SectorSituation[] = [
   'quiet',
@@ -26,25 +27,35 @@ export interface LiveUnitState {
   status: MoveOrderStatus
 }
 
+/** The clicked MGRS cell: its coordinate, aggregated situation, underlying tiles + units in it. */
+export interface InspectCell {
+  mgrs: string
+  situation: CellSituation
+  h3Indexes: string[]
+  units: { id: string; name: string }[]
+}
+
 interface InspectPanelProps {
-  tile?: Tile
+  cell?: InspectCell
   unit?: UnitInstance
   unitType?: UnitType
   live?: LiveUnitState
-  onMutateTile?: (h3Index: string, mutation: TileMutationRequest) => void
+  /** Apply a mutation to every tile in the cell (cell-wide sector edit). */
+  onMutateCell?: (h3Indexes: string[], mutation: TileMutationRequest) => void
   onClose: () => void
 }
 
-function TileEdit({
-  tile,
+function CellEdit({
+  cell,
   onMutate,
 }: {
-  tile: Tile
-  onMutate: (h3Index: string, mutation: TileMutationRequest) => void
+  cell: InspectCell
+  onMutate: (h3Indexes: string[], mutation: TileMutationRequest) => void
 }) {
+  const h3 = cell.h3Indexes
   return (
     <div className="tile-edit" data-testid="tile-edit">
-      <h3>Edit sector</h3>
+      <h3>Edit cell</h3>
       <div className="inspect-row">
         <span className="inspect-label">Threat</span>
         <span className="tile-edit-threat">
@@ -52,9 +63,9 @@ function TileEdit({
             <button
               key={n}
               type="button"
-              className={`threat-btn${tile.threat_level === n ? ' active' : ''}`}
+              className={`threat-btn${cell.situation.maxThreat === n ? ' active' : ''}`}
               data-testid={`set-threat-${n}`}
-              onClick={() => onMutate(tile.h3_index, { threat_level: n })}
+              onClick={() => onMutate(h3, { threat_level: n })}
             >
               {n}
             </button>
@@ -64,10 +75,10 @@ function TileEdit({
       <label className="inspect-row">
         <span className="inspect-label">Road</span>
         <select
-          value={tile.road_condition}
+          value={cell.situation.worstRoad}
           data-testid="set-road"
           onChange={(e) =>
-            onMutate(tile.h3_index, { road_condition: e.target.value as Tile['road_condition'] })
+            onMutate(h3, { road_condition: e.target.value as Tile['road_condition'] })
           }
         >
           <option value="clear">clear</option>
@@ -78,10 +89,10 @@ function TileEdit({
       <label className="inspect-row">
         <span className="inspect-label">Situation</span>
         <select
-          value={tile.situation ?? ''}
+          defaultValue=""
           data-testid="set-situation"
           onChange={(e) =>
-            e.target.value && onMutate(tile.h3_index, { situation: e.target.value as SectorSituation })
+            e.target.value && onMutate(h3, { situation: e.target.value as SectorSituation })
           }
         >
           <option value="">—</option>
@@ -97,7 +108,7 @@ function TileEdit({
         onSubmit={(e) => {
           e.preventDefault()
           const input = e.currentTarget.elements.namedItem('note') as HTMLInputElement
-          onMutate(tile.h3_index, { note: input.value })
+          onMutate(h3, { note: input.value })
         }}
       >
         <input
@@ -105,7 +116,6 @@ function TileEdit({
           type="text"
           maxLength={280}
           placeholder="Add note…"
-          defaultValue={tile.note ?? ''}
           data-testid="set-note-input"
         />
         <button type="submit" data-testid="set-note-submit">
@@ -126,14 +136,14 @@ function Row({ label, value }: { label: string; value: string | number }) {
 }
 
 export function InspectPanel({
-  tile,
+  cell,
   unit,
   unitType,
   live,
-  onMutateTile,
+  onMutateCell,
   onClose,
 }: InspectPanelProps) {
-  if (!tile && !unit) return null
+  if (!cell && !unit) return null
 
   return (
     <aside className="inspect" data-testid="inspect-panel">
@@ -141,17 +151,21 @@ export function InspectPanel({
         ×
       </button>
 
-      {tile && (
+      {cell && (
         <>
-          <h2>Tile</h2>
-          <Row label="Terrain" value={tile.terrain} />
-          <Row label="Threat" value={`${tile.threat_level} / 5`} />
-          <Row label="Intel" value={tile.intel_level} />
-          <Row label="Weather" value={tile.weather} />
-          <Row label="Road" value={tile.road_condition} />
-          <Row label="Cover" value={tile.cover} />
-          <Row label="H3" value={tile.h3_index} />
-          {onMutateTile && <TileEdit tile={tile} onMutate={onMutateTile} />}
+          <h2>MGRS Cell</h2>
+          <Row label="Coordinate" value={cell.mgrs} />
+          <Row label="Threat" value={`${cell.situation.maxThreat} / 5`} />
+          <Row label="Terrain" value={cell.situation.dominantTerrain} />
+          <Row label="Road" value={cell.situation.worstRoad} />
+          <Row label="Intel" value={cell.situation.maxIntel} />
+          <Row label="Tiles" value={cell.situation.count} />
+          {cell.units.length > 0 && (
+            <Row label="Units" value={cell.units.map((u) => u.name).join(', ')} />
+          )}
+          {onMutateCell && cell.h3Indexes.length > 0 && (
+            <CellEdit cell={cell} onMutate={onMutateCell} />
+          )}
         </>
       )}
 

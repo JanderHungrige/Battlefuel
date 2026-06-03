@@ -3,11 +3,13 @@
 
 import type {
   BuyOrderUpdate,
+  CombatEvent,
   RefuelOrderUpdate,
   StrategicMessage,
   TileUpdate,
   UnitUpdate,
 } from '../api/types'
+import { formatMgrs, toMgrs } from '../map/mgrsGrid'
 
 function parse(raw: string): Record<string, unknown> | null {
   try {
@@ -69,6 +71,34 @@ export function parseRefuelOrderUpdate(raw: string): RefuelOrderUpdate | null {
     return msg as unknown as RefuelOrderUpdate
   }
   return null
+}
+
+/** Parse a raw WS frame into a CombatEvent, or null if it is not a valid combat_event. */
+export function parseCombatEvent(raw: string): CombatEvent | null {
+  const msg = parse(raw)
+  if (
+    msg &&
+    msg.type === 'combat_event' &&
+    typeof msg.id === 'string' &&
+    typeof msg.lat === 'number' &&
+    typeof msg.lon === 'number'
+  ) {
+    return msg as unknown as CombatEvent
+  }
+  return null
+}
+
+/** Formatted MGRS coordinate (to 1 m) for a combat event's location — the chatter tag. */
+export function combatEventMgrs(ev: CombatEvent): string {
+  return formatMgrs(toMgrs(ev.lat, ev.lon))
+}
+
+/** Latest combat-event frame per id wins. Returns a new map (never mutates the input). */
+export function applyCombatEvent(
+  state: Record<string, CombatEvent>,
+  event: CombatEvent,
+): Record<string, CombatEvent> {
+  return { ...state, [event.id]: event }
 }
 
 /** Parse a raw WS frame into a StrategicMessage, or null if not a valid strategic_message. */

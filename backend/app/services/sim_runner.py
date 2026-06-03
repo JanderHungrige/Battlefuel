@@ -18,8 +18,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.ws import ConnectionManager
 from app.config import get_settings
 from app.db import get_session_maker
+from app.domain.combat_event import combat_event_frame
 from app.models.unit_instance import UnitInstanceRow
 from app.providers.buy_orders import build_buy_order_provider
+from app.providers.combat_events import (
+    CombatEventFeedProvider,
+    build_combat_event_feed_provider,
+    due_combat_events,
+)
 from app.providers.factory import build_unit_provider
 from app.providers.move_orders import build_move_order_provider
 from app.providers.refuel_orders import build_refuel_order_provider
@@ -68,6 +74,7 @@ class SimEngine:
         maker = get_session_maker()
         feed = build_tile_feed_provider()
         strategic = build_strategic_feed_provider()
+        combat = build_combat_event_feed_provider()
         events = EventEngine(
             Random(),
             mean_interval_game_s=settings.event_mean_interval_game_s,
@@ -84,6 +91,7 @@ class SimEngine:
                     await self.advance_buy_orders(session, dt_game)
                     await self.apply_feed(session, feed, prev_game_s, self._game_s)
                     await self.apply_strategic_feed(strategic, prev_game_s, self._game_s)
+                    await self.apply_combat_feed(combat, prev_game_s, self._game_s)
                     await events.step(
                         session, build_tile_provider(), self._manager, self._game_s, dt_game
                     )
@@ -122,6 +130,17 @@ class SimEngine:
                     "game_s": round(now_s, 1),
                 }
             )
+            sent += 1
+        return sent
+
+    async def apply_combat_feed(
+        self, combat: CombatEventFeedProvider, prev_s: float, now_s: float
+    ) -> int:
+        """Broadcast located combat events that came due in (prev_s, now_s]. Public for testing.
+        Returns the number sent."""
+        sent = 0
+        for ev in due_combat_events(combat.events(), prev_s, now_s):
+            await self._manager.broadcast(combat_event_frame(ev, now_s))
             sent += 1
         return sent
 

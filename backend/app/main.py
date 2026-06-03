@@ -18,6 +18,7 @@ from app.api.advice_movement import router as advice_movement_router
 from app.api.advice_redistribution import router as advice_redistribution_router
 from app.api.advice_refuel import router as advice_refuel_router
 from app.api.buy_orders import router as buy_orders_router
+from app.api.enemy_units import router as enemy_units_router
 from app.api.move_orders import router as move_orders_router
 from app.api.obstacles import router as obstacles_router
 from app.api.refuel_orders import router as refuel_orders_router
@@ -67,6 +68,7 @@ def create_app(enable_sim: bool = False) -> FastAPI:
     api_v1.include_router(units_router)
     api_v1.include_router(tiles_router)
     api_v1.include_router(unit_instances_router)
+    api_v1.include_router(enemy_units_router)
     api_v1.include_router(theater_router)
     api_v1.include_router(routes_router)
     api_v1.include_router(move_orders_router)

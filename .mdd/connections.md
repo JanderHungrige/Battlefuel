@@ -1,8 +1,8 @@
 ---
 generated: 2026-06-03
-doc_count: 49
-connection_count: 125
-overlap_count: 44
+doc_count: 60
+connection_count: 137
+overlap_count: 49
 ---
 
 # Connections
@@ -32,6 +32,10 @@ Deploy/Runbook/
   └── 41-deploy-runbook  complete
 Deploy/Stack/
   └── 38-production-stack  complete
+Events/CombatEvents/
+  └── 49-located-event-model  complete
+Map/Chatter/
+  └── 52-chatter-mgrs-tagging  complete
 Map/Dynamic/
   └── 18-dynamic-tile-updates  complete
 Map/Events/
@@ -42,6 +46,11 @@ Map/Frontend/
 Map/Grid/
   ├── 46-framed-map-and-hexes  complete
   └── 47-mgrs-grid-layout  complete
+Map/Inspect/
+  ├── 55-mgrs-cell-index  complete
+  ├── 56-mgrs-cell-aggregation  complete
+  ├── 57-mgrs-inspect-panel  complete
+  └── 59-retire-hex-ux  complete
 Map/Movement/
   ├── 15-move-planning-ui  complete
   ├── 16-live-movement-ui  complete
@@ -53,8 +62,15 @@ Map/Style/
   └── 48-accent-and-selection-restyle  complete
 Map/Theater/
   └── 06-osm-theater-data  complete
+Map/Threat/
+  ├── 50-threat-mgrs-squares  complete
+  ├── 51-event-hover-icons  complete
+  └── 58-mgrs-threat-shading  complete
 Map/Tiles/
   └── 07-hex-tile-model-api  complete
+Map/Units/
+  ├── 53-enemy-red-nato-units  complete
+  └── 54-depot-nato-symbol-fuelbars  complete
 Meta/Schema/
   └── 00-frontmatter-spec  complete
 Platform/Database/
@@ -154,6 +170,17 @@ graph LR
   46_framed_map_and_hexes["46-framed-map-and-hexes"]:::complete
   47_mgrs_grid_layout["47-mgrs-grid-layout"]:::complete
   48_accent_and_selection_restyle["48-accent-and-selection-restyle"]:::complete
+  49_located_event_model["49-located-event-model"]:::complete
+  50_threat_mgrs_squares["50-threat-mgrs-squares"]:::complete
+  51_event_hover_icons["51-event-hover-icons"]:::complete
+  52_chatter_mgrs_tagging["52-chatter-mgrs-tagging"]:::complete
+  53_enemy_red_nato_units["53-enemy-red-nato-units"]:::complete
+  54_depot_nato_symbol_fuelbars["54-depot-nato-symbol-fuelbars"]:::complete
+  55_mgrs_cell_index["55-mgrs-cell-index"]:::complete
+  56_mgrs_cell_aggregation["56-mgrs-cell-aggregation"]:::complete
+  57_mgrs_inspect_panel["57-mgrs-inspect-panel"]:::complete
+  58_mgrs_threat_shading["58-mgrs-threat-shading"]:::complete
+  59_retire_hex_ux["59-retire-hex-ux"]:::complete
   01_unit_stats_model --> 02_data_source_factory
   02_data_source_factory --> 03_seed_unit_catalog
   01_unit_stats_model --> 03_seed_unit_catalog
@@ -279,6 +306,18 @@ graph LR
   45_classic_map_style --> 46_framed_map_and_hexes
   46_framed_map_and_hexes --> 47_mgrs_grid_layout
   45_classic_map_style --> 48_accent_and_selection_restyle
+  49_located_event_model --> 50_threat_mgrs_squares
+  50_threat_mgrs_squares --> 51_event_hover_icons
+  49_located_event_model --> 52_chatter_mgrs_tagging
+  50_threat_mgrs_squares --> 52_chatter_mgrs_tagging
+  47_mgrs_grid_layout --> 55_mgrs_cell_index
+  55_mgrs_cell_index --> 56_mgrs_cell_aggregation
+  55_mgrs_cell_index --> 57_mgrs_inspect_panel
+  56_mgrs_cell_aggregation --> 57_mgrs_inspect_panel
+  55_mgrs_cell_index --> 58_mgrs_threat_shading
+  56_mgrs_cell_aggregation --> 58_mgrs_threat_shading
+  57_mgrs_inspect_panel --> 59_retire_hex_ux
+  58_mgrs_threat_shading --> 59_retire_hex_ux
   classDef complete fill:#00e5cc,color:#000
   classDef in_progress fill:#ffaa00,color:#000
   classDef draft fill:#888,color:#fff
@@ -306,6 +345,9 @@ graph LR
 - `backend/app/api/unit_instances.py`
   - 08-unit-instances
   - 31-unit-overview-telemetry
+- `backend/app/api/ws.py`
+  - 14-sim-engine
+  - 49-located-event-model
 - `backend/app/config.py`
   - 02-data-source-factory
   - 05-db-spatial-foundation
@@ -317,6 +359,8 @@ graph LR
   - 26-refuel-orders
   - 27-buy-orders
   - 30-strategic-support-chatter
+  - 49-located-event-model
+  - 53-enemy-red-nato-units
 - `backend/app/domain/route.py`
   - 11-routing-graph
   - 12-route-planning-api
@@ -342,6 +386,7 @@ graph LR
   - 33-refuel-optimizer
   - 34-redistribution-optimizer
   - 35-movement-route-advisor
+  - 53-enemy-red-nato-units
 - `backend/app/models/tile.py`
   - 07-hex-tile-model-api
   - 23-ops-chatter-sectors
@@ -383,6 +428,7 @@ graph LR
   - 26-refuel-orders
   - 27-buy-orders
   - 30-strategic-support-chatter
+  - 49-located-event-model
 - `backend/app/services/tile_mutation.py`
   - 18-dynamic-tile-updates
   - 23-ops-chatter-sectors
@@ -419,6 +465,12 @@ graph LR
   - 45-classic-map-style
   - 47-mgrs-grid-layout
   - 48-accent-and-selection-restyle
+  - 50-threat-mgrs-squares
+  - 52-chatter-mgrs-tagging
+  - 53-enemy-red-nato-units
+  - 54-depot-nato-symbol-fuelbars
+  - 57-mgrs-inspect-panel
+  - 59-retire-hex-ux
 - `frontend/src/api/client.ts`
   - 09-frontend-map-shell
   - 15-move-planning-ui
@@ -427,6 +479,7 @@ graph LR
   - 29-of8-supply-ui
   - 31-unit-overview-telemetry
   - 36-advisor-ui
+  - 53-enemy-red-nato-units
 - `frontend/src/api/types.ts`
   - 09-frontend-map-shell
   - 15-move-planning-ui
@@ -438,14 +491,23 @@ graph LR
   - 30-strategic-support-chatter
   - 31-unit-overview-telemetry
   - 36-advisor-ui
+  - 49-located-event-model
+  - 52-chatter-mgrs-tagging
+  - 53-enemy-red-nato-units
 - `frontend/src/components/ChatterLog.tsx`
   - 23-ops-chatter-sectors
   - 30-strategic-support-chatter
+  - 52-chatter-mgrs-tagging
+  - 59-retire-hex-ux
+- `frontend/src/components/GridLayoutControl.tsx`
+  - 47-mgrs-grid-layout
+  - 59-retire-hex-ux
 - `frontend/src/components/InspectPanel.tsx`
   - 10-map-overlays-inspect
   - 16-live-movement-ui
   - 22-obstacle-tile-ops-ui
   - 23-ops-chatter-sectors
+  - 57-mgrs-inspect-panel
 - `frontend/src/components/MoveRoutesPanel.tsx`
   - 15-move-planning-ui
   - 21-threat-planning-ui
@@ -459,12 +521,16 @@ graph LR
   - 23-ops-chatter-sectors
   - 29-of8-supply-ui
   - 30-strategic-support-chatter
+  - 49-located-event-model
+  - 52-chatter-mgrs-tagging
 - `frontend/src/hooks/useSimSocket.ts`
   - 16-live-movement-ui
   - 21-threat-planning-ui
   - 23-ops-chatter-sectors
   - 29-of8-supply-ui
   - 30-strategic-support-chatter
+  - 49-located-event-model
+  - 52-chatter-mgrs-tagging
 - `frontend/src/index.css`
   - 09-frontend-map-shell
   - 10-map-overlays-inspect
@@ -495,9 +561,24 @@ graph LR
   - 46-framed-map-and-hexes
   - 47-mgrs-grid-layout
   - 48-accent-and-selection-restyle
+  - 50-threat-mgrs-squares
+  - 51-event-hover-icons
+  - 52-chatter-mgrs-tagging
+  - 53-enemy-red-nato-units
+  - 54-depot-nato-symbol-fuelbars
+  - 57-mgrs-inspect-panel
+  - 58-mgrs-threat-shading
+  - 59-retire-hex-ux
 - `frontend/src/map/basemapStyle.ts`
   - 09-frontend-map-shell
   - 45-classic-map-style
+- `frontend/src/map/colors.ts`
+  - 48-accent-and-selection-restyle
+  - 50-threat-mgrs-squares
+- `frontend/src/map/mgrsGrid.ts`
+  - 47-mgrs-grid-layout
+  - 50-threat-mgrs-squares
+  - 55-mgrs-cell-index
 - `frontend/src/map/overlays.ts`
   - 10-map-overlays-inspect
   - 15-move-planning-ui
@@ -508,6 +589,14 @@ graph LR
   - 29-of8-supply-ui
   - 36-advisor-ui
   - 46-framed-map-and-hexes
+  - 50-threat-mgrs-squares
+  - 51-event-hover-icons
+  - 53-enemy-red-nato-units
+  - 54-depot-nato-symbol-fuelbars
+  - 58-mgrs-threat-shading
+- `frontend/src/map/symbols.ts`
+  - 10-map-overlays-inspect
+  - 54-depot-nato-symbol-fuelbars
 - `frontend/src/roles.ts`
   - 28-role-view-switch
   - 36-advisor-ui

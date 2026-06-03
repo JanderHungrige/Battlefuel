@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { Recommendation } from './api/types'
+import type { Recommendation, TileMutationRequest } from './api/types'
 import { AdvisorPanel } from './components/AdvisorPanel'
 import { ChatterLog } from './components/ChatterLog'
 import { GridLayoutControl } from './components/GridLayoutControl'
-import { InspectPanel } from './components/InspectPanel'
+import { InspectPanel, type InspectCell } from './components/InspectPanel'
 import { MoveRoutesPanel } from './components/MoveRoutesPanel'
 import { ObstacleKindPicker } from './components/ObstacleKindPicker'
 import type { ObstacleKind } from './components/obstacleKinds'
@@ -21,19 +21,20 @@ import { useSupply } from './hooks/useSupply'
 import { useSupplyOrders } from './hooks/useSupplyOrders'
 import { useTheaterData } from './hooks/useTheaterData'
 import { useUnitOverview } from './hooks/useUnitOverview'
-import { MapView, type GridLayout } from './map/MapView'
-import { DEFAULT_PRECISION_M, GRID_PRECISIONS } from './map/mgrsGrid'
+import { aggregateCell } from './map/cellSituation'
+import { MapView } from './map/MapView'
+import { cellIdFor, cellMgrsLabel, DEFAULT_PRECISION_M, GRID_PRECISIONS } from './map/mgrsGrid'
 
 export default function App() {
   const [role, setRole] = useState<Role>('OF4')
-  const { theater, tiles, units, setUnits, unitTypes, error } = useTheaterData()
+  const { theater, tiles, units, setUnits, unitTypes, enemyUnits, error } = useTheaterData()
 
-  const [selectedTileH3, setSelectedTileH3] = useState<string | null>(null)
+  const [selectedCell, setSelectedCell] = useState<{ lat: number; lon: number } | null>(null)
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null)
   const [highlightH3, setHighlightH3] = useState<string | null>(null)
+  const [highlightEventId, setHighlightEventId] = useState<string | null>(null)
 
-  // Map grid: MGRS only (hex layout archived in code, not exposed). Drawn precision is persisted.
-  const gridLayout: GridLayout = 'mgrs'
+  // Map grid: MGRS only (v2 Wave 9 — hex retired). Drawn precision is persisted.
   const [gridPrecisionM, setGridPrecisionM] = useState<number>(() => {
     const v = Number(localStorage.getItem('bf.gridPrecisionM'))
     return GRID_PRECISIONS.some((p) => p.m === v) ? v : DEFAULT_PRECISION_M
@@ -42,7 +43,7 @@ export default function App() {
     localStorage.setItem('bf.gridPrecisionM', String(gridPrecisionM))
   }, [gridPrecisionM])
 
-  const { positions: live, tileUpdates, chatter, strategic, pushChatter, supplyTick } =
+  const { positions: live, tileUpdates, combatEvents, chatter, strategic, pushChatter, supplyTick } =
     useSimSocket()
 
   // Operator ops: obstacles + tile edits + the obstacle-placement mode and chosen kind.
@@ -59,9 +60,34 @@ export default function App() {
     })
   }, [tiles, tileUpdates])
 
-  const selectedTile = useMemo(
-    () => displayedTiles.find((t) => t.h3_index === selectedTileH3),
-    [displayedTiles, selectedTileH3],
+  // The clicked MGRS cell: aggregate the displayed tiles + units that fall in it (client-side).
+  const selectedCellInfo = useMemo<InspectCell | null>(() => {
+    if (!selectedCell) return null
+    const cid = cellIdFor(selectedCell.lat, selectedCell.lon, gridPrecisionM)
+    const tilesIn = displayedTiles.filter(
+      (t) => cellIdFor(t.center_lat, t.center_lon, gridPrecisionM) === cid,
+    )
+    const unitsIn = units
+      .filter((u) => {
+        const p = live[u.id]
+        const lat = p ? p.lat : u.lat
+        const lon = p ? p.lon : u.lon
+        return cellIdFor(lat, lon, gridPrecisionM) === cid
+      })
+      .map((u) => ({ id: u.id, name: u.name }))
+    return {
+      mgrs: cellMgrsLabel(selectedCell.lat, selectedCell.lon, gridPrecisionM),
+      situation: aggregateCell(tilesIn),
+      h3Indexes: tilesIn.map((t) => t.h3_index),
+      units: unitsIn,
+    }
+  }, [selectedCell, displayedTiles, gridPrecisionM, units, live])
+
+  const onMutateCell = useCallback(
+    (h3Indexes: string[], mutation: TileMutationRequest) => {
+      for (const h3 of h3Indexes) mutateTile(h3, mutation)
+    },
+    [mutateTile],
   )
   const selectedUnit = useMemo(
     () => units.find((u) => u.id === selectedUnitId),
@@ -98,11 +124,26 @@ export default function App() {
   const adviceMarker = useAdviceMarker(selectedAdvice, units, livePositions, supply.depots)
 
   const clear = useCallback(() => {
-    setSelectedTileH3(null)
+    setSelectedCell(null)
     setSelectedUnitId(null)
     setHighlightH3(null)
+    setHighlightEventId(null)
     planning.resetPlanning()
   }, [planning])
+
+  // Click a tagged combat chatter line: focus its MGRS square (clearing any other selection), and
+  // clicking the same line again toggles the highlight off. Clearing also happens via `clear`
+  // (map-background click or closing any inspect panel).
+  const locateEvent = useCallback(
+    (id: string) => {
+      setSelectedCell(null)
+      setSelectedUnitId(null)
+      setHighlightH3(null)
+      planning.resetPlanning()
+      setHighlightEventId((prev) => (prev === id ? null : id))
+    },
+    [planning],
+  )
 
   const ready = theater !== null
   // Obstacle placement is an OF-4 tactical tool; never active in the OF-8 supply view.
@@ -161,23 +202,28 @@ export default function App() {
               activeRoutes={planning.activeRouteGeometries}
               obstacles={obstacles}
               obstacleMode={obstacleActive}
-              depots={canShow(role, 'depotOverlay') ? supply.depots : []}
+              combatEvents={Object.values(combatEvents)}
+              highlightEventId={highlightEventId}
+              enemyUnits={enemyUnits}
+              depots={canShow(role, 'depotOverlay') ? (supply.overview?.depots ?? []) : []}
               rendezvous={canShow(role, 'supplyPanel') ? supplyOrders.rendezvous : null}
               adviceArrow={adviceMarker.arrow}
               adviceDest={adviceMarker.dest}
               highlightH3={supplyOrders.truckHighlightH3 ?? adviceMarker.highlightH3 ?? highlightH3}
               selectedUnitId={selectedUnitId}
-              gridLayout={gridLayout}
+              selectedCell={selectedCell}
               gridPrecisionM={gridPrecisionM}
               onPlaceObstacle={(lat, lon) => placeObstacle(lat, lon, obstacleKind)}
               onRemoveObstacle={removeObstacle}
-              onSelectTile={(h3) => {
+              onSelectCell={(lat, lon) => {
                 setSelectedUnitId(null)
+                setHighlightEventId(null)
                 planning.resetPlanning()
-                setSelectedTileH3(h3)
+                setSelectedCell({ lat, lon })
               }}
               onSelectUnit={(id) => {
-                setSelectedTileH3(null)
+                setSelectedCell(null)
+                setHighlightEventId(null)
                 planning.resetPlanning()
                 setSelectedUnitId(id)
               }}
@@ -185,7 +231,7 @@ export default function App() {
               onClearSelection={clear}
             />
             <GridLayoutControl precisionM={gridPrecisionM} onPrecision={setGridPrecisionM} />
-            <ChatterLog messages={chatter} onSelect={setHighlightH3} />
+            <ChatterLog messages={chatter} onSelect={setHighlightH3} onSelectEvent={locateEvent} />
             {canShow(role, 'strategicFeed') && (
               <ChatterLog
                 messages={strategic}
@@ -250,7 +296,7 @@ export default function App() {
               />
             )}
             <InspectPanel
-              tile={selectedTile}
+              cell={selectedCellInfo ?? undefined}
               unit={selectedUnit}
               unitType={selectedUnitType}
               live={
@@ -263,7 +309,7 @@ export default function App() {
                     }
                   : undefined
               }
-              onMutateTile={mutateTile}
+              onMutateCell={onMutateCell}
               onClose={clear}
             />
           </>

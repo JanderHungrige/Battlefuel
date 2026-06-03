@@ -57,6 +57,12 @@ export interface ChatterMessage {
   kind: 'status' | 'order'
   text: string
   h3_index?: string
+  /** Combat-event tagging (v2 Wave 3): MGRS coord + sender, and click-to-locate target. */
+  mgrs?: string
+  sender?: string
+  event_id?: string
+  lat?: number
+  lon?: number
 }
 
 export type InstanceStatus =
@@ -74,6 +80,16 @@ export interface UnitInstance {
   h3_index: string
   status: InstanceStatus
   current_fuel_liters: number | null
+}
+
+/** A placed enemy unit, rendered as a red APP-6 hostile symbol (v2 Wave 3). Render-only. */
+export interface EnemyUnit {
+  id: string
+  name: string
+  sidc: string
+  lat: number
+  lon: number
+  echelon: string | null
 }
 
 export interface FuelProfile {
@@ -313,4 +329,26 @@ export interface TileUpdate {
   cover: Tile['cover']
   situation: SectorSituation | null
   note: string | null
+}
+
+/** Colour semantics for a located combat event (v2 Wave 3). */
+export type CombatEventZone = 'combat' | 'blocked' | 'threat'
+
+/**
+ * A located, categorised, precision-tagged combat event (v2 Wave 3 located-event-model).
+ * `precision_m` is the drawn MGRS-square side in metres; `zone` drives the colour
+ * (combat → red, blocked → light-yellow, threat → graded by `estimated_threat`).
+ */
+export interface CombatEvent {
+  type: 'combat_event'
+  id: string
+  category: string
+  event: string
+  lat: number
+  lon: number
+  precision_m: number
+  estimated_threat: number
+  sender: string
+  zone: CombatEventZone
+  game_s: number
 }

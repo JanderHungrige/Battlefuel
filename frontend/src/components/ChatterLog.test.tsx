@@ -24,4 +24,30 @@ describe('ChatterLog', () => {
     fireEvent.click(msgs[1]) // the status line with a sector
     expect(onSelect).toHaveBeenCalledWith('h1')
   })
+
+  it('renders a combat line with its MGRS tag + sender and locates by event id', () => {
+    const onSelectEvent = vi.fn()
+    render(
+      <ChatterLog
+        messages={[
+          {
+            id: 3,
+            kind: 'status',
+            text: 'IED / mine detected or detonated',
+            mgrs: '32U PU 12345 67890',
+            sender: 'EOD 4-1 (52nd EOD)',
+            event_id: 'ied-msr-7',
+            lat: 49.215,
+            lon: 11.835,
+          },
+        ]}
+        onSelectEvent={onSelectEvent}
+      />,
+    )
+    const msg = screen.getByTestId('chatter-msg')
+    expect(msg).toHaveTextContent('32U PU 12345 67890')
+    expect(msg).toHaveTextContent('EOD 4-1 (52nd EOD)')
+    fireEvent.click(msg)
+    expect(onSelectEvent).toHaveBeenCalledWith('ied-msr-7')
+  })
 })
