@@ -7,7 +7,7 @@ status: planned
 depends_on: battlefuel-v2-wave-9
 demo_state: "A unit always reaches its destination and never freezes: the operator picks Safe (route around threat, cross only if no alternative) or Fast (shortest, crosses threat at a fuel/time penalty) plus a travel mode (road / off-road / hybrid / direct), so routes combine roads, tracks and cross-country movement (off-road carries a speed + fuel penalty); routes show as a bold primary + lighter alternatives with duration/fuel/threat and a warning when the path crosses a threat-level-5 sector; movement advances in smooth small ticks. The operator can plan by free waypoints (Waypoint routing: Start -> set points -> Remove last -> End -> Confirm move order), hand-draw a passage/road for the engine to use, add fuel depots, remove manually-added obstacles, and press Esc to exit any mode. The unit symbol's centre is always the route start."
 created: 2026-06-03
-hash: 6887cd86
+hash: b2aec3d8
 ---
 
 # Wave 10: Routing & Movement Overhaul (absorbs Wave 6)
@@ -62,7 +62,7 @@ Mark `complete` only after ALL three gates pass (per requester — never on a lo
 ## Features
 | # | Feature | Doc | Status | Depends on |
 |---|---------|-----|--------|------------|
-| 1 | never-stall-traversal-threat-crossing | — | planned | — |
+| 1 | never-stall-traversal-threat-crossing | docs/60-never-stall-traversal-threat-crossing.md | complete | — |
 | 2 | hybrid-direct-routing-modes | — | planned | never-stall-traversal-threat-crossing |
 | 3 | smaller-movement-ticks | — | planned | never-stall-traversal-threat-crossing |
 | 4 | routing-mode-multi-route-ui | — | planned | hybrid-direct-routing-modes |
