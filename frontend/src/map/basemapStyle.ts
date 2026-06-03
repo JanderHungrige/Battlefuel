@@ -19,11 +19,14 @@ export function buildBasemapStyle(pmtilesArchiveUrl: string): StyleSpecification
         attribution: OSM_ATTRIBUTION,
       },
     },
+    // Classic, light cartographic palette (parchment base, soft natural fills, dark roads for
+    // contrast). Tunable here. Still no symbol/glyph layers — labels need a glyphs endpoint that
+    // would break offline use.
     layers: [
       {
         id: 'background',
         type: 'background',
-        paint: { 'background-color': '#0e1116' },
+        paint: { 'background-color': '#f4f1e8' },
       },
       {
         id: 'areas',
@@ -34,14 +37,14 @@ export function buildBasemapStyle(pmtilesArchiveUrl: string): StyleSpecification
           'fill-color': [
             'case',
             ['==', ['get', 'natural'], 'water'],
-            '#15324f',
+            '#a9cce3',
             ['any', ['==', ['get', 'natural'], 'wood'], ['==', ['get', 'landuse'], 'forest']],
-            '#18351f',
+            '#c6d9b0',
             ['!=', ['get', 'building'], null],
-            '#2c3038',
-            '#1b2027',
+            '#ddd5c7',
+            '#ebe6db',
           ],
-          'fill-opacity': 0.65,
+          'fill-opacity': 0.85,
         },
       },
       {
@@ -50,7 +53,7 @@ export function buildBasemapStyle(pmtilesArchiveUrl: string): StyleSpecification
         source: 'basemap',
         'source-layer': 'roads',
         paint: {
-          'line-color': '#7d8794',
+          'line-color': '#8a8270',
           'line-width': ['interpolate', ['linear'], ['zoom'], 8, 0.4, 13, 1.2, 16, 2.5],
         },
       },

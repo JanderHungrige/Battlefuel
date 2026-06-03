@@ -19,4 +19,12 @@ describe('buildBasemapStyle', () => {
     expect(ids).toEqual(expect.arrayContaining(['background', 'areas', 'roads']))
     expect(style.layers.some((l) => l.type === 'symbol')).toBe(false)
   })
+
+  it('uses a classic LIGHT background (not the old dark theme)', () => {
+    const bg = style.layers.find((l) => l.id === 'background')
+    expect(bg?.type).toBe('background')
+    const color = bg?.type === 'background' ? bg.paint?.['background-color'] : undefined
+    expect(color).toBe('#f4f1e8')
+    expect(color).not.toBe('#0e1116')
+  })
 })
