@@ -165,7 +165,7 @@ export default function App() {
               combatEvents={Object.values(combatEvents)}
               highlightEventId={highlightEventId}
               enemyUnits={enemyUnits}
-              depots={canShow(role, 'depotOverlay') ? supply.depots : []}
+              depots={canShow(role, 'depotOverlay') ? (supply.overview?.depots ?? []) : []}
               rendezvous={canShow(role, 'supplyPanel') ? supplyOrders.rendezvous : null}
               adviceArrow={adviceMarker.arrow}
               adviceDest={adviceMarker.dest}

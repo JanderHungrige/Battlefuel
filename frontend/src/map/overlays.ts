@@ -6,13 +6,14 @@ import { cellToLatLng } from 'h3-js'
 import type {
   BBox,
   CombatEvent,
+  DepotFuel,
   EnemyUnit,
-  FuelDepot,
   Obstacle,
   TerrainType,
   Tile,
   UnitInstance,
 } from '../api/types'
+import { depotIconKey } from './depotSymbol'
 import { iconForEvent } from './eventIcons'
 import { squareCornersFromCenter } from './mgrsGrid'
 
@@ -150,14 +151,18 @@ export function obstaclesToGeoJSON(obstacles: Obstacle[]): FeatureCollection {
   }
 }
 
-/** Fuel depots → point FeatureCollection at each depot's location. */
-export function depotsToGeoJSON(depots: FuelDepot[]): FeatureCollection {
+/**
+ * Fuel depots → point FeatureCollection. Each feature references a composited icon (NATO sustainment
+ * symbol + per-fuel gauges) by a fill-encoded key, so MapView can register/look up the right image
+ * (v2 Wave 3, depot-nato-symbol-fuelbars).
+ */
+export function depotsToGeoJSON(depots: DepotFuel[]): FeatureCollection {
   return {
     type: 'FeatureCollection',
     features: depots.map((d) => ({
       type: 'Feature',
-      geometry: { type: 'Point', coordinates: [d.lon, d.lat] },
-      properties: { id: d.id, name: d.name },
+      geometry: { type: 'Point', coordinates: [d.depot.lon, d.depot.lat] },
+      properties: { id: d.depot.id, name: d.depot.name, icon: depotIconKey(d) },
     })),
   }
 }

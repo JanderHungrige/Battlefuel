@@ -169,13 +169,23 @@ describe('destinationToGeoJSON', () => {
 })
 
 describe('depotsToGeoJSON', () => {
-  it('emits one point feature per depot at [lon, lat] with id + name', () => {
+  it('emits one point per depot at [lon, lat] with id, name, and a fill-encoded icon key', () => {
     const fc = depotsToGeoJSON([
-      { id: 'depot-main', name: 'Main Supply Point', h3_index: 'x', lat: 49.2, lon: 11.8 },
+      {
+        depot: { id: 'depot-main', name: 'Main Supply Point', h3_index: 'x', lat: 49.2, lon: 11.8 },
+        stocks: [
+          { depot_id: 'depot-main', fuel_type: 'diesel', quantity_liters: 5000, capacity_liters: 10000 },
+          { depot_id: 'depot-main', fuel_type: 'jp8', quantity_liters: 10000, capacity_liters: 10000 },
+        ],
+      },
     ])
     expect(fc.features).toHaveLength(1)
     expect(fc.features[0].geometry).toEqual({ type: 'Point', coordinates: [11.8, 49.2] })
-    expect(fc.features[0].properties).toMatchObject({ id: 'depot-main', name: 'Main Supply Point' })
+    expect(fc.features[0].properties).toMatchObject({
+      id: 'depot-main',
+      name: 'Main Supply Point',
+      icon: 'depot:2-4', // diesel 50% → 2/4, jp8 100% → 4/4
+    })
   })
 })
 

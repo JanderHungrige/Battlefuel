@@ -17,13 +17,14 @@ import {
   ZONE_THREAT_FILL,
   ZONE_THREAT_LINE,
 } from './colors'
+import { DEPOT_SIDC, GAUGE_SEGMENTS, depotGauges, depotIconKey } from './depotSymbol'
 import { ALL_EVENT_ICONS } from './eventIcons'
 import { formatMgrs, gridLabels, gridLines, toMgrs } from './mgrsGrid'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type {
   CombatEvent,
+  DepotFuel,
   EnemyUnit,
-  FuelDepot,
   Obstacle,
   Theater,
   Tile,
@@ -45,7 +46,7 @@ import {
   tilesToGeoJSON,
   unitsToGeoJSON,
 } from './overlays'
-import { sidcToImage } from './symbols'
+import { sidcToCanvas, sidcToImage } from './symbols'
 
 let protocolRegistered = false
 function ensureProtocol(): void {
@@ -69,7 +70,7 @@ export interface MapViewProps {
   combatEvents: CombatEvent[]
   highlightEventId: string | null
   enemyUnits: EnemyUnit[]
-  depots: FuelDepot[]
+  depots: DepotFuel[]
   rendezvous: { lat: number; lon: number } | null
   adviceArrow: { from: { lat: number; lon: number }; to: { lat: number; lon: number } } | null
   adviceDest: { lat: number; lon: number } | null
@@ -306,18 +307,17 @@ function initLayers(map: maplibregl.Map): void {
     },
   })
 
-  // Fuel depots (OF-8 supply overlay): amber diamonds.
+  // Fuel depots (OF-8 supply overlay): NATO sustainment symbol + per-fuel gauges (composited icon).
   map.addSource('depots', { type: 'geojson', data: EMPTY })
   map.addLayer({
     id: 'depots',
-    type: 'circle',
+    type: 'symbol',
     source: 'depots',
-    paint: {
-      'circle-radius': 9,
-      'circle-color': '#ffb020',
-      'circle-opacity': 0.9,
-      'circle-stroke-width': 2,
-      'circle-stroke-color': '#0e1116',
+    layout: {
+      'icon-image': ['get', 'icon'],
+      'icon-size': 1,
+      'icon-allow-overlap': true,
+      'icon-anchor': 'bottom',
     },
   })
 
@@ -394,6 +394,62 @@ function syncEnemyUnits(map: maplibregl.Map, enemies: EnemyUnit[]): void {
     }
   }
   setData(map, 'enemy-units', enemyUnitsToGeoJSON(enemies))
+}
+
+const DIESEL_COLOR = '#3a8f4f'
+const JP8_COLOR = '#d39a2b'
+
+/** Draw a 4-segment fuel bar; the first `filled` segments are colour-coded, the rest greyed. */
+function gaugeBar(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  filled: number,
+  color: string,
+): void {
+  const seg = w / GAUGE_SEGMENTS
+  for (let i = 0; i < GAUGE_SEGMENTS; i++) {
+    ctx.fillStyle = i < filled ? color : 'rgba(20,18,14,0.22)'
+    ctx.fillRect(x + i * seg + 0.5, y, seg - 1, h)
+    ctx.strokeStyle = 'rgba(20,18,14,0.6)'
+    ctx.lineWidth = 0.5
+    ctx.strokeRect(x + i * seg + 0.5, y, seg - 1, h)
+  }
+}
+
+/** Composite a depot's NATO sustainment symbol + diesel/JP8 fuel gauges into one offline icon. */
+function depotImage(d: DepotFuel): { width: number; height: number; data: Uint8ClampedArray } {
+  const sym = sidcToCanvas(DEPOT_SIDC, 24)
+  const symW = sym?.width ?? 24
+  const symH = sym?.height ?? 24
+  const w = Math.max(40, symW)
+  const barH = 5
+  const gap = 2
+  const barsTop = symH + 3
+  const h = barsTop + barH * 2 + gap
+  const canvas = document.createElement('canvas')
+  canvas.width = w
+  canvas.height = h
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return { width: w, height: h, data: new Uint8ClampedArray(w * h * 4) }
+  if (sym) ctx.drawImage(sym, (w - symW) / 2, 0)
+  const g = depotGauges(d.stocks)
+  const barW = 34
+  const bx = (w - barW) / 2
+  gaugeBar(ctx, bx, barsTop, barW, barH, g.diesel, DIESEL_COLOR)
+  gaugeBar(ctx, bx, barsTop + barH + gap, barW, barH, g.jp8, JP8_COLOR)
+  return ctx.getImageData(0, 0, w, h)
+}
+
+/** Register a composited image per distinct depot fill, then push the depot points. */
+function syncDepots(map: maplibregl.Map, depots: DepotFuel[]): void {
+  for (const d of depots) {
+    const key = depotIconKey(d)
+    if (!map.hasImage(key)) map.addImage(key, depotImage(d))
+  }
+  setData(map, 'depots', depotsToGeoJSON(depots))
 }
 
 /** Rasterise a short label to a small pill image (offline — same technique as unit icons). */
@@ -596,7 +652,7 @@ export function MapView(props: MapViewProps) {
       setData(map, 'destination', destinationToGeoJSON(p.destination))
       setData(map, 'obstacles', obstaclesToGeoJSON(p.obstacles))
       setData(map, 'combat-events', combatEventsToGeoJSON(p.combatEvents))
-      setData(map, 'depots', depotsToGeoJSON(p.depots))
+      syncDepots(map, p.depots)
       setData(map, 'rendezvous', destinationToGeoJSON(p.rendezvous))
       setData(map, 'advice-arrow', adviceArrowToGeoJSON(p.adviceArrow?.from, p.adviceArrow?.to))
       setData(map, 'advice-dest', destinationToGeoJSON(p.adviceDest))
@@ -654,8 +710,7 @@ export function MapView(props: MapViewProps) {
     if (ev) map.easeTo({ center: [ev.lon, ev.lat], duration: 600 })
   }, [props.highlightEventId, props.combatEvents])
   useEffect(() => {
-    if (readyRef.current && mapRef.current)
-      setData(mapRef.current, 'depots', depotsToGeoJSON(props.depots))
+    if (readyRef.current && mapRef.current) syncDepots(mapRef.current, props.depots)
   }, [props.depots])
   useEffect(() => {
     if (readyRef.current && mapRef.current)
