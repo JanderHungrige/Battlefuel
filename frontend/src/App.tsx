@@ -1,7 +1,8 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Recommendation } from './api/types'
 import { AdvisorPanel } from './components/AdvisorPanel'
 import { ChatterLog } from './components/ChatterLog'
+import { GridLayoutControl } from './components/GridLayoutControl'
 import { InspectPanel } from './components/InspectPanel'
 import { MoveRoutesPanel } from './components/MoveRoutesPanel'
 import { ObstacleKindPicker } from './components/ObstacleKindPicker'
@@ -20,7 +21,8 @@ import { useSupply } from './hooks/useSupply'
 import { useSupplyOrders } from './hooks/useSupplyOrders'
 import { useTheaterData } from './hooks/useTheaterData'
 import { useUnitOverview } from './hooks/useUnitOverview'
-import { MapView } from './map/MapView'
+import { MapView, type GridLayout } from './map/MapView'
+import { DEFAULT_PRECISION_M } from './map/mgrsGrid'
 
 export default function App() {
   const [role, setRole] = useState<Role>('OF4')
@@ -29,6 +31,21 @@ export default function App() {
   const [selectedTileH3, setSelectedTileH3] = useState<string | null>(null)
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null)
   const [highlightH3, setHighlightH3] = useState<string | null>(null)
+
+  // Map grid layout (MGRS default ↔ hex) + drawn precision, persisted across reloads.
+  const [gridLayout, setGridLayout] = useState<GridLayout>(() =>
+    localStorage.getItem('bf.gridLayout') === 'hex' ? 'hex' : 'mgrs',
+  )
+  const [gridPrecisionM, setGridPrecisionM] = useState<number>(() => {
+    const v = Number(localStorage.getItem('bf.gridPrecisionM'))
+    return [100000, 10000, 1000, 100].includes(v) ? v : DEFAULT_PRECISION_M
+  })
+  useEffect(() => {
+    localStorage.setItem('bf.gridLayout', gridLayout)
+  }, [gridLayout])
+  useEffect(() => {
+    localStorage.setItem('bf.gridPrecisionM', String(gridPrecisionM))
+  }, [gridPrecisionM])
 
   const { positions: live, tileUpdates, chatter, strategic, pushChatter, supplyTick } =
     useSimSocket()
@@ -155,6 +172,8 @@ export default function App() {
               adviceDest={adviceMarker.dest}
               highlightH3={supplyOrders.truckHighlightH3 ?? adviceMarker.highlightH3 ?? highlightH3}
               selectedUnitId={selectedUnitId}
+              gridLayout={gridLayout}
+              gridPrecisionM={gridPrecisionM}
               onPlaceObstacle={(lat, lon) => placeObstacle(lat, lon, obstacleKind)}
               onRemoveObstacle={removeObstacle}
               onSelectTile={(h3) => {
@@ -169,6 +188,12 @@ export default function App() {
               }}
               onPickDestination={planning.pickDestination}
               onClearSelection={clear}
+            />
+            <GridLayoutControl
+              layout={gridLayout}
+              precisionM={gridPrecisionM}
+              onLayout={setGridLayout}
+              onPrecision={setGridPrecisionM}
             />
             <ChatterLog messages={chatter} onSelect={setHighlightH3} />
             {canShow(role, 'strategicFeed') && (
