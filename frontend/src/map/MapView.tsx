@@ -16,6 +16,7 @@ import {
   depotsToGeoJSON,
   destinationToGeoJSON,
   obstaclesToGeoJSON,
+  paddedBounds,
   routeToGeoJSON,
   tilesToGeoJSON,
   unitsToGeoJSON,
@@ -68,7 +69,7 @@ function initLayers(map: maplibregl.Map): void {
     id: 'tiles-fill',
     type: 'fill',
     source: 'tiles',
-    paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.4 },
+    paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.5 },
   })
   // Threat overlay: red, opacity ramped by threat_level (0 → transparent, 5 → strong).
   map.addLayer({
@@ -84,7 +85,8 @@ function initLayers(map: maplibregl.Map): void {
     id: 'tiles-outline',
     type: 'line',
     source: 'tiles',
-    paint: { 'line-color': '#5b6675', 'line-width': 0.5, 'line-opacity': 0.5 },
+    // Crisp neighbour separation on the light base — a clear mid-grey hairline.
+    paint: { 'line-color': '#6b7280', 'line-width': 0.8, 'line-opacity': 0.7 },
   })
   // Yellow highlight border for the sector referenced by a clicked chatter message.
   map.addLayer({
@@ -300,6 +302,8 @@ export function MapView(props: MapViewProps) {
       style: buildBasemapStyle(archiveUrl),
       center: [theater.center_lon, theater.center_lat],
       zoom: theater.default_zoom,
+      // Frame the theater: constrain panning to its bbox (padded) so the operator can't drift off.
+      maxBounds: paddedBounds(theater.bbox),
       attributionControl: { compact: true },
     })
     map.addControl(new maplibregl.NavigationControl(), 'top-right')

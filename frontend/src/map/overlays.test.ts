@@ -8,6 +8,7 @@ import {
   depotsToGeoJSON,
   destinationToGeoJSON,
   obstaclesToGeoJSON,
+  paddedBounds,
   routeToGeoJSON,
   tilesToGeoJSON,
   unitsToGeoJSON,
@@ -58,6 +59,24 @@ describe('tilesToGeoJSON', () => {
     expect(props?.threat_level).toBe(2)
     expect(props?.road_condition).toBe('clear')
     expect(props?.intel_level).toBe('low')
+  })
+})
+
+describe('paddedBounds', () => {
+  const bbox = { west: 11.78, south: 49.18, east: 11.92, north: 49.27 }
+
+  it('returns [[w-pad,s-pad],[e+pad,n+pad]] as a maxBounds tuple', () => {
+    expect(paddedBounds(bbox, 0.01)).toEqual([
+      [11.77, 49.17],
+      [11.93, 49.28],
+    ])
+  })
+
+  it('defaults to a small pad and keeps SW before NE', () => {
+    const [[w, s], [e, n]] = paddedBounds(bbox)
+    expect(w).toBeLessThan(e)
+    expect(s).toBeLessThan(n)
+    expect(w).toBeLessThan(bbox.west) // padded outward
   })
 })
 

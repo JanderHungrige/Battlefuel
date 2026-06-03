@@ -506,6 +506,11 @@ body {
   position: relative;
   flex: 1;
   min-height: 0;
+  /* Frame the theater map (Wave 2): a classic bordered viewport. */
+  border: 2px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
 }
 
 .status {

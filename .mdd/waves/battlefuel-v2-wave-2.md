@@ -61,7 +61,7 @@ hover icons, enemy/red NATO units, correct OF-8 depot symbol + fuel bars → **W
 | # | Feature | Doc | Status | Depends on |
 |---|---------|-----|--------|------------|
 | 1 | classic-map-style          | docs/45-classic-map-style.md | active | — |
-| 2 | framed-map-and-hexes       | — | planned | classic-map-style |
+| 2 | framed-map-and-hexes       | docs/46-framed-map-and-hexes.md | active | classic-map-style |
 | 3 | mgrs-grid-layout           | — | planned | framed-map-and-hexes |
 | 4 | accent-and-selection-restyle | — | planned | classic-map-style |
 

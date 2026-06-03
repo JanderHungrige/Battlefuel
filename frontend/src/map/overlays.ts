@@ -3,17 +3,29 @@
 
 import type { FeatureCollection } from 'geojson'
 import { cellToLatLng } from 'h3-js'
-import type { FuelDepot, Obstacle, TerrainType, Tile, UnitInstance } from '../api/types'
+import type { BBox, FuelDepot, Obstacle, TerrainType, Tile, UnitInstance } from '../api/types'
 
+// Light classic terrain tints — soft, distinct fills that read on the parchment basemap (45).
 export const TERRAIN_COLORS: Record<TerrainType, string> = {
-  open: '#3c4a30',
-  forest: '#1f3d2a',
-  urban: '#4a4a52',
-  water: '#15324f',
-  farmland: '#5b5a2c',
-  wetland: '#27514f',
-  military: '#5a2f2f',
-  unknown: '#333941',
+  open: '#dfe3c8',
+  forest: '#bcd2a6',
+  urban: '#cfcdd6',
+  water: '#a9cce3',
+  farmland: '#e6e2a8',
+  wetland: '#bcdcd2',
+  military: '#e0bcbc',
+  unknown: '#d7d3c8',
+}
+
+/**
+ * theater bbox → a MapLibre `maxBounds` tuple `[[west,south],[east,north]]`, padded outward by
+ * `padDeg` degrees so the theater edge sits just inside the framed viewport. Pure (no canvas).
+ */
+export function paddedBounds(bbox: BBox, padDeg = 0.01): [[number, number], [number, number]] {
+  return [
+    [bbox.west - padDeg, bbox.south - padDeg],
+    [bbox.east + padDeg, bbox.north + padDeg],
+  ]
 }
 
 /** Tiles → polygon FeatureCollection (boundary rings are closed here). */
