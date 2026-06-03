@@ -11,9 +11,20 @@ import math
 from dataclasses import dataclass
 
 from app.domain.move_order import MoveOrder, MoveOrderStatus
+from app.domain.route import RouteMetric
 from app.domain.unit import UnitType
+from app.services.cost_model import TileFactors
 
 _EARTH_RADIUS_M = 6_371_000.0
+
+# Threat level (0–5) at/above which a tile counts as a combat ("red") sector for crossing rules.
+THREAT_L5: int = 5
+# "Proceed slowly" crossing penalties: a physical block is a heavy crawl, threat a lighter one.
+# Each is a speed_factor floor + a fuel-burn multiplier applied while crossing.
+BLOCK_CROSS_SPEED_FACTOR: float = 0.08
+BLOCK_CROSS_FUEL_FACTOR: float = 1.5
+THREAT_CROSS_SPEED_FACTOR: float = 0.4
+THREAT_CROSS_FUEL_FACTOR: float = 1.2
 
 
 def haversine_m(lon1: float, lat1: float, lon2: float, lat2: float) -> float:
@@ -85,3 +96,100 @@ def advance(
         return SimStep(total, end[0], end[1], new_fuel, MoveOrderStatus.COMPLETE)
     pt = point_at(order.geometry, new_progress)
     return SimStep(new_progress, pt[0], pt[1], new_fuel, MoveOrderStatus.ACTIVE)
+
+
+def _halted(order: MoveOrder, fuel_l: float) -> SimStep:
+    """Stop cleanly at the current position: no progress, no fuel burn, status HALTED.
+
+    This replaces the old silent stall (speed 0 ⇒ 0 progress but fuel still bleeding)."""
+    pt = point_at(order.geometry, order.progress_m)
+    return SimStep(order.progress_m, pt[0], pt[1], fuel_l, MoveOrderStatus.HALTED)
+
+
+def _as_crossing(step: SimStep) -> SimStep:
+    """Tag a step CROSSING unless it already arrived (COMPLETE wins)."""
+    if step.status is MoveOrderStatus.COMPLETE:
+        return step
+    return SimStep(step.progress_m, step.lon, step.lat, step.fuel_l, MoveOrderStatus.CROSSING)
+
+
+def advance_with_terrain(
+    order: MoveOrder,
+    fuel_l: float,
+    unit_type: UnitType,
+    dt_game_s: float,
+    *,
+    factors: TileFactors,
+    threat_level: int,
+) -> SimStep:
+    """Posture- and tile-aware traversal (v2 Wave 10, never-stall-traversal-threat-crossing).
+
+    Decides whether the unit moves, crosses at a penalty, or halts cleanly — so it is *never*
+    frozen (0 progress while burning fuel). ``factors``/``threat_level`` describe the tile the
+    unit is entering this step; posture is ``order.metric`` and ``order.status == CROSSING``
+    means the operator already chose "proceed slowly". Pure — delegates kinematics to ``advance``.
+
+    - **crossing** order: crawl across a block (heavy penalty) or threat (lighter); on a clear,
+      sub-L5 tile it reverts to normal ACTIVE movement.
+    - **active** order: a physically blocked tile HALTS (either posture); a threat-L5 tile HALTS
+      in SAFE posture but is crossed at a penalty in FAST; otherwise it advances normally.
+    """
+    blocked = not factors.passable
+    in_threat = threat_level >= THREAT_L5
+
+    if order.status is MoveOrderStatus.CROSSING:
+        if blocked:
+            return _as_crossing(
+                advance(
+                    order,
+                    fuel_l,
+                    unit_type,
+                    dt_game_s,
+                    speed_factor=BLOCK_CROSS_SPEED_FACTOR,
+                    fuel_factor=factors.fuel_factor * BLOCK_CROSS_FUEL_FACTOR,
+                )
+            )
+        if in_threat:
+            return _as_crossing(
+                advance(
+                    order,
+                    fuel_l,
+                    unit_type,
+                    dt_game_s,
+                    speed_factor=factors.speed_factor * THREAT_CROSS_SPEED_FACTOR,
+                    fuel_factor=factors.fuel_factor * THREAT_CROSS_FUEL_FACTOR,
+                )
+            )
+        # cleared the obstruction → resume normal movement
+        return advance(
+            order,
+            fuel_l,
+            unit_type,
+            dt_game_s,
+            speed_factor=factors.speed_factor,
+            fuel_factor=factors.fuel_factor,
+        )
+
+    # ACTIVE order entering this tile.
+    if blocked:
+        return _halted(order, fuel_l)
+    if in_threat:
+        if order.metric is RouteMetric.SAFE:
+            return _halted(order, fuel_l)
+        # FAST accepted the fast route → cross the threat sector at a penalty, never halt.
+        return advance(
+            order,
+            fuel_l,
+            unit_type,
+            dt_game_s,
+            speed_factor=factors.speed_factor * THREAT_CROSS_SPEED_FACTOR,
+            fuel_factor=factors.fuel_factor * THREAT_CROSS_FUEL_FACTOR,
+        )
+    return advance(
+        order,
+        fuel_l,
+        unit_type,
+        dt_game_s,
+        speed_factor=factors.speed_factor,
+        fuel_factor=factors.fuel_factor,
+    )
