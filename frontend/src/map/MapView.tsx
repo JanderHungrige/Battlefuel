@@ -19,7 +19,7 @@ import {
 } from './colors'
 import { DEPOT_SIDC, GAUGE_SEGMENTS, depotGauges, depotIconKey } from './depotSymbol'
 import { ALL_EVENT_ICONS } from './eventIcons'
-import { formatMgrs, gridLabels, gridLines, toMgrs } from './mgrsGrid'
+import { formatMgrs, gridLabels, gridLines, squareCornersFromCenter, toMgrs } from './mgrsGrid'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type {
   CombatEvent,
@@ -76,9 +76,10 @@ export interface MapViewProps {
   adviceDest: { lat: number; lon: number } | null
   highlightH3: string | null
   selectedUnitId: string | null
+  selectedCell: { lat: number; lon: number } | null
   gridLayout: GridLayout
   gridPrecisionM: number
-  onSelectTile: (h3Index: string) => void
+  onSelectCell: (lat: number, lon: number) => void
   onSelectUnit: (id: string) => void
   onPickDestination: (lat: number, lon: number) => void
   onPlaceObstacle: (lat: number, lon: number) => void
@@ -228,6 +229,15 @@ function initLayers(map: maplibregl.Map): void {
     source: 'combat-events',
     filter: ['==', ['get', 'id'], ''],
     paint: { 'line-color': '#ffd23f', 'line-width': 3.5, 'line-opacity': 0.95 },
+  })
+
+  // Selected MGRS cell outline (v2 Wave 9 inspection) — the cell the operator clicked.
+  map.addSource('selected-cell', { type: 'geojson', data: EMPTY })
+  map.addLayer({
+    id: 'selected-cell',
+    type: 'line',
+    source: 'selected-cell',
+    paint: { 'line-color': '#1d4ed8', 'line-width': 2.5, 'line-opacity': 0.9 },
   })
 
   map.addSource('active-routes', { type: 'geojson', data: EMPTY })
@@ -560,7 +570,8 @@ function wireInteraction(map: maplibregl.Map, propsRef: { current: MapViewProps 
     }
     const hitTiles = map.queryRenderedFeatures(e.point, { layers: ['tiles-fill'] })
     if (hitTiles.length > 0) {
-      p.onSelectTile(String(hitTiles[0].properties?.h3_index))
+      // MGRS-native inspection: resolve the cell from the click coordinate (v2 Wave 9).
+      p.onSelectCell(e.lngLat.lat, e.lngLat.lng)
       return
     }
     p.onClearSelection()
@@ -745,6 +756,26 @@ export function MapView(props: MapViewProps) {
     if (readyRef.current && mapRef.current)
       mapRef.current.setFilter('units-selected', ['==', ['get', 'id'], props.selectedUnitId ?? ''])
   }, [props.selectedUnitId])
+  useEffect(() => {
+    if (!readyRef.current || !mapRef.current) return
+    const c = props.selectedCell
+    const data: GeoJSON.GeoJSON = c
+      ? {
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                type: 'Polygon',
+                coordinates: [squareCornersFromCenter(c.lat, c.lon, props.gridPrecisionM)],
+              },
+            },
+          ],
+        }
+      : EMPTY
+    setData(mapRef.current, 'selected-cell', data)
+  }, [props.selectedCell, props.gridPrecisionM])
   useEffect(() => {
     if (readyRef.current && mapRef.current)
       applyGridLayout(mapRef.current, props.theater, props.gridLayout, props.gridPrecisionM)
