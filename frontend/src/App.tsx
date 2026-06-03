@@ -32,17 +32,12 @@ export default function App() {
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null)
   const [highlightH3, setHighlightH3] = useState<string | null>(null)
 
-  // Map grid layout (MGRS default ↔ hex) + drawn precision, persisted across reloads.
-  const [gridLayout, setGridLayout] = useState<GridLayout>(() =>
-    localStorage.getItem('bf.gridLayout') === 'hex' ? 'hex' : 'mgrs',
-  )
+  // Map grid: MGRS only (hex layout archived in code, not exposed). Drawn precision is persisted.
+  const gridLayout: GridLayout = 'mgrs'
   const [gridPrecisionM, setGridPrecisionM] = useState<number>(() => {
     const v = Number(localStorage.getItem('bf.gridPrecisionM'))
     return [100000, 10000, 1000, 100].includes(v) ? v : DEFAULT_PRECISION_M
   })
-  useEffect(() => {
-    localStorage.setItem('bf.gridLayout', gridLayout)
-  }, [gridLayout])
   useEffect(() => {
     localStorage.setItem('bf.gridPrecisionM', String(gridPrecisionM))
   }, [gridPrecisionM])
@@ -189,12 +184,7 @@ export default function App() {
               onPickDestination={planning.pickDestination}
               onClearSelection={clear}
             />
-            <GridLayoutControl
-              layout={gridLayout}
-              precisionM={gridPrecisionM}
-              onLayout={setGridLayout}
-              onPrecision={setGridPrecisionM}
-            />
+            <GridLayoutControl precisionM={gridPrecisionM} onPrecision={setGridPrecisionM} />
             <ChatterLog messages={chatter} onSelect={setHighlightH3} />
             {canShow(role, 'strategicFeed') && (
               <ChatterLog

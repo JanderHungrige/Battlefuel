@@ -6,7 +6,7 @@ import { cellToLatLng } from 'h3-js'
 import maplibregl from 'maplibre-gl'
 import { Protocol } from 'pmtiles'
 import { useEffect, useRef } from 'react'
-import { ACCENT, SELECTED_UNIT, SELECTED_UNIT_RING } from './colors'
+import { ROUTE, SELECTED_UNIT, SELECTED_UNIT_RING } from './colors'
 import { formatMgrs, gridLabels, gridLines, toMgrs } from './mgrsGrid'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { FuelDepot, Obstacle, Theater, Tile, UnitInstance, UnitType } from '../api/types'
@@ -139,7 +139,7 @@ function initLayers(map: maplibregl.Map): void {
     type: 'line',
     source: 'active-routes',
     layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': ACCENT, 'line-width': 3, 'line-opacity': 0.45, 'line-dasharray': [2, 2] },
+    paint: { 'line-color': ROUTE, 'line-width': 3, 'line-opacity': 0.45, 'line-dasharray': [2, 2] },
   })
 
   map.addSource('route', { type: 'geojson', data: EMPTY })
@@ -148,7 +148,7 @@ function initLayers(map: maplibregl.Map): void {
     type: 'line',
     source: 'route',
     layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': ACCENT, 'line-width': 4, 'line-opacity': 0.85 },
+    paint: { 'line-color': ROUTE, 'line-width': 4, 'line-opacity': 0.85 },
   })
 
   map.addSource('destination', { type: 'geojson', data: EMPTY })
@@ -158,14 +158,14 @@ function initLayers(map: maplibregl.Map): void {
     source: 'destination',
     paint: {
       'circle-radius': 7,
-      'circle-color': ACCENT,
+      'circle-color': ROUTE,
       'circle-stroke-width': 2,
       'circle-stroke-color': '#0e1116',
     },
   })
 
   map.addSource('units', { type: 'geojson', data: EMPTY })
-  // Selected-unit halo (darker blue), drawn under the icon; filter set from selectedUnitId.
+  // Selected-unit halo (bright yellow for visibility), drawn under the icon; filter from selectedUnitId.
   map.addLayer({
     id: 'units-selected',
     type: 'circle',
@@ -174,8 +174,8 @@ function initLayers(map: maplibregl.Map): void {
     paint: {
       'circle-radius': 18,
       'circle-color': SELECTED_UNIT,
-      'circle-opacity': 0.35,
-      'circle-stroke-width': 2,
+      'circle-opacity': 0.55,
+      'circle-stroke-width': 2.5,
       'circle-stroke-color': SELECTED_UNIT_RING,
     },
   })
@@ -329,8 +329,9 @@ function applyGridLayout(
   map.setLayoutProperty('mgrs-labels', 'visibility', mgrs ? 'visible' : 'none')
   // Keep tiles-fill present (opacity 0) when MGRS is active so a click still resolves the H3 cell.
   map.setPaintProperty('tiles-fill', 'fill-opacity', mgrs ? 0 : 0.5)
-  map.setLayoutProperty('tiles-threat', 'visibility', mgrs ? 'none' : 'visible')
   map.setLayoutProperty('tiles-outline', 'visibility', mgrs ? 'none' : 'visible')
+  // Threat colouring is always shown — over the MGRS grid as well as the hex grid.
+  map.setLayoutProperty('tiles-threat', 'visibility', 'visible')
 }
 
 /** Live MGRS coordinate readout (to 1 m) following the cursor, shown in either layout. */

@@ -528,6 +528,13 @@ body {
   border-radius: 6px;
 }
 
+.grid-control-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
 .grid-control-toggle {
   display: flex;
 }

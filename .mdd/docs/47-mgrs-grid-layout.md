@@ -62,12 +62,16 @@ client-side from lat/lon; the H3 tiles remain the authoritative data layer.
 
 ## Business Rules
 
-- **Default layout = MGRS**, default drawn precision = **1 km**; persisted in `localStorage`.
-- **Switch, not overlay:** MGRS active ⇒ hex fill/threat/outline at opacity 0 (still clickable);
-  Hex active ⇒ mgrs grid/labels hidden.
-- **Drawn precision** ∈ {100 km, 10 km, 1 km, 100 m}; finer levels are *not drawn* (would be solid).
+- **MGRS is the only grid** (post-review): the **hex layout option is archived** — the rendering
+  code is retained (the `GridLayout` type + `applyGridLayout` hex branch in `MapView`) but is no
+  longer exposed in the UI; `GridLayoutControl` shows only the precision selector.
+- **Threat colouring is always shown** over the MGRS grid (the `tiles-threat` red overlay stays
+  visible; the terrain hex fill + outline are hidden, fill kept at opacity 0).
+- **Drawn precision** ∈ {100 km, 10 km, 1 km, 100 m}, default **1 km**; persisted in `localStorage`.
+  Finer levels are *not drawn* (would be solid).
 - **Readout always to 1 m** (`accuracy 5`) regardless of drawn precision.
-- **Click resolves the H3 tile** in either layout (the MGRS grid is a reference layer).
+- **Click resolves the H3 tile** (the MGRS grid is a reference layer; `tiles-fill` stays at
+  opacity 0 so it remains clickable).
 - Grid math assumes the theater is in **UTM zone 32U** (single zone).
 
 ## API Endpoints

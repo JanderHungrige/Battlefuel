@@ -19,9 +19,10 @@ export const TERRAIN_COLORS: Record<TerrainType, string> = {
 
 /**
  * theater bbox → a MapLibre `maxBounds` tuple `[[west,south],[east,north]]`, padded outward by
- * `padDeg` degrees so the theater edge sits just inside the framed viewport. Pure (no canvas).
+ * `padDeg` degrees. A generous pad (~6 km) frames the theater while still allowing the operator to
+ * zoom out comfortably around it. Pure (no canvas).
  */
-export function paddedBounds(bbox: BBox, padDeg = 0.01): [[number, number], [number, number]] {
+export function paddedBounds(bbox: BBox, padDeg = 0.06): [[number, number], [number, number]] {
   return [
     [bbox.west - padDeg, bbox.south - padDeg],
     [bbox.east + padDeg, bbox.north + padDeg],

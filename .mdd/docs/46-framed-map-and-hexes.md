@@ -56,7 +56,8 @@ schema or API change. New pure helper `paddedBounds(bbox, padDeg)` → `[[w,s],[
 
 ## Business Rules
 
-- **maxBounds** = theater bbox padded by `padDeg` (default ~0.01°); panning is constrained to it.
+- **maxBounds** = theater bbox padded by `padDeg` (default ~0.06° ≈ 6 km, generous enough to zoom
+  out comfortably while still framing the theater); panning is constrained to it.
 - **Initial view** unchanged (`theater.center_*` / `default_zoom`), now clamped by `maxBounds`.
 - **Crisp hexes:** outline visibly separates neighbours on the light base; fills are light tints,
   threat overlay still ramps red on top, click-highlight (yellow) unchanged.

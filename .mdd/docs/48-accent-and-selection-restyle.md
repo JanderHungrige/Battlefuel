@@ -56,10 +56,13 @@ New `src/map/colors.ts`: `ACCENT = '#FFD9BD'`, `SELECTED_UNIT = '#1d4ed8'` (dark
 
 ## Business Rules
 
-- **Accent = #FFD9BD** everywhere the old cyan appeared: `--accent` CSS var + the 3 map literals
-  (now `ACCENT` from `colors.ts`).
-- **Selected unit** shows a darker-blue halo under its APP-6 icon while `selectedUnitId` is set;
-  clears when selection clears. The icon itself is unchanged (still on top).
+- **UI accent = #FFD9BD** for buttons/badges: `--accent` CSS var + `ACCENT` in `colors.ts`.
+- **Route visuals = `ROUTE` (#80e0ff)** — matches the **friendly APP-6 symbol fill** (milsymbol
+  Friend `rgb(128,224,255)`), applied to the route line, active-route line, and destination point
+  (post-review change: these are blue to read as the unit's path, not the warm UI accent).
+- **Selected unit** shows a **bright-yellow** halo (`SELECTED_UNIT #ffe600`, ring
+  `SELECTED_UNIT_RING #8a6d00`, opacity 0.55) under its APP-6 icon while `selectedUnitId` is set
+  (post-review change from dark blue → high-visibility yellow). The icon is unchanged (on top).
 - Selection highlight is purely visual; click→select behaviour is unchanged.
 
 ## API Endpoints
