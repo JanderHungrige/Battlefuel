@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from itertools import pairwise
 from typing import Any
 
 import h3
@@ -57,6 +58,26 @@ class TestGeometry:
         assert point_at(_LINE, 10_000) == [11.80, 49.22]  # beyond → last
         mid = point_at(_LINE, polyline_length_m(_LINE) / 2)
         assert mid[1] == pytest.approx(49.21, abs=1e-3)
+
+
+class TestSubstepDt:
+    """F3 (Wave 10, doc 62): sub-step sizing that caps the distance per broadcast frame."""
+
+    def test_caps_distance_per_substep(self) -> None:
+        from app.services.sim import substep_dt
+
+        # 10 m/s, 200 m cap → 20 game-seconds per sub-step.
+        assert substep_dt(60.0, 10.0, 200.0) == pytest.approx(20.0)
+
+    def test_uses_remaining_when_smaller(self) -> None:
+        from app.services.sim import substep_dt
+
+        assert substep_dt(5.0, 10.0, 200.0) == pytest.approx(5.0)
+
+    def test_zero_speed_collapses_to_whole_step(self) -> None:
+        from app.services.sim import substep_dt
+
+        assert substep_dt(60.0, 0.0, 200.0) == pytest.approx(60.0)
 
 
 class TestAdvance:
@@ -237,6 +258,53 @@ class TestTick:
                     {"c": cell},
                 )
                 await session.commit()
+
+    async def test_tick_substeps_into_multiple_smooth_frames(self) -> None:
+        """F3 (Wave 10): a tick that moves a unit hundreds of metres is split into multiple small
+        unit_update frames (≤ sim_max_step_m apart), not one big jump."""
+        async with _session() as session:
+            try:
+                ways = (await session.execute(text("SELECT count(*) FROM ways"))).scalar_one()
+            except SQLAlchemyError:
+                pytest.skip("ways table missing — run build_routing_graph.sh")
+            if not ways:
+                pytest.skip("routing graph empty")
+
+            await seed_unit_instances(session)
+            instances = build_unit_instance_provider()
+            orders = build_move_order_provider()
+            inst = await instances.get_instance(session, "inst-armor-1")
+            assert inst is not None
+            unit_type = build_unit_provider().get_unit(inst.unit_type_id)
+            assert unit_type is not None
+            order = await create_move_order(
+                session,
+                build_routing_provider(),
+                orders,
+                inst,
+                unit_type,
+                49.20,
+                11.83,
+                RouteMetric.FAST,
+            )
+            assert order is not None
+            await orders.set_status(session, order.id, MoveOrderStatus.ACTIVE)
+
+            ws = _FakeWS()
+            mgr = ConnectionManager()
+            await mgr.connect(ws)  # type: ignore[arg-type]
+            engine = SimEngine(mgr)
+            await engine.tick(session, dt_game_s=600)  # several km of travel in one tick
+
+            frames = [m for m in ws.messages if m["type"] == "unit_update"]
+            assert len(frames) >= 2  # sub-stepped, not a single jump
+            # Each hop is bounded near sim_max_step_m (200 m). The bound is loose because the
+            # look-ahead sizes the sub-step on the current tile's speed while the actual move uses
+            # the entering tile's, so a slow→fast terrain transition can stretch a hop a little —
+            # still ~30x smaller than the ~6 km single jump this would be without sub-stepping.
+            for a, b in pairwise(frames):
+                hop = haversine_m(a["lon"], a["lat"], b["lon"], b["lat"])
+                assert hop <= 400
 
 
 class TestNeverStallTraversal:

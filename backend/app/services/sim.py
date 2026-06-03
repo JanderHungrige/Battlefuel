@@ -98,6 +98,17 @@ def advance(
     return SimStep(new_progress, pt[0], pt[1], new_fuel, MoveOrderStatus.ACTIVE)
 
 
+def substep_dt(remaining_game_s: float, speed_mps: float, max_step_m: float) -> float:
+    """Game-seconds for one sub-step that advances at most ``max_step_m`` (v2 Wave 10).
+
+    Splitting a tick into capped sub-steps keeps on-screen movement smooth. A stationary unit
+    (speed 0) or a non-positive cap collapses to the whole remaining step.
+    """
+    if speed_mps <= 0 or max_step_m <= 0:
+        return remaining_game_s
+    return min(remaining_game_s, max_step_m / speed_mps)
+
+
 def _halted(order: MoveOrder, fuel_l: float) -> SimStep:
     """Stop cleanly at the current position: no progress, no fuel burn, status HALTED.
 
