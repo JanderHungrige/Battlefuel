@@ -118,7 +118,13 @@ export interface UnitType {
 /** Which cost the route was optimised for. */
 export type RouteMetric = 'fast' | 'safe'
 
-export type MoveOrderStatus = 'pending' | 'active' | 'complete' | 'cancelled'
+export type MoveOrderStatus =
+  | 'pending'
+  | 'active'
+  | 'complete'
+  | 'cancelled'
+  | 'halted' // stopped at an obstruction; awaiting operator (Wave 10 F1)
+  | 'crossing' // operator chose "proceed slowly": crawling across the obstruction (Wave 10 F1)
 
 /** One planning option returned by POST /routes/plan. geometry is [lon, lat] pairs. */
 export interface RouteOption {
