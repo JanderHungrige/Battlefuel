@@ -7,7 +7,7 @@ status: planned
 depends_on: battlefuel-v2-wave-3
 demo_state: "The operator inspects the battlefield purely in MGRS: clicking the map selects the MGRS cell at the current grid precision, and the panel reports that cell's MGRS coordinate plus its aggregated situation (highest threat, terrain mix, road state, intel, units in the cell) — with no hex/H3 vocabulary anywhere in the UI. Aggregation runs client-side from the live tile data; a backend MGRS-cell data layer is deferred to a future data wave, and terrain routing stays on H3."
 created: 2026-06-03
-hash: 55b13263
+hash: 6db9ac90
 ---
 
 # Wave 9: MGRS-Native Inspection — Retire the Hex Tile from the UX
@@ -62,7 +62,8 @@ and removes hex from what the operator sees.
 | 1 | mgrs-cell-index        | docs/55-mgrs-cell-index.md | complete | — |
 | 2 | mgrs-cell-aggregation  | docs/56-mgrs-cell-aggregation.md | complete | mgrs-cell-index |
 | 3 | mgrs-inspect-panel     | docs/57-mgrs-inspect-panel.md | complete | mgrs-cell-aggregation |
-| 4 | retire-hex-ux          | — | planned | mgrs-inspect-panel |
+| 4 | mgrs-threat-shading    | docs/58-mgrs-threat-shading.md | complete | mgrs-cell-aggregation |
+| 5 | retire-hex-ux          | — | planned | mgrs-threat-shading |
 
 > **Deferred:** the original F3 `mgrs-cell-endpoint` (backend `GET /api/v1/mgrs-cells`) is **deferred
 > to a future data-migration wave** (requester decision 2026-06-03) — it needs a server-side
@@ -70,7 +71,8 @@ and removes hex from what the operator sees.
 > aggregates client-side from live tile data). Logged in `TODO.md`. Wave 9 is therefore MGRS-native
 > inspection done **client-side**; the backend data layer stays H3 for now.
 
-**Build order:** 1 → 2 → 3 → 4 (4 removes the now-unused hex surface last).
+**Build order:** 1 → 2 → 3 → 4 → 5 (4 shades MGRS cells by threat — the threat-first migration that
+replaces the hex wash; 5 removes the now-unused hex surface last).
 
 ### Feature notes
 - **mgrs-cell-index** (frontend pure) — extend `mgrsGrid.ts`: `cellIdFor(lat,lon,precisionM)` +
@@ -83,8 +85,13 @@ and removes hex from what the operator sees.
   attributes (`aggregateCell` over the live displayed tiles in the cell) + units in the cell; remove
   the `h3_index` display. Reflects live `tile_update` data (client-side aggregation). Keep selection
   single-focus with the Wave-3 combat-square / chatter highlights.
+- **mgrs-threat-shading** (frontend) — aggregate tile threat per MGRS cell (`cellIdFor` +
+  `aggregateCell` maxThreat) and shade those squares red by threat; a new `cell-threat` MapLibre fill
+  layer fed from the displayed tiles + active precision. Replaces the hex threat wash — the "Hybrid,
+  threat-first" migration to MGRS (still client-side; backend data layer deferred).
 - **retire-hex-ux** (frontend) — remove the archived hex `GridLayout` option + `applyGridLayout`
-  hex branch and any hex/H3 vocabulary from the operator UI; MGRS-only.
+  hex branch + `gridLayout` prop (always MGRS); hide the now-redundant hex threat wash + the hex
+  click-outline (route sector-chatter locate to an MGRS square); strip hex/H3 vocabulary. MGRS-only.
 
 ## Open Research
 - **Where aggregation runs** — client-side (uses the live tile data the frontend already holds, no

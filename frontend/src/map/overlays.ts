@@ -15,7 +15,7 @@ import type {
 } from '../api/types'
 import { depotIconKey } from './depotSymbol'
 import { iconForEvent } from './eventIcons'
-import { squareCornersFromCenter } from './mgrsGrid'
+import { cellIdFor, squareCornersFromCenter } from './mgrsGrid'
 
 // Light classic terrain tints — soft, distinct fills that read on the parchment basemap (45).
 export const TERRAIN_COLORS: Record<TerrainType, string> = {
@@ -133,6 +133,37 @@ export function enemyUnitsToGeoJSON(enemies: EnemyUnit[]): FeatureCollection {
       geometry: { type: 'Point', coordinates: [e.lon, e.lat] },
       properties: { id: e.id, name: e.name, sidc: e.sidc, echelon: e.echelon },
     })),
+  }
+}
+
+/**
+ * Ambient threat as shaded MGRS cells (v2 Wave 9, mgrs-threat-shading) — replaces the hex threat
+ * wash. Groups tiles by their MGRS cell at `precisionM`, takes each cell's max threat, and emits one
+ * square Polygon per cell with `threat > 0` (carrying `threat` for the opacity ramp).
+ */
+export function cellThreatToGeoJSON(tiles: Tile[], precisionM: number): FeatureCollection {
+  const cells = new Map<string, { lat: number; lon: number; threat: number }>()
+  for (const t of tiles) {
+    const id = cellIdFor(t.center_lat, t.center_lon, precisionM)
+    const prev = cells.get(id)
+    if (prev === undefined) {
+      cells.set(id, { lat: t.center_lat, lon: t.center_lon, threat: t.threat_level })
+    } else if (t.threat_level > prev.threat) {
+      prev.threat = t.threat_level
+    }
+  }
+  return {
+    type: 'FeatureCollection',
+    features: [...cells.values()]
+      .filter((c) => c.threat > 0)
+      .map((c) => ({
+        type: 'Feature',
+        geometry: {
+          type: 'Polygon',
+          coordinates: [squareCornersFromCenter(c.lat, c.lon, precisionM)],
+        },
+        properties: { threat: c.threat },
+      })),
   }
 }
 

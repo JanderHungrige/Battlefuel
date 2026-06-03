@@ -36,6 +36,7 @@ import { buildBasemapStyle } from './basemapStyle'
 import {
   activeRoutesToGeoJSON,
   adviceArrowToGeoJSON,
+  cellThreatToGeoJSON,
   combatEventsToGeoJSON,
   depotsToGeoJSON,
   enemyUnitsToGeoJSON,
@@ -130,6 +131,19 @@ function initLayers(map: maplibregl.Map): void {
     source: 'tiles',
     filter: ['==', ['get', 'h3_index'], ''],
     paint: { 'line-color': '#ffd23f', 'line-width': 3 },
+  })
+
+  // MGRS-cell ambient threat shading (v2 Wave 9) — replaces the hex threat wash. Red, opacity
+  // ramped by the cell's max threat. Drawn under the grid + combat squares.
+  map.addSource('cell-threat', { type: 'geojson', data: EMPTY })
+  map.addLayer({
+    id: 'cell-threat',
+    type: 'fill',
+    source: 'cell-threat',
+    paint: {
+      'fill-color': '#ff3030',
+      'fill-opacity': ['interpolate', ['linear'], ['get', 'threat'], 0, 0, 1, 0.12, 5, 0.55],
+    },
   })
 
   // MGRS coordinate grid (Wave 2): lines + per-square labels (canvas-rasterized icon-image, so no
@@ -536,8 +550,8 @@ function applyGridLayout(
   // Keep tiles-fill present (opacity 0) when MGRS is active so a click still resolves the H3 cell.
   map.setPaintProperty('tiles-fill', 'fill-opacity', mgrs ? 0 : 0.5)
   map.setLayoutProperty('tiles-outline', 'visibility', mgrs ? 'none' : 'visible')
-  // Threat colouring is always shown — over the MGRS grid as well as the hex grid.
-  map.setLayoutProperty('tiles-threat', 'visibility', 'visible')
+  // The hex threat wash is replaced by the MGRS 'cell-threat' shading (v2 Wave 9) — hide it in MGRS.
+  map.setLayoutProperty('tiles-threat', 'visibility', mgrs ? 'none' : 'visible')
 }
 
 /** Live MGRS coordinate readout (to 1 m) following the cursor, shown in either layout. */
@@ -656,6 +670,7 @@ export function MapView(props: MapViewProps) {
       const p = propsRef.current
       initLayers(map)
       setData(map, 'tiles', tilesToGeoJSON(p.tiles))
+      setData(map, 'cell-threat', cellThreatToGeoJSON(p.tiles, p.gridPrecisionM))
       syncUnits(map, p.units, p.unitTypes, p.livePositions)
       syncEnemyUnits(map, p.enemyUnits)
       setData(map, 'active-routes', activeRoutesToGeoJSON(p.activeRoutes))
@@ -686,6 +701,10 @@ export function MapView(props: MapViewProps) {
   useEffect(() => {
     if (readyRef.current && mapRef.current) setData(mapRef.current, 'tiles', tilesToGeoJSON(props.tiles))
   }, [props.tiles])
+  useEffect(() => {
+    if (readyRef.current && mapRef.current)
+      setData(mapRef.current, 'cell-threat', cellThreatToGeoJSON(props.tiles, props.gridPrecisionM))
+  }, [props.tiles, props.gridPrecisionM])
   useEffect(() => {
     if (readyRef.current && mapRef.current)
       syncUnits(mapRef.current, props.units, props.unitTypes, props.livePositions)

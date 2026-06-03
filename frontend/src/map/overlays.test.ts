@@ -5,6 +5,7 @@ import {
   TERRAIN_COLORS,
   activeRoutesToGeoJSON,
   adviceArrowToGeoJSON,
+  cellThreatToGeoJSON,
   combatEventsToGeoJSON,
   depotsToGeoJSON,
   enemyUnitsToGeoJSON,
@@ -268,5 +269,41 @@ describe('enemyUnitsToGeoJSON', () => {
 
   it('is empty when there are no enemy units', () => {
     expect(enemyUnitsToGeoJSON([]).features).toEqual([])
+  })
+})
+
+describe('cellThreatToGeoJSON', () => {
+  const tile = (lat: number, lon: number, threat: number): Tile => ({
+    h3_index: `${lat}:${lon}`,
+    resolution: 8,
+    center_lat: lat,
+    center_lon: lon,
+    terrain: 'open',
+    threat_level: threat,
+    intel_level: 'none',
+    weather: 'clear',
+    road_condition: 'clear',
+    cover: 'none',
+    boundary: [],
+  })
+
+  it('emits one square per threatened MGRS cell, carrying the cell max threat', () => {
+    // Two tiles in the same 1km cell (close together) → one square with the max threat.
+    const fc = cellThreatToGeoJSON(
+      [tile(49.215, 11.835, 2), tile(49.2152, 11.8352, 4), tile(49.25, 11.88, 1)],
+      1000,
+    )
+    expect(fc.features).toHaveLength(2) // two distinct cells
+    const threats = fc.features.map((f) => f.properties?.threat).sort()
+    expect(threats).toEqual([1, 4]) // first cell took max(2,4)=4
+    for (const f of fc.features) {
+      expect(f.geometry.type).toBe('Polygon')
+      const ring = (f.geometry as { coordinates: number[][][] }).coordinates[0]
+      expect(ring).toHaveLength(5) // closed square
+    }
+  })
+
+  it('omits zero-threat cells', () => {
+    expect(cellThreatToGeoJSON([tile(49.21, 11.83, 0)], 1000).features).toEqual([])
   })
 })
