@@ -56,6 +56,50 @@ def build_option(
     )
 
 
+def pick_route_option(
+    metric: RouteMetric, road: RouteOption | None, offroad: RouteOption | None
+) -> RouteOption | None:
+    """Choose between a road and an off-road option for the hybrid mode (v2 Wave 10).
+
+    FAST → the lower duration. SAFE → the lower threat, then the lower duration. ``None`` inputs
+    are skipped; returns ``None`` only when both are missing.
+    """
+    candidates = [o for o in (road, offroad) if o is not None]
+    if not candidates:
+        return None
+    if metric is RouteMetric.SAFE:
+        return min(candidates, key=lambda o: (o.threat_max, o.duration_s))
+    return min(candidates, key=lambda o: o.duration_s)
+
+
+async def _build_for_provider(
+    session: AsyncSession,
+    provider: RoutingProvider,
+    instance: UnitInstance,
+    unit_type: UnitType,
+    dest_lat: float,
+    dest_lon: float,
+    metric: RouteMetric,
+    label: str,
+    *,
+    speed_kph: float,
+    start_fuel_l: float,
+) -> RouteOption | None:
+    """Plan one metric with one provider and layer duration/fuel, or None if no path."""
+    path = await provider.shortest_path(
+        session, instance.lat, instance.lon, dest_lat, dest_lon, metric
+    )
+    if path is None:
+        return None
+    return build_option(
+        path,
+        label=label,
+        speed_road_kph=speed_kph,
+        consumption_normal_lph=unit_type.fuel.consumption_normal_lph,
+        start_fuel_l=start_fuel_l,
+    )
+
+
 async def plan_routes(
     session: AsyncSession,
     routing: RoutingProvider,
@@ -68,15 +112,12 @@ async def plan_routes(
 ) -> list[RouteOption]:
     """Compute fastest + safest route options from the unit's position to the destination.
 
-    ``mode`` selects the router and the speed: ``road`` uses the injected (road) provider at the
-    unit's road speed; ``offroad`` uses the terrain A* router at its off-road / by-foot speed.
+    ``mode`` selects the router and the speed: ``road`` uses the injected road provider at road
+    speed; ``offroad`` and ``direct`` use the terrain / straight-line routers at off-road speed;
+    ``hybrid`` returns, per metric, the better of the road and off-road options.
     """
-    provider = routing if mode is RouteMode.ROAD else build_routing_provider_for_mode(mode)
-    speed_kph = (
-        unit_type.movement.speed_offroad_kph
-        if mode is RouteMode.OFFROAD
-        else unit_type.movement.speed_road_kph
-    )
+    road_kph = unit_type.movement.speed_road_kph
+    offroad_kph = unit_type.movement.speed_offroad_kph
     start_fuel = (
         instance.current_fuel_liters
         if instance.current_fuel_liters is not None
@@ -84,18 +125,49 @@ async def plan_routes(
     )
     options: list[RouteOption] = []
     for metric, label in _METRICS:
-        path = await provider.shortest_path(
-            session, instance.lat, instance.lon, dest_lat, dest_lon, metric
-        )
-        if path is None:
-            continue
-        options.append(
-            build_option(
-                path,
-                label=label,
-                speed_road_kph=speed_kph,
-                consumption_normal_lph=unit_type.fuel.consumption_normal_lph,
+        if mode is RouteMode.HYBRID:
+            road_opt = await _build_for_provider(
+                session,
+                routing,
+                instance,
+                unit_type,
+                dest_lat,
+                dest_lon,
+                metric,
+                label,
+                speed_kph=road_kph,
                 start_fuel_l=start_fuel,
             )
+            off_opt = await _build_for_provider(
+                session,
+                build_routing_provider_for_mode(RouteMode.OFFROAD),
+                instance,
+                unit_type,
+                dest_lat,
+                dest_lon,
+                metric,
+                label,
+                speed_kph=offroad_kph,
+                start_fuel_l=start_fuel,
+            )
+            best = pick_route_option(metric, road_opt, off_opt)
+            if best is not None:
+                options.append(best)
+            continue
+        provider = routing if mode is RouteMode.ROAD else build_routing_provider_for_mode(mode)
+        speed_kph = offroad_kph if mode in (RouteMode.OFFROAD, RouteMode.DIRECT) else road_kph
+        opt = await _build_for_provider(
+            session,
+            provider,
+            instance,
+            unit_type,
+            dest_lat,
+            dest_lon,
+            metric,
+            label,
+            speed_kph=speed_kph,
+            start_fuel_l=start_fuel,
         )
+        if opt is not None:
+            options.append(opt)
     return options

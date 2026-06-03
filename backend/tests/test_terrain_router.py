@@ -111,3 +111,50 @@ class TestSafeMetricAvoidsThreat:
         assert safe.threat_max == 0
         # Avoiding the center means a longer real distance.
         assert safe.distance_m > fast.distance_m
+
+
+class TestDirectPath:
+    """F2 (Wave 10, doc 61): the 'direct' mode — a near-straight cross-country line that follows
+    terrain cost but does NOT avoid threat or obstacles. RED until direct_path exists."""
+
+    def test_direct_path_returns_straight_start_to_dest(self) -> None:
+        from app.services.terrain_router import direct_path
+
+        tiles = _region_tiles()
+        s_lat, s_lon = _latlng(_START)
+        d_lat, d_lon = _latlng(_DEST)
+        path = direct_path(tiles, s_lat, s_lon, d_lat, d_lon, RouteMetric.FAST)
+        assert path is not None
+        assert len(path.geometry) >= 2
+        assert path.distance_m > 0
+        assert path.effective_distance_m > 0
+        assert path.degraded is False
+
+    def test_direct_path_does_not_avoid_threat(self) -> None:
+        from app.services.terrain_router import direct_path
+
+        # High-threat center between two opposite ring cells: the straight line crosses it.
+        n1 = _RING[0]
+        n1_lat, n1_lon = _latlng(n1)
+
+        def _dist_from_n1(c: str) -> float:
+            lat, lon = _latlng(c)
+            return haversine_m(lon, lat, n1_lon, n1_lat)
+
+        opposite = max(_RING, key=_dist_from_n1)
+        tiles: dict[str, tuple] = {_CENTER: (TerrainType.OPEN, 5)}
+        for c in _RING:
+            tiles[c] = (TerrainType.OPEN, 0)
+        s_lat, s_lon = _latlng(n1)
+        d_lat, d_lon = _latlng(opposite)
+        # Even SAFE 'direct' goes straight through the threat — direct never detours.
+        path = direct_path(tiles, s_lat, s_lon, d_lat, d_lon, RouteMetric.SAFE)
+        assert path is not None
+        assert path.threat_max == 5
+
+    def test_direct_path_same_or_empty_is_none(self) -> None:
+        from app.services.terrain_router import direct_path
+
+        lat, lon = _latlng(_START)
+        assert direct_path(_region_tiles(), lat, lon, lat, lon, RouteMetric.FAST) is None
+        assert direct_path({}, 49.21, 11.84, 49.22, 11.84, RouteMetric.FAST) is None
