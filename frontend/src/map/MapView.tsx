@@ -6,6 +6,7 @@ import { cellToLatLng } from 'h3-js'
 import maplibregl from 'maplibre-gl'
 import { Protocol } from 'pmtiles'
 import { useEffect, useRef } from 'react'
+import { ACCENT, SELECTED_UNIT, SELECTED_UNIT_RING } from './colors'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { FuelDepot, Obstacle, Theater, Tile, UnitInstance, UnitType } from '../api/types'
 import { PMTILES_PATH } from '../config'
@@ -47,6 +48,7 @@ export interface MapViewProps {
   adviceArrow: { from: { lat: number; lon: number }; to: { lat: number; lon: number } } | null
   adviceDest: { lat: number; lon: number } | null
   highlightH3: string | null
+  selectedUnitId: string | null
   onSelectTile: (h3Index: string) => void
   onSelectUnit: (id: string) => void
   onPickDestination: (lat: number, lon: number) => void
@@ -103,7 +105,7 @@ function initLayers(map: maplibregl.Map): void {
     type: 'line',
     source: 'active-routes',
     layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': '#00e5cc', 'line-width': 3, 'line-opacity': 0.45, 'line-dasharray': [2, 2] },
+    paint: { 'line-color': ACCENT, 'line-width': 3, 'line-opacity': 0.45, 'line-dasharray': [2, 2] },
   })
 
   map.addSource('route', { type: 'geojson', data: EMPTY })
@@ -112,7 +114,7 @@ function initLayers(map: maplibregl.Map): void {
     type: 'line',
     source: 'route',
     layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': '#00e5cc', 'line-width': 4, 'line-opacity': 0.85 },
+    paint: { 'line-color': ACCENT, 'line-width': 4, 'line-opacity': 0.85 },
   })
 
   map.addSource('destination', { type: 'geojson', data: EMPTY })
@@ -122,13 +124,27 @@ function initLayers(map: maplibregl.Map): void {
     source: 'destination',
     paint: {
       'circle-radius': 7,
-      'circle-color': '#00e5cc',
+      'circle-color': ACCENT,
       'circle-stroke-width': 2,
       'circle-stroke-color': '#0e1116',
     },
   })
 
   map.addSource('units', { type: 'geojson', data: EMPTY })
+  // Selected-unit halo (darker blue), drawn under the icon; filter set from selectedUnitId.
+  map.addLayer({
+    id: 'units-selected',
+    type: 'circle',
+    source: 'units',
+    filter: ['==', ['get', 'id'], ''],
+    paint: {
+      'circle-radius': 18,
+      'circle-color': SELECTED_UNIT,
+      'circle-opacity': 0.35,
+      'circle-stroke-width': 2,
+      'circle-stroke-color': SELECTED_UNIT_RING,
+    },
+  })
   map.addLayer({
     id: 'units',
     type: 'symbol',
@@ -385,6 +401,10 @@ export function MapView(props: MapViewProps) {
       map.easeTo({ center: [lon, lat], duration: 600 })
     }
   }, [props.highlightH3])
+  useEffect(() => {
+    if (readyRef.current && mapRef.current)
+      mapRef.current.setFilter('units-selected', ['==', ['get', 'id'], props.selectedUnitId ?? ''])
+  }, [props.selectedUnitId])
 
   return (
     <div ref={containerRef} data-testid="map-container" style={{ width: '100%', height: '100%' }} />

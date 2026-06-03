@@ -154,6 +154,7 @@ export default function App() {
               adviceArrow={adviceMarker.arrow}
               adviceDest={adviceMarker.dest}
               highlightH3={supplyOrders.truckHighlightH3 ?? adviceMarker.highlightH3 ?? highlightH3}
+              selectedUnitId={selectedUnitId}
               onPlaceObstacle={(lat, lon) => placeObstacle(lat, lon, obstacleKind)}
               onRemoveObstacle={removeObstacle}
               onSelectTile={(h3) => {

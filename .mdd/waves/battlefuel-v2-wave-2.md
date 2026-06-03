@@ -63,7 +63,7 @@ hover icons, enemy/red NATO units, correct OF-8 depot symbol + fuel bars → **W
 | 1 | classic-map-style          | docs/45-classic-map-style.md | active | — |
 | 2 | framed-map-and-hexes       | docs/46-framed-map-and-hexes.md | active | classic-map-style |
 | 3 | mgrs-grid-layout           | — | planned | framed-map-and-hexes |
-| 4 | accent-and-selection-restyle | — | planned | classic-map-style |
+| 4 | accent-and-selection-restyle | docs/48-accent-and-selection-restyle.md | active | classic-map-style |
 
 Build order: 1 → 2 → 3 → 4 (4 may follow 1 independently of 2–3).
 
