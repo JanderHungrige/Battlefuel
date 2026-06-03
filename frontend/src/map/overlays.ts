@@ -3,7 +3,16 @@
 
 import type { FeatureCollection } from 'geojson'
 import { cellToLatLng } from 'h3-js'
-import type { BBox, FuelDepot, Obstacle, TerrainType, Tile, UnitInstance } from '../api/types'
+import type {
+  BBox,
+  CombatEvent,
+  FuelDepot,
+  Obstacle,
+  TerrainType,
+  Tile,
+  UnitInstance,
+} from '../api/types'
+import { squareCornersFromCenter } from './mgrsGrid'
 
 // Light classic terrain tints — soft, distinct fills that read on the parchment basemap (45).
 export const TERRAIN_COLORS: Record<TerrainType, string> = {
@@ -78,6 +87,33 @@ export function unitsToGeoJSON(
         },
       }
     }),
+  }
+}
+
+/**
+ * Located combat events → Polygon FeatureCollection, one MGRS-grid-aligned square per event at its
+ * `precision_m` (v2 Wave 3, threat-mgrs-squares). Properties carry `zone` + `estimated_threat` for
+ * styling and `category`/`event`/`sender` for the F3 hover / F4 chatter consumers.
+ */
+export function combatEventsToGeoJSON(events: CombatEvent[]): FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: events.map((ev) => ({
+      type: 'Feature',
+      geometry: {
+        type: 'Polygon',
+        coordinates: [squareCornersFromCenter(ev.lat, ev.lon, ev.precision_m)],
+      },
+      properties: {
+        id: ev.id,
+        zone: ev.zone,
+        estimated_threat: ev.estimated_threat,
+        category: ev.category,
+        event: ev.event,
+        sender: ev.sender,
+        precision_m: ev.precision_m,
+      },
+    })),
   }
 }
 

@@ -42,7 +42,7 @@ export default function App() {
     localStorage.setItem('bf.gridPrecisionM', String(gridPrecisionM))
   }, [gridPrecisionM])
 
-  const { positions: live, tileUpdates, chatter, strategic, pushChatter, supplyTick } =
+  const { positions: live, tileUpdates, combatEvents, chatter, strategic, pushChatter, supplyTick } =
     useSimSocket()
 
   // Operator ops: obstacles + tile edits + the obstacle-placement mode and chosen kind.
@@ -161,6 +161,7 @@ export default function App() {
               activeRoutes={planning.activeRouteGeometries}
               obstacles={obstacles}
               obstacleMode={obstacleActive}
+              combatEvents={Object.values(combatEvents)}
               depots={canShow(role, 'depotOverlay') ? supply.depots : []}
               rendezvous={canShow(role, 'supplyPanel') ? supplyOrders.rendezvous : null}
               adviceArrow={adviceMarker.arrow}

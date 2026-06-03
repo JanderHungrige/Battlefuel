@@ -7,7 +7,7 @@ status: planned
 depends_on: battlefuel-v2-wave-2
 demo_state: "Threat is drawn as MGRS squares at a per-event precision (IED/mine → 100 m, enemy-spotted → 1–2 km) from located + categorised combat events; red is reserved for combat zones and blocked areas read light-yellow, with category hover icons (drone / checkpoint / enemy-near). Chatter messages are tagged with their MGRS coordinate + sender and click-to-locate the square. Enemy units render as red NATO (APP-6 hostile) symbols from a seeded stub, and OF-8 depots show the correct NATO sustainment symbol with 4 diesel / 4 JP8 colour-coded fuel-fill bars."
 created: 2026-06-03
-hash: 7943477b
+hash: d05dac38
 ---
 
 # Wave 3: MGRS-native Threat & Symbology
@@ -85,7 +85,7 @@ introduced here is designed so Wave 4 **extends** it rather than rewriting it.
 | # | Feature | Doc | Status | Depends on |
 |---|---------|-----|--------|------------|
 | 1 | located-event-model        | docs/49-located-event-model.md | active | — |
-| 2 | threat-mgrs-squares        | — | planned | located-event-model |
+| 2 | threat-mgrs-squares        | docs/50-threat-mgrs-squares.md | active | located-event-model |
 | 3 | event-hover-icons          | — | planned | threat-mgrs-squares |
 | 4 | chatter-mgrs-tagging       | — | planned | located-event-model |
 | 5 | enemy-red-nato-units       | — | planned | — |

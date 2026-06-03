@@ -6,15 +6,34 @@ import { cellToLatLng } from 'h3-js'
 import maplibregl from 'maplibre-gl'
 import { Protocol } from 'pmtiles'
 import { useEffect, useRef } from 'react'
-import { ROUTE, SELECTED_UNIT, SELECTED_UNIT_RING } from './colors'
+import {
+  ROUTE,
+  SELECTED_UNIT,
+  SELECTED_UNIT_RING,
+  ZONE_BLOCKED_FILL,
+  ZONE_BLOCKED_LINE,
+  ZONE_COMBAT_FILL,
+  ZONE_COMBAT_LINE,
+  ZONE_THREAT_FILL,
+  ZONE_THREAT_LINE,
+} from './colors'
 import { formatMgrs, gridLabels, gridLines, toMgrs } from './mgrsGrid'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import type { FuelDepot, Obstacle, Theater, Tile, UnitInstance, UnitType } from '../api/types'
+import type {
+  CombatEvent,
+  FuelDepot,
+  Obstacle,
+  Theater,
+  Tile,
+  UnitInstance,
+  UnitType,
+} from '../api/types'
 import { PMTILES_PATH } from '../config'
 import { buildBasemapStyle } from './basemapStyle'
 import {
   activeRoutesToGeoJSON,
   adviceArrowToGeoJSON,
+  combatEventsToGeoJSON,
   depotsToGeoJSON,
   destinationToGeoJSON,
   obstaclesToGeoJSON,
@@ -44,6 +63,7 @@ export interface MapViewProps {
   activeRoutes: number[][][]
   obstacles: Obstacle[]
   obstacleMode: boolean
+  combatEvents: CombatEvent[]
   depots: FuelDepot[]
   rendezvous: { lat: number; lon: number } | null
   adviceArrow: { from: { lat: number; lon: number }; to: { lat: number; lon: number } } | null
@@ -130,6 +150,54 @@ function initLayers(map: maplibregl.Map): void {
       'icon-size': 1,
       'icon-allow-overlap': false,
       'icon-ignore-placement': false,
+    },
+  })
+
+  // Located combat-event threat squares (v2 Wave 3): MGRS-aligned squares coloured by zone
+  // (combat → red, blocked → light-yellow, threat → amber), opacity ramped by estimated_threat.
+  // Drawn above the grid but below routes/units so symbols stay legible.
+  map.addSource('combat-events', { type: 'geojson', data: EMPTY })
+  map.addLayer({
+    id: 'combat-events-fill',
+    type: 'fill',
+    source: 'combat-events',
+    paint: {
+      'fill-color': [
+        'match',
+        ['get', 'zone'],
+        'combat',
+        ZONE_COMBAT_FILL,
+        'blocked',
+        ZONE_BLOCKED_FILL,
+        ZONE_THREAT_FILL,
+      ],
+      'fill-opacity': [
+        'interpolate',
+        ['linear'],
+        ['get', 'estimated_threat'],
+        0,
+        0.18,
+        5,
+        0.5,
+      ],
+    },
+  })
+  map.addLayer({
+    id: 'combat-events-outline',
+    type: 'line',
+    source: 'combat-events',
+    paint: {
+      'line-color': [
+        'match',
+        ['get', 'zone'],
+        'combat',
+        ZONE_COMBAT_LINE,
+        'blocked',
+        ZONE_BLOCKED_LINE,
+        ZONE_THREAT_LINE,
+      ],
+      'line-width': 1.5,
+      'line-opacity': 0.9,
     },
   })
 
@@ -429,6 +497,7 @@ export function MapView(props: MapViewProps) {
       setData(map, 'route', routeToGeoJSON(p.routeGeometry))
       setData(map, 'destination', destinationToGeoJSON(p.destination))
       setData(map, 'obstacles', obstaclesToGeoJSON(p.obstacles))
+      setData(map, 'combat-events', combatEventsToGeoJSON(p.combatEvents))
       setData(map, 'depots', depotsToGeoJSON(p.depots))
       setData(map, 'rendezvous', destinationToGeoJSON(p.rendezvous))
       setData(map, 'advice-arrow', adviceArrowToGeoJSON(p.adviceArrow?.from, p.adviceArrow?.to))
@@ -471,6 +540,10 @@ export function MapView(props: MapViewProps) {
     if (readyRef.current && mapRef.current)
       setData(mapRef.current, 'obstacles', obstaclesToGeoJSON(props.obstacles))
   }, [props.obstacles])
+  useEffect(() => {
+    if (readyRef.current && mapRef.current)
+      setData(mapRef.current, 'combat-events', combatEventsToGeoJSON(props.combatEvents))
+  }, [props.combatEvents])
   useEffect(() => {
     if (readyRef.current && mapRef.current)
       setData(mapRef.current, 'depots', depotsToGeoJSON(props.depots))

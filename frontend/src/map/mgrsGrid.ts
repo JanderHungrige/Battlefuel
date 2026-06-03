@@ -111,6 +111,27 @@ export function gridLines(bbox: BBox, precisionM: number): number[][][] {
   return lines
 }
 
+/**
+ * The MGRS-grid-aligned square of side `precisionM` (metres, zone 32U) that contains `(lat, lon)`,
+ * as a closed ring of 5 `[lon, lat]` points. Snaps the point's UTM easting/northing down to the
+ * `precisionM` lattice — the same lattice `gridLines` draws — so an event renders in its containing
+ * MGRS cell, not an arbitrary centred box. (v2 Wave 3, threat-mgrs-squares.)
+ */
+export function squareCornersFromCenter(lat: number, lon: number, precisionM: number): number[][] {
+  const [e, n] = toUtm(lon, lat)
+  const e0 = Math.floor(e / precisionM) * precisionM
+  const n0 = Math.floor(n / precisionM) * precisionM
+  const e1 = e0 + precisionM
+  const n1 = n0 + precisionM
+  return [
+    toLonLat(e0, n0),
+    toLonLat(e1, n0),
+    toLonLat(e1, n1),
+    toLonLat(e0, n1),
+    toLonLat(e0, n0),
+  ]
+}
+
 export interface GridLabel {
   lon: number
   lat: number

@@ -26,6 +26,7 @@ vi.mock('./hooks/useSimSocket', () => ({
   useSimSocket: () => ({
     positions: {},
     tileUpdates: {},
+    combatEvents: {},
     chatter: [],
     pushChatter: () => {},
     connected: false,

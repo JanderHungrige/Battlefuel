@@ -7,6 +7,7 @@ import {
   gridLabels,
   gridLines,
   precisionToAccuracy,
+  squareCornersFromCenter,
   squareLabel,
   toMgrs,
 } from './mgrsGrid'
@@ -69,6 +70,52 @@ describe('gridLines', () => {
 
   it('draws fewer lines at coarser precision', () => {
     expect(gridLines(BBOX, 10000).length).toBeLessThan(gridLines(BBOX, 1000).length)
+  })
+})
+
+describe('squareCornersFromCenter', () => {
+  const CTR_LAT = 49.215
+  const CTR_LON = 11.835
+
+  it('returns a closed ring of 5 [lon,lat] points', () => {
+    const ring = squareCornersFromCenter(CTR_LAT, CTR_LON, 1000)
+    expect(ring).toHaveLength(5)
+    expect(ring[0]).toEqual(ring[4]) // closed
+    for (const [lon, lat] of ring) {
+      expect(lon).toBeGreaterThan(11.7)
+      expect(lon).toBeLessThan(11.95)
+      expect(lat).toBeGreaterThan(49.1)
+      expect(lat).toBeLessThan(49.3)
+    }
+  })
+
+  it('contains its centre point', () => {
+    const ring = squareCornersFromCenter(CTR_LAT, CTR_LON, 1000)
+    const lons = ring.map((p) => p[0])
+    const lats = ring.map((p) => p[1])
+    expect(Math.min(...lons)).toBeLessThanOrEqual(CTR_LON)
+    expect(Math.max(...lons)).toBeGreaterThanOrEqual(CTR_LON)
+    expect(Math.min(...lats)).toBeLessThanOrEqual(CTR_LAT)
+    expect(Math.max(...lats)).toBeGreaterThanOrEqual(CTR_LAT)
+  })
+
+  it('draws a larger box at a coarser precision', () => {
+    const span = (p: number): number => {
+      const ring = squareCornersFromCenter(CTR_LAT, CTR_LON, p)
+      const lons = ring.map((c) => c[0])
+      return Math.max(...lons) - Math.min(...lons)
+    }
+    expect(span(2000)).toBeGreaterThan(span(100))
+  })
+
+  it('is deterministic and lattice-aligned (a ~1km-shifted point lands in a different cell)', () => {
+    expect(squareCornersFromCenter(CTR_LAT, CTR_LON, 1000)).toEqual(
+      squareCornersFromCenter(CTR_LAT, CTR_LON, 1000),
+    )
+    // ~0.012° lat ≈ 1.3 km north → a different 1 km cell → a different square.
+    const here = squareCornersFromCenter(CTR_LAT, CTR_LON, 1000)
+    const north = squareCornersFromCenter(CTR_LAT + 0.012, CTR_LON, 1000)
+    expect(north).not.toEqual(here)
   })
 })
 

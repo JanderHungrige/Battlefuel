@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import type { Tile, UnitInstance } from '../api/types'
+import type { CombatEvent, Tile, UnitInstance } from '../api/types'
 import { latLngToCell } from 'h3-js'
 import {
   TERRAIN_COLORS,
   activeRoutesToGeoJSON,
   adviceArrowToGeoJSON,
+  combatEventsToGeoJSON,
   depotsToGeoJSON,
   destinationToGeoJSON,
   obstaclesToGeoJSON,
@@ -199,5 +200,40 @@ describe('adviceArrowToGeoJSON', () => {
     const poly = head!.geometry as { coordinates: number[][][] }
     expect(poly.coordinates[0][0]).toEqual([11.90, 49.25])
     expect(poly.coordinates[0]).toHaveLength(4) // closed triangle
+  })
+})
+
+const combatEvent = (over: Partial<CombatEvent> = {}): CombatEvent => ({
+  type: 'combat_event',
+  id: 'ied-1',
+  category: 'Threat Events',
+  event: 'IED / mine detected or detonated',
+  lat: 49.215,
+  lon: 11.835,
+  precision_m: 100,
+  estimated_threat: 4,
+  sender: 'EOD 4-1 (52nd EOD)',
+  zone: 'blocked',
+  ...over,
+})
+
+describe('combatEventsToGeoJSON', () => {
+  it('renders one closed-square polygon per event carrying zone + threat props', () => {
+    const fc = combatEventsToGeoJSON([
+      combatEvent(),
+      combatEvent({ id: 'red-1', zone: 'combat', estimated_threat: 5, precision_m: 1000 }),
+    ])
+    expect(fc.features).toHaveLength(2)
+    const f0 = fc.features[0]
+    expect(f0.geometry.type).toBe('Polygon')
+    const ring = (f0.geometry as { coordinates: number[][][] }).coordinates[0]
+    expect(ring).toHaveLength(5)
+    expect(ring[0]).toEqual(ring[4]) // closed
+    expect(f0.properties).toMatchObject({ id: 'ied-1', zone: 'blocked', estimated_threat: 4 })
+    expect(fc.features[1].properties).toMatchObject({ zone: 'combat', estimated_threat: 5 })
+  })
+
+  it('returns an empty collection for no events', () => {
+    expect(combatEventsToGeoJSON([]).features).toEqual([])
   })
 })
