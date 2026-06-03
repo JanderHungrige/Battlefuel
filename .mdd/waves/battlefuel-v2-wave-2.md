@@ -3,20 +3,20 @@ id: battlefuel-v2-wave-2
 title: "Wave 2: Map Foundations — Classic Light Theater, Framed Grid & MGRS Layout"
 initiative: battlefuel-v2
 initiative_version: 2
-status: planned
+status: complete
 depends_on: battlefuel-v2-wave-1
 demo_state: "The map reads as a lighter, classic offline theater framed within the viewport with crisp, non-overlapping hexes; the indicator accent is #FFD9BD and a selected unit is shown in a darker blue. A grid-layout setting switches the map between the H3 hex grid and an MGRS grid (default) — the MGRS grid draws standard squares at a selectable precision (100 km / 10 km / 1 km / 100 m, default 1 km) with MGRS labels, and hovering/clicking reports a full MGRS coordinate down to 1 m."
 created: 2026-06-03
-hash: ef1cee6d
+hash: fe8f2df4
 ---
 
 # Wave 2: Map Foundations — Classic Light Theater, Framed Grid & MGRS Layout
 
-## Done-When (close-out gate)
-Track in this doc; mark `complete` only after all three pass (see initiative DoD):
+## Done-When (close-out gate) — ✅ CLOSED 2026-06-03
+All three gates passed:
 - [x] **tested local** — `make dev` verified (incl. review tweaks + 5/2km/500m grid options)
-- [ ] **tested online** — `dev-deployment` → `:3001`, verifying now
-- [ ] **merged into main / deployed in prod** — `:3000`, verified → then close
+- [x] **tested online** — `dev-deployment` → `:3001`, verified (after the esbuild prod-build fix)
+- [x] **merged into main / deployed in prod** — `:3000` verified live (archive: archive/main-pre-v2-wave-2)
 
 ## Demo-State
 A lighter, **classic** offline map (no legend), with the theater **framed** in the viewport and
