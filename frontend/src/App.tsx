@@ -8,7 +8,6 @@ import { ObstacleKindPicker } from './components/ObstacleKindPicker'
 import type { ObstacleKind } from './components/obstacleKinds'
 import { RoleToggle } from './components/RoleToggle'
 import { SupplyPanel } from './components/SupplyPanel'
-import { TerrainLegend } from './components/TerrainLegend'
 import { UnitOverview } from './components/UnitOverview'
 import { OSM_ATTRIBUTION } from './config'
 import { canShow, type Role } from './roles'
@@ -170,7 +169,6 @@ export default function App() {
               onPickDestination={planning.pickDestination}
               onClearSelection={clear}
             />
-            {canShow(role, 'terrainLegend') && <TerrainLegend />}
             <ChatterLog messages={chatter} onSelect={setHighlightH3} />
             {canShow(role, 'strategicFeed') && (
               <ChatterLog
