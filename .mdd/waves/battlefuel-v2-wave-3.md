@@ -3,23 +3,24 @@ id: battlefuel-v2-wave-3
 title: "Wave 3: MGRS-native Threat & Symbology"
 initiative: battlefuel-v2
 initiative_version: 2
-status: planned
+status: complete
 depends_on: battlefuel-v2-wave-2
 demo_state: "Threat is drawn as MGRS squares at a per-event precision (IED/mine → 100 m, enemy-spotted → 1–2 km) from located + categorised combat events; red is reserved for combat zones and blocked areas read light-yellow, with category hover icons (drone / checkpoint / enemy-near). Chatter messages are tagged with their MGRS coordinate + sender and click-to-locate the square. Enemy units render as red NATO (APP-6 hostile) symbols from a seeded stub, and OF-8 depots show the correct NATO sustainment symbol with 4 diesel / 4 JP8 colour-coded fuel-fill bars."
 created: 2026-06-03
-hash: c231c964
+hash: 05b8c749
 ---
 
 # Wave 3: MGRS-native Threat & Symbology
 
-## Done-When (close-out gate)
-Per the initiative's Wave Definition of Done, this wave is **NOT complete after a localhost
-demo**. Mark `complete` only after all three gates pass (merging to `main`/prod needs explicit
-approval first):
+## Done-When (close-out gate) — ✅ CLOSED 2026-06-03 (local-verified; dev/prod deploy deferred)
+Closed by requester decision: the dev/prod online gates are **deliberately deferred** — Wave 3 is
+not to land on `dev-deployment` (:3001) until the **hex → MGRS inspection** wave is done, so the two
+are tested together on dev. The branch `feat/battlefuel-v2-wave-3` stays unmerged until then.
 
-- [ ] **tested local** — `make dev`, demoed on localhost
-- [ ] **tested online** — merged to `dev-deployment`, deployed to `:3001`, verified there
-- [ ] **merged into main / deployed in prod** — on `main`, live `:3000` → then close the wave
+- [x] **tested local** — `make dev`, combat symbology + MGRS-tagged chatter verified on localhost
+  (incl. the two review fixes: sticky-highlight + threat-laydown snapshot on connect)
+- [ ] **tested online** — DEFERRED: batch with the hex→MGRS wave on `dev-deployment` (:3001)
+- [ ] **merged into main / deployed in prod** — DEFERRED: follows the online test (needs approval)
 
 > Frontend prod-build caveat (from Wave 2): smoke-test the **minified** build (`vite preview` +
 > headless Chrome), not just `make dev` — dev is unminified and mocks `MapView`.
