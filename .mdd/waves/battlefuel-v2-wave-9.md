@@ -7,7 +7,7 @@ status: planned
 depends_on: battlefuel-v2-wave-3
 demo_state: "The operator inspects the battlefield purely in MGRS: clicking the map selects the MGRS cell at the current grid precision, and the panel reports that cell's MGRS coordinate plus its aggregated situation (highest threat, terrain mix, road state, intel, units in the cell) — with no hex/H3 vocabulary anywhere in the UI. Aggregation runs client-side from the live tile data; a backend MGRS-cell data layer is deferred to a future data wave, and terrain routing stays on H3."
 created: 2026-06-03
-hash: 2d872688
+hash: e070a37d
 ---
 
 # Wave 9: MGRS-Native Inspection — Retire the Hex Tile from the UX
@@ -17,7 +17,7 @@ Per the initiative's Wave Definition of Done. **Deploy note:** this wave is the 
 takes **Wave 3 + Wave 9 together onto `dev-deployment` (:3001)** — Wave 3's dev/prod gates were
 deliberately deferred to batch here.
 
-- [ ] **tested local** — `make dev`, MGRS-cell inspection + no-hex UX verified on localhost
+- [x] **tested local** — `make dev`, MGRS-cell inspection + no-hex UX verified on localhost
 - [ ] **tested online** — merge `dev-deployment` → `:3001`, verify there (carries Wave 3 + Wave 9)
 - [ ] **merged into main / deployed in prod** — on `main`, live `:3000` (needs approval) → close
 
