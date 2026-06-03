@@ -38,5 +38,8 @@ export function iconForEvent(category: string, event: string): EventIcon {
   if (/hostile|spotted|enemy/.test(e)) return ENEMY
   if (/chokepoint|route|ford|checkpoint|crossing|bottleneck/.test(e)) return CHECKPOINT
   if (/air strike|ambush|engagement|fires?|gunfire|strike/.test(e)) return FIRES
+  // Category fallback (mirrors the backend classify): an unrecognised threat/adversary event still
+  // reads as enemy-near rather than a bare generic marker.
+  if (/adversary|threat/i.test(category)) return ENEMY
   return GENERIC
 }
