@@ -24,3 +24,10 @@ Hetzner Cloud host, TLS/domain, persistent Postgres+PostGIS volume with backups,
 - [ ] **Landing-page login / authentication** — deferred 2026-06-02. Wave 8 ships the landing
   page + data-integration guide without auth; add a "fun login" / real authentication later
   (app is currently single-user, no auth). See `.mdd/initiatives/battlefuel-v2.md`.
+- [ ] **MGRS-native tile inspection (retire the hex tile from the UX)** — deferred 2026-06-03
+  (raised during Wave 3 review). Wave 2 made MGRS the default *grid* and hides the hex layers,
+  but the **data/inspect layer is still H3**: clicking the map resolves to an H3 cell and the
+  inspect window shows hex-tile attributes. Make inspection MGRS-cell-native and drop the hex
+  tile from the operator UX. Touches the tile panel, map click-resolution, and the tile model —
+  scope as its own wave/task, not a Wave-3 add-on. (Wave 3's combat-square highlight now clears
+  on closing the inspect window / map-background click, so the immediate UX bug is resolved.)
