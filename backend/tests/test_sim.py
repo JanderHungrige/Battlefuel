@@ -6,6 +6,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
+import h3
 import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -24,6 +25,7 @@ from app.services.instance_seed import seed_unit_instances
 from app.services.move_order_service import create_move_order
 from app.services.sim import advance, haversine_m, point_at, polyline_length_m
 from app.services.sim_runner import SimEngine
+from app.services.tile_grid import DEFAULT_RESOLUTION
 
 _ARMOR = next(u for u in SEED_UNITS if u.id == "armor-tank-coy")
 _LINE = [[11.80, 49.20], [11.80, 49.21], [11.80, 49.22]]  # ~2.2 km due north
@@ -174,3 +176,221 @@ class TestTick:
             assert moved.lon == pytest.approx(last[0], abs=1e-5)
             assert moved.lat == pytest.approx(last[1], abs=1e-5)
             assert (moved.current_fuel_liters or 0) < 15000
+
+    async def test_tick_halts_on_blocked_tile_without_fuel_bleed(self) -> None:
+        """F1 (Wave 10): end-to-end — a unit on a blocked tile HALTS cleanly (no progress,
+        no idle fuel burn) instead of freezing while it bleeds fuel."""
+        async with _session() as session:
+            try:
+                ways = (await session.execute(text("SELECT count(*) FROM ways"))).scalar_one()
+            except SQLAlchemyError:
+                pytest.skip("ways table missing — run build_routing_graph.sh")
+            if not ways:
+                pytest.skip("routing graph empty")
+
+            await seed_unit_instances(session)
+            instances = build_unit_instance_provider()
+            orders = build_move_order_provider()
+            inst = await instances.get_instance(session, "inst-armor-1")
+            assert inst is not None
+            unit_type = build_unit_provider().get_unit(inst.unit_type_id)
+            assert unit_type is not None
+            order = await create_move_order(
+                session,
+                build_routing_provider(),
+                orders,
+                inst,
+                unit_type,
+                49.20,
+                11.83,
+                RouteMetric.FAST,
+            )
+            assert order is not None
+            await orders.set_status(session, order.id, MoveOrderStatus.ACTIVE)
+
+            # Block the tile the unit is standing on (as the event feed could mid-mission).
+            # Restored in `finally` so this test never pollutes the shared dev DB.
+            cell = h3.latlng_to_cell(inst.lat, inst.lon, DEFAULT_RESOLUTION)
+            cap = unit_type.fuel.capacity_liters
+            fuel_before = await instances.get_instance(session, "inst-armor-1") or inst
+            before_l = fuel_before.current_fuel_liters if fuel_before.current_fuel_liters else cap
+            try:
+                await session.execute(
+                    text("UPDATE tiles SET road_condition='blocked' WHERE h3_index = :c"),
+                    {"c": cell},
+                )
+                await session.commit()
+
+                engine = SimEngine(ConnectionManager())
+                await engine.tick(session, dt_game_s=60)
+
+                halted = await orders.get(session, order.id)
+                assert halted is not None and halted.status is MoveOrderStatus.HALTED
+                assert halted.progress_m == 0.0  # never entered the block
+                after = await instances.get_instance(session, "inst-armor-1")
+                assert after is not None
+                after_l = after.current_fuel_liters if after.current_fuel_liters else cap
+                assert after_l == pytest.approx(before_l, abs=1e-6)  # halted -> no idle fuel bleed
+            finally:
+                await session.execute(
+                    text("UPDATE tiles SET road_condition='clear' WHERE h3_index = :c"),
+                    {"c": cell},
+                )
+                await session.commit()
+
+
+class TestNeverStallTraversal:
+    """F1 (Wave 10, doc 60): a unit never freezes. A physical block (or threat-L5 in Safe)
+    halts cleanly (no progress, no idle fuel burn); Fast crosses threat-L5 at a penalty;
+    a 'crossing' order crawls across the obstruction and reverts to active once clear.
+
+    These target the NEW pure decision function ``advance_with_terrain`` (wraps ``advance``),
+    so they need no DB and stay deterministic. Local imports keep module collection working
+    until the symbol exists. RED until F1 is implemented.
+    """
+
+    @staticmethod
+    def _order(
+        progress_m: float = 0.0,
+        *,
+        metric: RouteMetric = RouteMetric.FAST,
+        status: MoveOrderStatus = MoveOrderStatus.ACTIVE,
+    ) -> MoveOrder:
+        return MoveOrder(
+            id="o1",
+            instance_id="i1",
+            status=status,
+            metric=metric,
+            distance_m=polyline_length_m(_LINE),
+            duration_s=100.0,
+            fuel_consumed_l=10.0,
+            progress_m=progress_m,
+            geometry=_LINE,
+        )
+
+    def test_blocked_tile_halts_with_no_progress_and_no_fuel_burn(self) -> None:
+        from app.services.cost_model import TileFactors
+        from app.services.sim import advance_with_terrain
+
+        order = self._order(progress_m=100.0)
+        step = advance_with_terrain(
+            order,
+            fuel_l=18000,
+            unit_type=_ARMOR,
+            dt_game_s=30,
+            factors=TileFactors(speed_factor=0.0, fuel_factor=1.0),
+            threat_level=0,
+        )
+        assert step.status == "halted"
+        assert step.progress_m == 100.0  # did not enter the block
+        assert step.fuel_l == 18000  # halted ⇒ no idle burn (this is the stall fix)
+
+    def test_blocked_tile_halts_in_safe_posture_too(self) -> None:
+        from app.services.cost_model import TileFactors
+        from app.services.sim import advance_with_terrain
+
+        step = advance_with_terrain(
+            self._order(metric=RouteMetric.SAFE),
+            fuel_l=18000,
+            unit_type=_ARMOR,
+            dt_game_s=30,
+            factors=TileFactors(speed_factor=0.0, fuel_factor=1.0),
+            threat_level=0,
+        )
+        assert step.status == "halted"
+
+    def test_threat_l5_fast_crosses_at_penalty_not_halt(self) -> None:
+        from app.services.cost_model import TileFactors
+        from app.services.sim import advance_with_terrain
+
+        clear = TileFactors(speed_factor=1.0, fuel_factor=1.0)
+        normal = advance_with_terrain(
+            self._order(),
+            fuel_l=18000,
+            unit_type=_ARMOR,
+            dt_game_s=30,
+            factors=clear,
+            threat_level=0,
+        )
+        crossed = advance_with_terrain(
+            self._order(metric=RouteMetric.FAST),
+            fuel_l=18000,
+            unit_type=_ARMOR,
+            dt_game_s=30,
+            factors=clear,
+            threat_level=5,
+        )
+        assert crossed.status == "active"  # Fast does not halt on threat
+        assert 0 < crossed.progress_m < normal.progress_m  # crosses, but slower (penalty)
+        assert (18000 - crossed.fuel_l) > (18000 - normal.fuel_l)  # extra fuel burn
+
+    def test_threat_l5_safe_halts(self) -> None:
+        from app.services.cost_model import TileFactors
+        from app.services.sim import advance_with_terrain
+
+        step = advance_with_terrain(
+            self._order(progress_m=50.0, metric=RouteMetric.SAFE),
+            fuel_l=18000,
+            unit_type=_ARMOR,
+            dt_game_s=30,
+            factors=TileFactors(speed_factor=1.0, fuel_factor=1.0),
+            threat_level=5,
+        )
+        assert step.status == "halted"
+        assert step.progress_m == 50.0
+        assert step.fuel_l == 18000
+
+    def test_threat_below_5_moves_normally(self) -> None:
+        from app.services.cost_model import TileFactors
+        from app.services.sim import advance_with_terrain
+
+        clear_step = advance_with_terrain(
+            self._order(),
+            fuel_l=18000,
+            unit_type=_ARMOR,
+            dt_game_s=30,
+            factors=TileFactors(speed_factor=1.0, fuel_factor=1.0),
+            threat_level=0,
+        )
+        t4 = advance_with_terrain(
+            self._order(metric=RouteMetric.SAFE),
+            fuel_l=18000,
+            unit_type=_ARMOR,
+            dt_game_s=30,
+            factors=TileFactors(speed_factor=1.0, fuel_factor=1.0),
+            threat_level=4,
+        )
+        assert t4.status == "active"
+        assert t4.progress_m == pytest.approx(clear_step.progress_m, rel=1e-6)
+
+    def test_crossing_order_crawls_across_block_without_freezing(self) -> None:
+        from app.services.cost_model import TileFactors
+        from app.services.sim import advance_with_terrain
+
+        order = self._order(progress_m=100.0, status=MoveOrderStatus.CROSSING)
+        step = advance_with_terrain(
+            order,
+            fuel_l=18000,
+            unit_type=_ARMOR,
+            dt_game_s=30,
+            factors=TileFactors(speed_factor=0.0, fuel_factor=1.0),
+            threat_level=0,
+        )
+        assert step.status == "crossing"
+        assert step.progress_m > 100.0  # inches forward — never frozen
+        assert step.fuel_l < 18000  # burns fuel while crossing
+
+    def test_crossing_reverts_to_active_on_clear_tile(self) -> None:
+        from app.services.cost_model import TileFactors
+        from app.services.sim import advance_with_terrain
+
+        step = advance_with_terrain(
+            self._order(status=MoveOrderStatus.CROSSING),
+            fuel_l=18000,
+            unit_type=_ARMOR,
+            dt_game_s=30,
+            factors=TileFactors(speed_factor=1.0, fuel_factor=1.0),
+            threat_level=0,
+        )
+        assert step.status == "active"  # cleared the obstruction → normal movement resumes
+        assert step.progress_m > 0
