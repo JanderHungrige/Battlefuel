@@ -14,8 +14,8 @@ hash: ef1cee6d
 
 ## Done-When (close-out gate)
 Track in this doc; mark `complete` only after all three pass (see initiative DoD):
-- [ ] **tested local** — `make dev`, demoed on localhost
-- [ ] **tested online** — `dev-deployment` → `:3001`, verified there
+- [x] **tested local** — `make dev` verified (incl. review tweaks + 5/2km/500m grid options)
+- [ ] **tested online** — `dev-deployment` → `:3001`, verifying now
 - [ ] **merged into main / deployed in prod** — `:3000`, verified → then close
 
 ## Demo-State
