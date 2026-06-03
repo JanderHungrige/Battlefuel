@@ -9,6 +9,7 @@ import type {
   TileUpdate,
   UnitUpdate,
 } from '../api/types'
+import { formatMgrs, toMgrs } from '../map/mgrsGrid'
 
 function parse(raw: string): Record<string, unknown> | null {
   try {
@@ -85,6 +86,11 @@ export function parseCombatEvent(raw: string): CombatEvent | null {
     return msg as unknown as CombatEvent
   }
   return null
+}
+
+/** Formatted MGRS coordinate (to 1 m) for a combat event's location — the chatter tag. */
+export function combatEventMgrs(ev: CombatEvent): string {
+  return formatMgrs(toMgrs(ev.lat, ev.lon))
 }
 
 /** Latest combat-event frame per id wins. Returns a new map (never mutates the input). */

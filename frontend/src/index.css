@@ -876,6 +876,31 @@ body {
   border-color: #ffd23f;
 }
 
+/* Combat-event chatter tagging (v2 Wave 3): MGRS coord chip + sender signature. */
+.chatter-mgrs {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  letter-spacing: 0.3px;
+  color: #0e1116;
+  background: var(--accent);
+  border-radius: 3px;
+}
+
+.chatter-text {
+  vertical-align: middle;
+}
+
+.chatter-sender {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+  font-style: italic;
+  opacity: 0.7;
+}
+
 /* Obstacle type picker (left side, under the planning area). */
 .obstacle-picker {
   position: absolute;

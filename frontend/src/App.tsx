@@ -31,6 +31,7 @@ export default function App() {
   const [selectedTileH3, setSelectedTileH3] = useState<string | null>(null)
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null)
   const [highlightH3, setHighlightH3] = useState<string | null>(null)
+  const [highlightEventId, setHighlightEventId] = useState<string | null>(null)
 
   // Map grid: MGRS only (hex layout archived in code, not exposed). Drawn precision is persisted.
   const gridLayout: GridLayout = 'mgrs'
@@ -162,6 +163,7 @@ export default function App() {
               obstacles={obstacles}
               obstacleMode={obstacleActive}
               combatEvents={Object.values(combatEvents)}
+              highlightEventId={highlightEventId}
               depots={canShow(role, 'depotOverlay') ? supply.depots : []}
               rendezvous={canShow(role, 'supplyPanel') ? supplyOrders.rendezvous : null}
               adviceArrow={adviceMarker.arrow}
@@ -186,7 +188,11 @@ export default function App() {
               onClearSelection={clear}
             />
             <GridLayoutControl precisionM={gridPrecisionM} onPrecision={setGridPrecisionM} />
-            <ChatterLog messages={chatter} onSelect={setHighlightH3} />
+            <ChatterLog
+              messages={chatter}
+              onSelect={setHighlightH3}
+              onSelectEvent={setHighlightEventId}
+            />
             {canShow(role, 'strategicFeed') && (
               <ChatterLog
                 messages={strategic}

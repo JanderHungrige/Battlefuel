@@ -4,6 +4,7 @@ import {
   applyCombatEvent,
   applyTileUpdate,
   applyUnitUpdate,
+  combatEventMgrs,
   describeBuyOrderUpdate,
   describeRefuelOrderUpdate,
   describeTileUpdate,
@@ -223,5 +224,12 @@ describe('applyCombatEvent', () => {
     const s2 = applyCombatEvent(s1, { ...combatFrame, estimated_threat: 5, zone: 'combat' })
     expect(s2['ied-msr-7'].estimated_threat).toBe(5)
     expect(s2['ied-msr-7'].zone).toBe('combat')
+  })
+})
+
+describe('combatEventMgrs', () => {
+  it('formats the event location as a spaced zone-32U MGRS string (to 1 m)', () => {
+    const mgrs = combatEventMgrs(combatFrame)
+    expect(mgrs).toMatch(/^32U [A-Z]{2} \d{5} \d{5}$/)
   })
 })

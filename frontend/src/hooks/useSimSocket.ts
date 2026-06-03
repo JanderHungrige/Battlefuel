@@ -8,6 +8,7 @@ import {
   applyCombatEvent,
   applyTileUpdate,
   applyUnitUpdate,
+  combatEventMgrs,
   describeBuyOrderUpdate,
   describeRefuelOrderUpdate,
   describeTileUpdate,
@@ -97,6 +98,17 @@ export function useSimSocket(enabled = true): SimSocketState {
         const combat = parseCombatEvent(raw)
         if (combat) {
           setCombatEvents((prev) => applyCombatEvent(prev, combat))
+          const msg: ChatterMessage = {
+            id: (seq.current += 1),
+            kind: 'status',
+            text: combat.event,
+            mgrs: combatEventMgrs(combat),
+            sender: combat.sender,
+            event_id: combat.id,
+            lat: combat.lat,
+            lon: combat.lon,
+          }
+          setChatter((prev) => [...prev, msg].slice(-MAX_CHATTER))
           return
         }
         const strat = parseStrategicMessage(raw)

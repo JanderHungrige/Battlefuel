@@ -57,6 +57,12 @@ export interface ChatterMessage {
   kind: 'status' | 'order'
   text: string
   h3_index?: string
+  /** Combat-event tagging (v2 Wave 3): MGRS coord + sender, and click-to-locate target. */
+  mgrs?: string
+  sender?: string
+  event_id?: string
+  lat?: number
+  lon?: number
 }
 
 export type InstanceStatus =

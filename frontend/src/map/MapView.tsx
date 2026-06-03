@@ -65,6 +65,7 @@ export interface MapViewProps {
   obstacles: Obstacle[]
   obstacleMode: boolean
   combatEvents: CombatEvent[]
+  highlightEventId: string | null
   depots: FuelDepot[]
   rendezvous: { lat: number; lon: number } | null
   adviceArrow: { from: { lat: number; lon: number }; to: { lat: number; lon: number } } | null
@@ -215,6 +216,14 @@ function initLayers(map: maplibregl.Map): void {
       'icon-size': 1,
       'icon-allow-overlap': true,
     },
+  })
+  // Bright highlight outline for a combat square located from the chatter log (F4 click-to-locate).
+  map.addLayer({
+    id: 'combat-events-highlight',
+    type: 'line',
+    source: 'combat-events',
+    filter: ['==', ['get', 'id'], ''],
+    paint: { 'line-color': '#ffd23f', 'line-width': 3.5, 'line-opacity': 0.95 },
   })
 
   map.addSource('active-routes', { type: 'geojson', data: EMPTY })
@@ -609,6 +618,13 @@ export function MapView(props: MapViewProps) {
     if (readyRef.current && mapRef.current)
       setData(mapRef.current, 'combat-events', combatEventsToGeoJSON(props.combatEvents))
   }, [props.combatEvents])
+  useEffect(() => {
+    if (!readyRef.current || !mapRef.current) return
+    const map = mapRef.current
+    map.setFilter('combat-events-highlight', ['==', ['get', 'id'], props.highlightEventId ?? ''])
+    const ev = props.combatEvents.find((e) => e.id === props.highlightEventId)
+    if (ev) map.easeTo({ center: [ev.lon, ev.lat], duration: 600 })
+  }, [props.highlightEventId, props.combatEvents])
   useEffect(() => {
     if (readyRef.current && mapRef.current)
       setData(mapRef.current, 'depots', depotsToGeoJSON(props.depots))

@@ -100,6 +100,32 @@ describe('useSimSocket', () => {
     expect(result.current.chatter[0].text).toContain('threat 4/5')
   })
 
+  it('routes a combat_event into combatEvents and a MGRS-tagged chatter line', () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket as unknown as typeof WebSocket)
+    const { result } = renderHook(() => useSimSocket())
+    const ws = FakeWebSocket.last
+    const combat = JSON.stringify({
+      type: 'combat_event',
+      id: 'ied-msr-7',
+      category: 'Threat Events',
+      event: 'IED / mine detected or detonated',
+      lat: 49.215,
+      lon: 11.835,
+      precision_m: 100,
+      estimated_threat: 4,
+      sender: 'EOD 4-1 (52nd EOD)',
+      zone: 'blocked',
+      game_s: 20,
+    })
+    act(() => ws?.onmessage?.({ data: combat }))
+    expect(result.current.combatEvents['ied-msr-7'].zone).toBe('blocked')
+    const line = result.current.chatter.at(-1)
+    expect(line?.event_id).toBe('ied-msr-7')
+    expect(line?.sender).toBe('EOD 4-1 (52nd EOD)')
+    expect(line?.mgrs).toMatch(/^32U /)
+    expect(line?.text).toContain('IED')
+  })
+
   it('pushChatter adds an order line', () => {
     vi.stubGlobal('WebSocket', FakeWebSocket as unknown as typeof WebSocket)
     const { result } = renderHook(() => useSimSocket())
