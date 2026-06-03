@@ -22,7 +22,7 @@ import { useSupplyOrders } from './hooks/useSupplyOrders'
 import { useTheaterData } from './hooks/useTheaterData'
 import { useUnitOverview } from './hooks/useUnitOverview'
 import { aggregateCell } from './map/cellSituation'
-import { MapView, type GridLayout } from './map/MapView'
+import { MapView } from './map/MapView'
 import { cellIdFor, cellMgrsLabel, DEFAULT_PRECISION_M, GRID_PRECISIONS } from './map/mgrsGrid'
 
 export default function App() {
@@ -34,8 +34,7 @@ export default function App() {
   const [highlightH3, setHighlightH3] = useState<string | null>(null)
   const [highlightEventId, setHighlightEventId] = useState<string | null>(null)
 
-  // Map grid: MGRS only (hex layout archived in code, not exposed). Drawn precision is persisted.
-  const gridLayout: GridLayout = 'mgrs'
+  // Map grid: MGRS only (v2 Wave 9 — hex retired). Drawn precision is persisted.
   const [gridPrecisionM, setGridPrecisionM] = useState<number>(() => {
     const v = Number(localStorage.getItem('bf.gridPrecisionM'))
     return GRID_PRECISIONS.some((p) => p.m === v) ? v : DEFAULT_PRECISION_M
@@ -213,7 +212,6 @@ export default function App() {
               highlightH3={supplyOrders.truckHighlightH3 ?? adviceMarker.highlightH3 ?? highlightH3}
               selectedUnitId={selectedUnitId}
               selectedCell={selectedCell}
-              gridLayout={gridLayout}
               gridPrecisionM={gridPrecisionM}
               onPlaceObstacle={(lat, lon) => placeObstacle(lat, lon, obstacleKind)}
               onRemoveObstacle={removeObstacle}

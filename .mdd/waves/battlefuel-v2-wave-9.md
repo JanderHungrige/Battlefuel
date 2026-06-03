@@ -7,7 +7,7 @@ status: planned
 depends_on: battlefuel-v2-wave-3
 demo_state: "The operator inspects the battlefield purely in MGRS: clicking the map selects the MGRS cell at the current grid precision, and the panel reports that cell's MGRS coordinate plus its aggregated situation (highest threat, terrain mix, road state, intel, units in the cell) — with no hex/H3 vocabulary anywhere in the UI. Aggregation runs client-side from the live tile data; a backend MGRS-cell data layer is deferred to a future data wave, and terrain routing stays on H3."
 created: 2026-06-03
-hash: 6db9ac90
+hash: 2d872688
 ---
 
 # Wave 9: MGRS-Native Inspection — Retire the Hex Tile from the UX
@@ -63,7 +63,7 @@ and removes hex from what the operator sees.
 | 2 | mgrs-cell-aggregation  | docs/56-mgrs-cell-aggregation.md | complete | mgrs-cell-index |
 | 3 | mgrs-inspect-panel     | docs/57-mgrs-inspect-panel.md | complete | mgrs-cell-aggregation |
 | 4 | mgrs-threat-shading    | docs/58-mgrs-threat-shading.md | complete | mgrs-cell-aggregation |
-| 5 | retire-hex-ux          | — | planned | mgrs-threat-shading |
+| 5 | retire-hex-ux          | docs/59-retire-hex-ux.md | complete | mgrs-threat-shading |
 
 > **Deferred:** the original F3 `mgrs-cell-endpoint` (backend `GET /api/v1/mgrs-cells`) is **deferred
 > to a future data-migration wave** (requester decision 2026-06-03) — it needs a server-side

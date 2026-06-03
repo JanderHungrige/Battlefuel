@@ -78,7 +78,6 @@ export interface MapViewProps {
   highlightH3: string | null
   selectedUnitId: string | null
   selectedCell: { lat: number; lon: number } | null
-  gridLayout: GridLayout
   gridPrecisionM: number
   onSelectCell: (lat: number, lon: number) => void
   onSelectUnit: (id: string) => void
@@ -90,8 +89,6 @@ export interface MapViewProps {
 
 const EMPTY = { type: 'FeatureCollection' as const, features: [] }
 
-/** Which grid the map draws: the MGRS coordinate grid or the H3 hex grid. */
-export type GridLayout = 'mgrs' | 'hex'
 
 function setData(map: maplibregl.Map, id: string, data: GeoJSON.GeoJSON): void {
   const src = map.getSource(id) as maplibregl.GeoJSONSource | undefined
@@ -125,11 +122,13 @@ function initLayers(map: maplibregl.Map): void {
     paint: { 'line-color': '#6b7280', 'line-width': 0.8, 'line-opacity': 0.7 },
   })
   // Yellow highlight border for the sector referenced by a clicked chatter message.
+  // Sector locate-highlight (chatter / supply / advice): the MGRS square of the referenced location
+  // (v2 Wave 9 — was an H3 hex outline; hex retired from the UX).
+  map.addSource('sector-highlight', { type: 'geojson', data: EMPTY })
   map.addLayer({
-    id: 'tiles-highlight',
+    id: 'sector-highlight',
     type: 'line',
-    source: 'tiles',
-    filter: ['==', ['get', 'h3_index'], ''],
+    source: 'sector-highlight',
     paint: { 'line-color': '#ffd23f', 'line-width': 3 },
   })
 
@@ -522,36 +521,32 @@ function glyphImage(glyph: string): { width: number; height: number; data: Uint8
   return ctx.getImageData(0, 0, d, d)
 }
 
-/** Repaint the MGRS grid for the current precision and toggle MGRS vs hex visibility. */
-function applyGridLayout(
-  map: maplibregl.Map,
-  theater: Theater,
-  layout: GridLayout,
-  precisionM: number,
-): void {
-  const mgrs = layout === 'mgrs'
-  if (mgrs) {
-    const lines: GeoJSON.FeatureCollection = {
-      type: 'FeatureCollection',
-      features: [
-        { type: 'Feature', properties: {}, geometry: { type: 'MultiLineString', coordinates: gridLines(theater.bbox, precisionM) } },
-      ],
-    }
-    setData(map, 'mgrs-grid', lines)
-    const labelFeatures: GeoJSON.Feature[] = gridLabels(theater.bbox, precisionM).map((l) => {
-      const icon = `mgrs:${l.label}`
-      if (!map.hasImage(icon)) map.addImage(icon, labelImage(l.label))
-      return { type: 'Feature', properties: { icon }, geometry: { type: 'Point', coordinates: [l.lon, l.lat] } }
-    })
-    setData(map, 'mgrs-labels', { type: 'FeatureCollection', features: labelFeatures })
+/**
+ * Repaint the MGRS grid for the current precision. MGRS is the only grid (v2 Wave 9 — hex retired):
+ * the H3 `tiles` layers stay only as the invisible data substrate (tiles-fill at opacity 0 is the
+ * click target; the outline + hex threat wash are hidden — ambient threat is the MGRS cell-threat
+ * shading).
+ */
+function applyMgrsGrid(map: maplibregl.Map, theater: Theater, precisionM: number): void {
+  const lines: GeoJSON.FeatureCollection = {
+    type: 'FeatureCollection',
+    features: [
+      { type: 'Feature', properties: {}, geometry: { type: 'MultiLineString', coordinates: gridLines(theater.bbox, precisionM) } },
+    ],
   }
-  map.setLayoutProperty('mgrs-grid-line', 'visibility', mgrs ? 'visible' : 'none')
-  map.setLayoutProperty('mgrs-labels', 'visibility', mgrs ? 'visible' : 'none')
-  // Keep tiles-fill present (opacity 0) when MGRS is active so a click still resolves the H3 cell.
-  map.setPaintProperty('tiles-fill', 'fill-opacity', mgrs ? 0 : 0.5)
-  map.setLayoutProperty('tiles-outline', 'visibility', mgrs ? 'none' : 'visible')
-  // The hex threat wash is replaced by the MGRS 'cell-threat' shading (v2 Wave 9) — hide it in MGRS.
-  map.setLayoutProperty('tiles-threat', 'visibility', mgrs ? 'none' : 'visible')
+  setData(map, 'mgrs-grid', lines)
+  const labelFeatures: GeoJSON.Feature[] = gridLabels(theater.bbox, precisionM).map((l) => {
+    const icon = `mgrs:${l.label}`
+    if (!map.hasImage(icon)) map.addImage(icon, labelImage(l.label))
+    return { type: 'Feature', properties: { icon }, geometry: { type: 'Point', coordinates: [l.lon, l.lat] } }
+  })
+  setData(map, 'mgrs-labels', { type: 'FeatureCollection', features: labelFeatures })
+  map.setLayoutProperty('mgrs-grid-line', 'visibility', 'visible')
+  map.setLayoutProperty('mgrs-labels', 'visibility', 'visible')
+  // tiles-fill stays present at opacity 0 so a click still resolves a location for the MGRS cell.
+  map.setPaintProperty('tiles-fill', 'fill-opacity', 0)
+  map.setLayoutProperty('tiles-outline', 'visibility', 'none')
+  map.setLayoutProperty('tiles-threat', 'visibility', 'none')
 }
 
 /** Live MGRS coordinate readout (to 1 m) following the cursor, shown in either layout. */
@@ -685,7 +680,7 @@ export function MapView(props: MapViewProps) {
       wireInteraction(map, propsRef)
       wireHover(map)
       wireCombatHover(map)
-      applyGridLayout(map, p.theater, p.gridLayout, p.gridPrecisionM)
+      applyMgrsGrid(map, p.theater, p.gridPrecisionM)
       if (readoutRef.current) wireReadout(map, readoutRef.current)
       readyRef.current = true
     })
@@ -765,12 +760,26 @@ export function MapView(props: MapViewProps) {
   useEffect(() => {
     if (!readyRef.current || !mapRef.current) return
     const map = mapRef.current
-    map.setFilter('tiles-highlight', ['==', ['get', 'h3_index'], props.highlightH3 ?? ''])
     if (props.highlightH3) {
       const [lat, lon] = cellToLatLng(props.highlightH3)
+      setData(map, 'sector-highlight', {
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: {},
+            geometry: {
+              type: 'Polygon',
+              coordinates: [squareCornersFromCenter(lat, lon, props.gridPrecisionM)],
+            },
+          },
+        ],
+      })
       map.easeTo({ center: [lon, lat], duration: 600 })
+    } else {
+      setData(map, 'sector-highlight', EMPTY)
     }
-  }, [props.highlightH3])
+  }, [props.highlightH3, props.gridPrecisionM])
   useEffect(() => {
     if (readyRef.current && mapRef.current)
       mapRef.current.setFilter('units-selected', ['==', ['get', 'id'], props.selectedUnitId ?? ''])
@@ -797,8 +806,8 @@ export function MapView(props: MapViewProps) {
   }, [props.selectedCell, props.gridPrecisionM])
   useEffect(() => {
     if (readyRef.current && mapRef.current)
-      applyGridLayout(mapRef.current, props.theater, props.gridLayout, props.gridPrecisionM)
-  }, [props.theater, props.gridLayout, props.gridPrecisionM])
+      applyMgrsGrid(mapRef.current, props.theater, props.gridPrecisionM)
+  }, [props.theater, props.gridPrecisionM])
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>

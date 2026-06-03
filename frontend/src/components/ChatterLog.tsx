@@ -1,5 +1,5 @@
 // Side "radio" chatter log (Wave 4 ops-chatter-sectors). Newest first; a message that
-// references a sector is clickable and highlights that hex. Reused for the OF-8 strategic
+// references a sector is clickable and highlights that MGRS cell. Reused for the OF-8 strategic
 // feed (Wave 5) via the optional title/className/testId props.
 
 import type { ChatterMessage } from '../api/types'
