@@ -6,6 +6,8 @@ import { cellToLatLng } from 'h3-js'
 import maplibregl from 'maplibre-gl'
 import { Protocol } from 'pmtiles'
 import { useEffect, useRef } from 'react'
+import { ROUTE, SELECTED_UNIT, SELECTED_UNIT_RING } from './colors'
+import { formatMgrs, gridLabels, gridLines, toMgrs } from './mgrsGrid'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { FuelDepot, Obstacle, Theater, Tile, UnitInstance, UnitType } from '../api/types'
 import { PMTILES_PATH } from '../config'
@@ -16,6 +18,7 @@ import {
   depotsToGeoJSON,
   destinationToGeoJSON,
   obstaclesToGeoJSON,
+  paddedBounds,
   routeToGeoJSON,
   tilesToGeoJSON,
   unitsToGeoJSON,
@@ -46,6 +49,9 @@ export interface MapViewProps {
   adviceArrow: { from: { lat: number; lon: number }; to: { lat: number; lon: number } } | null
   adviceDest: { lat: number; lon: number } | null
   highlightH3: string | null
+  selectedUnitId: string | null
+  gridLayout: GridLayout
+  gridPrecisionM: number
   onSelectTile: (h3Index: string) => void
   onSelectUnit: (id: string) => void
   onPickDestination: (lat: number, lon: number) => void
@@ -55,6 +61,9 @@ export interface MapViewProps {
 }
 
 const EMPTY = { type: 'FeatureCollection' as const, features: [] }
+
+/** Which grid the map draws: the MGRS coordinate grid or the H3 hex grid. */
+export type GridLayout = 'mgrs' | 'hex'
 
 function setData(map: maplibregl.Map, id: string, data: GeoJSON.GeoJSON): void {
   const src = map.getSource(id) as maplibregl.GeoJSONSource | undefined
@@ -68,7 +77,7 @@ function initLayers(map: maplibregl.Map): void {
     id: 'tiles-fill',
     type: 'fill',
     source: 'tiles',
-    paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.4 },
+    paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.5 },
   })
   // Threat overlay: red, opacity ramped by threat_level (0 → transparent, 5 → strong).
   map.addLayer({
@@ -84,7 +93,8 @@ function initLayers(map: maplibregl.Map): void {
     id: 'tiles-outline',
     type: 'line',
     source: 'tiles',
-    paint: { 'line-color': '#5b6675', 'line-width': 0.5, 'line-opacity': 0.5 },
+    // Crisp neighbour separation on the light base — a clear mid-grey hairline.
+    paint: { 'line-color': '#6b7280', 'line-width': 0.8, 'line-opacity': 0.7 },
   })
   // Yellow highlight border for the sector referenced by a clicked chatter message.
   map.addLayer({
@@ -95,13 +105,41 @@ function initLayers(map: maplibregl.Map): void {
     paint: { 'line-color': '#ffd23f', 'line-width': 3 },
   })
 
+  // MGRS coordinate grid (Wave 2): lines + per-square labels (canvas-rasterized icon-image, so no
+  // glyphs are needed). Hidden until the MGRS layout is active.
+  map.addSource('mgrs-grid', { type: 'geojson', data: EMPTY })
+  map.addLayer({
+    id: 'mgrs-grid-line',
+    type: 'line',
+    source: 'mgrs-grid',
+    layout: { visibility: 'none' },
+    paint: {
+      'line-color': '#5a5346',
+      'line-opacity': 0.55,
+      'line-width': ['interpolate', ['linear'], ['zoom'], 9, 0.4, 13, 1.0, 16, 1.8],
+    },
+  })
+  map.addSource('mgrs-labels', { type: 'geojson', data: EMPTY })
+  map.addLayer({
+    id: 'mgrs-labels',
+    type: 'symbol',
+    source: 'mgrs-labels',
+    layout: {
+      visibility: 'none',
+      'icon-image': ['get', 'icon'],
+      'icon-size': 1,
+      'icon-allow-overlap': false,
+      'icon-ignore-placement': false,
+    },
+  })
+
   map.addSource('active-routes', { type: 'geojson', data: EMPTY })
   map.addLayer({
     id: 'active-routes-line',
     type: 'line',
     source: 'active-routes',
     layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': '#00e5cc', 'line-width': 3, 'line-opacity': 0.45, 'line-dasharray': [2, 2] },
+    paint: { 'line-color': ROUTE, 'line-width': 3, 'line-opacity': 0.45, 'line-dasharray': [2, 2] },
   })
 
   map.addSource('route', { type: 'geojson', data: EMPTY })
@@ -110,7 +148,7 @@ function initLayers(map: maplibregl.Map): void {
     type: 'line',
     source: 'route',
     layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': '#00e5cc', 'line-width': 4, 'line-opacity': 0.85 },
+    paint: { 'line-color': ROUTE, 'line-width': 4, 'line-opacity': 0.85 },
   })
 
   map.addSource('destination', { type: 'geojson', data: EMPTY })
@@ -120,13 +158,27 @@ function initLayers(map: maplibregl.Map): void {
     source: 'destination',
     paint: {
       'circle-radius': 7,
-      'circle-color': '#00e5cc',
+      'circle-color': ROUTE,
       'circle-stroke-width': 2,
       'circle-stroke-color': '#0e1116',
     },
   })
 
   map.addSource('units', { type: 'geojson', data: EMPTY })
+  // Selected-unit halo (bright yellow for visibility), drawn under the icon; filter from selectedUnitId.
+  map.addLayer({
+    id: 'units-selected',
+    type: 'circle',
+    source: 'units',
+    filter: ['==', ['get', 'id'], ''],
+    paint: {
+      'circle-radius': 18,
+      'circle-color': SELECTED_UNIT,
+      'circle-opacity': 0.55,
+      'circle-stroke-width': 2.5,
+      'circle-stroke-color': SELECTED_UNIT_RING,
+    },
+  })
   map.addLayer({
     id: 'units',
     type: 'symbol',
@@ -227,6 +279,68 @@ function syncUnits(
   setData(map, 'units', unitsToGeoJSON(units, sidcByType, live))
 }
 
+/** Rasterise a short label to a small pill image (offline — same technique as unit icons). */
+function labelImage(text: string): { width: number; height: number; data: Uint8ClampedArray } {
+  const pad = 4
+  const fontPx = 12
+  const measure = document.createElement('canvas').getContext('2d')
+  const font = `${fontPx}px system-ui, -apple-system, sans-serif`
+  if (measure) measure.font = font
+  const width = Math.ceil((measure?.measureText(text).width ?? text.length * 7) + pad * 2)
+  const height = fontPx + pad * 2
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return { width, height, data: new Uint8ClampedArray(width * height * 4) }
+  ctx.font = font
+  ctx.textBaseline = 'middle'
+  ctx.fillStyle = 'rgba(244,241,232,0.72)'
+  ctx.fillRect(0, 0, width, height)
+  ctx.fillStyle = '#3a352b'
+  ctx.fillText(text, pad, height / 2 + 0.5)
+  return ctx.getImageData(0, 0, width, height)
+}
+
+/** Repaint the MGRS grid for the current precision and toggle MGRS vs hex visibility. */
+function applyGridLayout(
+  map: maplibregl.Map,
+  theater: Theater,
+  layout: GridLayout,
+  precisionM: number,
+): void {
+  const mgrs = layout === 'mgrs'
+  if (mgrs) {
+    const lines: GeoJSON.FeatureCollection = {
+      type: 'FeatureCollection',
+      features: [
+        { type: 'Feature', properties: {}, geometry: { type: 'MultiLineString', coordinates: gridLines(theater.bbox, precisionM) } },
+      ],
+    }
+    setData(map, 'mgrs-grid', lines)
+    const labelFeatures: GeoJSON.Feature[] = gridLabels(theater.bbox, precisionM).map((l) => {
+      const icon = `mgrs:${l.label}`
+      if (!map.hasImage(icon)) map.addImage(icon, labelImage(l.label))
+      return { type: 'Feature', properties: { icon }, geometry: { type: 'Point', coordinates: [l.lon, l.lat] } }
+    })
+    setData(map, 'mgrs-labels', { type: 'FeatureCollection', features: labelFeatures })
+  }
+  map.setLayoutProperty('mgrs-grid-line', 'visibility', mgrs ? 'visible' : 'none')
+  map.setLayoutProperty('mgrs-labels', 'visibility', mgrs ? 'visible' : 'none')
+  // Keep tiles-fill present (opacity 0) when MGRS is active so a click still resolves the H3 cell.
+  map.setPaintProperty('tiles-fill', 'fill-opacity', mgrs ? 0 : 0.5)
+  map.setLayoutProperty('tiles-outline', 'visibility', mgrs ? 'none' : 'visible')
+  // Threat colouring is always shown — over the MGRS grid as well as the hex grid.
+  map.setLayoutProperty('tiles-threat', 'visibility', 'visible')
+}
+
+/** Live MGRS coordinate readout (to 1 m) following the cursor, shown in either layout. */
+function wireReadout(map: maplibregl.Map, el: HTMLElement): void {
+  map.on('mousemove', (e) => {
+    el.textContent = formatMgrs(toMgrs(e.lngLat.lat, e.lngLat.lng, 5))
+  })
+}
+
 function wireInteraction(map: maplibregl.Map, propsRef: { current: MapViewProps }): void {
   map.on('click', (e) => {
     const p = propsRef.current
@@ -280,6 +394,7 @@ function wireHover(map: maplibregl.Map): void {
 
 export function MapView(props: MapViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const readoutRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const readyRef = useRef(false)
   const propsRef = useRef(props)
@@ -300,6 +415,8 @@ export function MapView(props: MapViewProps) {
       style: buildBasemapStyle(archiveUrl),
       center: [theater.center_lon, theater.center_lat],
       zoom: theater.default_zoom,
+      // Frame the theater: constrain panning to its bbox (padded) so the operator can't drift off.
+      maxBounds: paddedBounds(theater.bbox),
       attributionControl: { compact: true },
     })
     map.addControl(new maplibregl.NavigationControl(), 'top-right')
@@ -318,6 +435,8 @@ export function MapView(props: MapViewProps) {
       setData(map, 'advice-dest', destinationToGeoJSON(p.adviceDest))
       wireInteraction(map, propsRef)
       wireHover(map)
+      applyGridLayout(map, p.theater, p.gridLayout, p.gridPrecisionM)
+      if (readoutRef.current) wireReadout(map, readoutRef.current)
       readyRef.current = true
     })
     mapRef.current = map
@@ -381,8 +500,19 @@ export function MapView(props: MapViewProps) {
       map.easeTo({ center: [lon, lat], duration: 600 })
     }
   }, [props.highlightH3])
+  useEffect(() => {
+    if (readyRef.current && mapRef.current)
+      mapRef.current.setFilter('units-selected', ['==', ['get', 'id'], props.selectedUnitId ?? ''])
+  }, [props.selectedUnitId])
+  useEffect(() => {
+    if (readyRef.current && mapRef.current)
+      applyGridLayout(mapRef.current, props.theater, props.gridLayout, props.gridPrecisionM)
+  }, [props.theater, props.gridLayout, props.gridPrecisionM])
 
   return (
-    <div ref={containerRef} data-testid="map-container" style={{ width: '100%', height: '100%' }} />
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <div ref={containerRef} data-testid="map-container" style={{ width: '100%', height: '100%' }} />
+      <div ref={readoutRef} className="mgrs-readout" data-testid="mgrs-readout" />
+    </div>
   )
 }

@@ -17,7 +17,6 @@ export type PanelKey =
   | 'obstacleMode'
   | 'moveRoutes'
   | 'obstaclePicker'
-  | 'terrainLegend'
   // OF-8 supply surfaces (wired by 29 / 30)
   | 'supplyPanel'
   | 'depotOverlay'
@@ -33,7 +32,6 @@ const ROLE_PANELS: Record<Role, ReadonlySet<PanelKey>> = {
     'obstacleMode',
     'moveRoutes',
     'obstaclePicker',
-    'terrainLegend',
     'inspect',
     'chatter',
     'unitOverview',
