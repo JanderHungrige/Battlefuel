@@ -15,30 +15,25 @@ export interface GridPrecision {
   label: string
 }
 
-/** Drawn MGRS square sizes (finer levels would be solid ink at theater scale — readout covers 1 m). */
+/** Drawn grid square sizes. Standard MGRS decades plus operator-friendly 5/2 km and 500 m steps
+ * (finer levels would be solid ink at theater scale — the readout always covers 1 m). */
 export const GRID_PRECISIONS: GridPrecision[] = [
   { m: 100000, label: '100 km' },
   { m: 10000, label: '10 km' },
+  { m: 5000, label: '5 km' },
+  { m: 2000, label: '2 km' },
   { m: 1000, label: '1 km' },
+  { m: 500, label: '500 m' },
   { m: 100, label: '100 m' },
 ]
 
 export const DEFAULT_PRECISION_M = 1000
 
-/** MGRS `forward` accuracy (digits per axis) for a drawn precision: 100km→0 … 100m→3. */
+/** MGRS label digit-accuracy fine enough to distinguish adjacent squares at a drawn precision:
+ * the smallest accuracy whose resolution (10^(5-acc) m) is ≤ the spacing. 100km→0 … 500m/100m→3. */
 export function precisionToAccuracy(precisionM: number): number {
-  switch (precisionM) {
-    case 100000:
-      return 0
-    case 10000:
-      return 1
-    case 1000:
-      return 2
-    case 100:
-      return 3
-    default:
-      return 2
-  }
+  const acc = 5 - Math.floor(Math.log10(precisionM))
+  return Math.max(0, Math.min(5, acc))
 }
 
 /** Full MGRS string for a point, to `accuracy` digits (default 5 = 1 m). */

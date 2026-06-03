@@ -15,15 +15,18 @@ import {
 const BBOX: BBox = { west: 11.78, south: 49.18, east: 11.92, north: 49.27 }
 
 describe('precision table', () => {
-  it('offers 100km→100m and defaults to 1km', () => {
-    expect(GRID_PRECISIONS.map((p) => p.m)).toEqual([100000, 10000, 1000, 100])
+  it('offers 100km→100m incl. 5/2km + 500m, and defaults to 1km', () => {
+    expect(GRID_PRECISIONS.map((p) => p.m)).toEqual([100000, 10000, 5000, 2000, 1000, 500, 100])
     expect(DEFAULT_PRECISION_M).toBe(1000)
   })
 
-  it('maps drawn precision to MGRS digit-accuracy', () => {
+  it('maps drawn precision to a digit-accuracy that distinguishes adjacent squares', () => {
     expect(precisionToAccuracy(100000)).toBe(0)
     expect(precisionToAccuracy(10000)).toBe(1)
+    expect(precisionToAccuracy(5000)).toBe(2)
+    expect(precisionToAccuracy(2000)).toBe(2)
     expect(precisionToAccuracy(1000)).toBe(2)
+    expect(precisionToAccuracy(500)).toBe(3)
     expect(precisionToAccuracy(100)).toBe(3)
   })
 })

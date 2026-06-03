@@ -22,7 +22,7 @@ import { useSupplyOrders } from './hooks/useSupplyOrders'
 import { useTheaterData } from './hooks/useTheaterData'
 import { useUnitOverview } from './hooks/useUnitOverview'
 import { MapView, type GridLayout } from './map/MapView'
-import { DEFAULT_PRECISION_M } from './map/mgrsGrid'
+import { DEFAULT_PRECISION_M, GRID_PRECISIONS } from './map/mgrsGrid'
 
 export default function App() {
   const [role, setRole] = useState<Role>('OF4')
@@ -36,7 +36,7 @@ export default function App() {
   const gridLayout: GridLayout = 'mgrs'
   const [gridPrecisionM, setGridPrecisionM] = useState<number>(() => {
     const v = Number(localStorage.getItem('bf.gridPrecisionM'))
-    return [100000, 10000, 1000, 100].includes(v) ? v : DEFAULT_PRECISION_M
+    return GRID_PRECISIONS.some((p) => p.m === v) ? v : DEFAULT_PRECISION_M
   })
   useEffect(() => {
     localStorage.setItem('bf.gridPrecisionM', String(gridPrecisionM))
