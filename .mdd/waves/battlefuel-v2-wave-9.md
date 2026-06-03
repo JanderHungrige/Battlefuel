@@ -7,7 +7,7 @@ status: planned
 depends_on: battlefuel-v2-wave-3
 demo_state: "The operator inspects the battlefield purely in MGRS: clicking the map selects the MGRS cell at the current grid precision, and the panel reports that cell's MGRS coordinate plus its aggregated situation (highest & most-recent threat, terrain mix, road state, intel, units in the cell) — with no hex/H3 vocabulary anywhere in the UI. A read-only backend MGRS-cell aggregation endpoint begins moving the data layer toward MGRS (threat first); terrain routing deliberately stays on H3 until the routing/movement wave."
 created: 2026-06-03
-hash: b43aa7d7
+hash: f72e82ea
 ---
 
 # Wave 9: MGRS-Native Inspection — Retire the Hex Tile from the UX
@@ -59,7 +59,7 @@ and removes hex from what the operator sees.
 ## Features
 | # | Feature | Doc | Status | Depends on |
 |---|---------|-----|--------|------------|
-| 1 | mgrs-cell-index        | — | planned | — |
+| 1 | mgrs-cell-index        | docs/55-mgrs-cell-index.md | complete | — |
 | 2 | mgrs-cell-aggregation  | — | planned | mgrs-cell-index |
 | 3 | mgrs-cell-endpoint     | — | planned | mgrs-cell-aggregation |
 | 4 | mgrs-inspect-panel     | — | planned | mgrs-cell-aggregation |

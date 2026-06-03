@@ -132,6 +132,28 @@ export function squareCornersFromCenter(lat: number, lon: number, precisionM: nu
   ]
 }
 
+/**
+ * Stable id of the MGRS cell (side `precisionM`, zone 32U) containing `(lat, lon)`: the point's UTM
+ * easting/northing snapped down to the lattice, as `"<precisionM>:<e0>:<n0>"`. Same lattice as
+ * `squareCornersFromCenter`, so the id matches the drawn square. Robust for non-decade precisions
+ * (2 km / 5 km) where an MGRS digit-string can't uniquely name the cell. (v2 Wave 9, mgrs-cell-index.)
+ */
+export function cellIdFor(lat: number, lon: number, precisionM: number): string {
+  const [e, n] = toUtm(lon, lat)
+  const e0 = Math.floor(e / precisionM) * precisionM
+  const n0 = Math.floor(n / precisionM) * precisionM
+  return `${precisionM}:${e0}:${n0}`
+}
+
+/** Formatted MGRS coordinate of the cell's centre — one label shared by every point in the cell. */
+export function cellMgrsLabel(lat: number, lon: number, precisionM: number): string {
+  const [e, n] = toUtm(lon, lat)
+  const cE = Math.floor(e / precisionM) * precisionM + precisionM / 2
+  const cN = Math.floor(n / precisionM) * precisionM + precisionM / 2
+  const [clon, clat] = toLonLat(cE, cN)
+  return formatMgrs(toMgrs(clat, clon))
+}
+
 export interface GridLabel {
   lon: number
   lat: number

@@ -3,6 +3,8 @@ import type { BBox } from '../api/types'
 import {
   DEFAULT_PRECISION_M,
   GRID_PRECISIONS,
+  cellIdFor,
+  cellMgrsLabel,
   formatMgrs,
   gridLabels,
   gridLines,
@@ -128,5 +130,42 @@ describe('gridLabels', () => {
       expect(l.lon).toBeLessThan(11.95)
       expect(l.label).toMatch(/^\d{2} \d{2}$/) // 1km → "EE NN"
     }
+  })
+})
+
+describe('cellIdFor', () => {
+  const LAT = 49.215
+  const LON = 11.835
+
+  it('is deterministic and groups nearby points into the same 1km cell id', () => {
+    const a = cellIdFor(LAT, LON, 1000)
+    expect(cellIdFor(LAT, LON, 1000)).toBe(a)
+    expect(a).toMatch(/^1000:\d+:\d+$/)
+  })
+
+  it('puts a ~1.3km-shifted point in a different cell', () => {
+    expect(cellIdFor(LAT + 0.012, LON, 1000)).not.toBe(cellIdFor(LAT, LON, 1000))
+  })
+
+  it('encodes the precision (coarser precision → different id)', () => {
+    expect(cellIdFor(LAT, LON, 2000)).not.toBe(cellIdFor(LAT, LON, 1000))
+    expect(cellIdFor(LAT, LON, 2000).startsWith('2000:')).toBe(true)
+  })
+
+  it('matches the drawn square: a square corner shares the cell of its centre', () => {
+    // The SW-ish interior of the square that contains the point shares the point's cell id.
+    const ring = squareCornersFromCenter(LAT, LON, 1000)
+    // nudge inward from the SW corner so we stay inside the cell
+    const [swLon, swLat] = ring[0]
+    expect(cellIdFor(swLat + 0.0005, swLon + 0.0005, 1000)).toBe(cellIdFor(LAT, LON, 1000))
+  })
+})
+
+describe('cellMgrsLabel', () => {
+  it('returns one formatted MGRS string shared by all points in the cell', () => {
+    const a = cellMgrsLabel(49.215, 11.835, 1000)
+    const b = cellMgrsLabel(49.2156, 11.8356, 1000) // same 1km cell (small nudge)
+    expect(a).toMatch(/^32U [A-Z]{2} /)
+    expect(b).toBe(a)
   })
 })
