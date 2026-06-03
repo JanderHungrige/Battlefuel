@@ -12,6 +12,7 @@ import type {
   Tile,
   UnitInstance,
 } from '../api/types'
+import { iconForEvent } from './eventIcons'
 import { squareCornersFromCenter } from './mgrsGrid'
 
 // Light classic terrain tints — soft, distinct fills that read on the parchment basemap (45).
@@ -112,6 +113,7 @@ export function combatEventsToGeoJSON(events: CombatEvent[]): FeatureCollection 
         event: ev.event,
         sender: ev.sender,
         precision_m: ev.precision_m,
+        icon: iconForEvent(ev.category, ev.event).key,
       },
     })),
   }

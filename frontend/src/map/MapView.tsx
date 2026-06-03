@@ -17,6 +17,7 @@ import {
   ZONE_THREAT_FILL,
   ZONE_THREAT_LINE,
 } from './colors'
+import { ALL_EVENT_ICONS } from './eventIcons'
 import { formatMgrs, gridLabels, gridLines, toMgrs } from './mgrsGrid'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type {
@@ -200,6 +201,21 @@ function initLayers(map: maplibregl.Map): void {
       'line-opacity': 0.9,
     },
   })
+  // Category glyph at each square's centre (offline-rasterized; F3 event-hover-icons).
+  for (const ic of ALL_EVENT_ICONS) {
+    if (!map.hasImage(ic.key)) map.addImage(ic.key, glyphImage(ic.glyph))
+  }
+  map.addLayer({
+    id: 'combat-events-icons',
+    type: 'symbol',
+    source: 'combat-events',
+    layout: {
+      'symbol-placement': 'point',
+      'icon-image': ['get', 'icon'],
+      'icon-size': 1,
+      'icon-allow-overlap': true,
+    },
+  })
 
   map.addSource('active-routes', { type: 'geojson', data: EMPTY })
   map.addLayer({
@@ -370,6 +386,29 @@ function labelImage(text: string): { width: number; height: number; data: Uint8C
   return ctx.getImageData(0, 0, width, height)
 }
 
+/** Rasterise a category glyph into a small dark disc icon (offline — same technique as labels). */
+function glyphImage(glyph: string): { width: number; height: number; data: Uint8ClampedArray } {
+  const d = 22
+  const canvas = document.createElement('canvas')
+  canvas.width = d
+  canvas.height = d
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return { width: d, height: d, data: new Uint8ClampedArray(d * d * 4) }
+  ctx.beginPath()
+  ctx.arc(d / 2, d / 2, d / 2 - 1, 0, Math.PI * 2)
+  ctx.fillStyle = 'rgba(20,18,14,0.82)'
+  ctx.fill()
+  ctx.lineWidth = 1.5
+  ctx.strokeStyle = 'rgba(244,241,232,0.9)'
+  ctx.stroke()
+  ctx.fillStyle = '#f4f1e8'
+  ctx.font = 'bold 12px system-ui, -apple-system, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(glyph, d / 2, d / 2 + 0.5)
+  return ctx.getImageData(0, 0, d, d)
+}
+
 /** Repaint the MGRS grid for the current precision and toggle MGRS vs hex visibility. */
 function applyGridLayout(
   map: maplibregl.Map,
@@ -460,6 +499,31 @@ function wireHover(map: maplibregl.Map): void {
   })
 }
 
+/** Hover popup over a combat-event square: event, category, estimated threat, sender. */
+function wireCombatHover(map: maplibregl.Map): void {
+  const popup = new maplibregl.Popup({
+    closeButton: false,
+    closeOnClick: false,
+    className: 'hex-popup',
+  })
+  map.on('mousemove', 'combat-events-fill', (e) => {
+    const p = e.features?.[0]?.properties
+    if (!p) return
+    map.getCanvas().style.cursor = 'pointer'
+    popup
+      .setLngLat(e.lngLat)
+      .setHTML(
+        `<b>${p.event}</b><br>${p.category} · threat ${p.estimated_threat}/5<br>` +
+          `<i>${p.sender}</i>`,
+      )
+      .addTo(map)
+  })
+  map.on('mouseleave', 'combat-events-fill', () => {
+    map.getCanvas().style.cursor = ''
+    popup.remove()
+  })
+}
+
 export function MapView(props: MapViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const readoutRef = useRef<HTMLDivElement | null>(null)
@@ -504,6 +568,7 @@ export function MapView(props: MapViewProps) {
       setData(map, 'advice-dest', destinationToGeoJSON(p.adviceDest))
       wireInteraction(map, propsRef)
       wireHover(map)
+      wireCombatHover(map)
       applyGridLayout(map, p.theater, p.gridLayout, p.gridPrecisionM)
       if (readoutRef.current) wireReadout(map, readoutRef.current)
       readyRef.current = true
