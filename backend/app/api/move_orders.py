@@ -95,6 +95,26 @@ async def cancel_order(order_id: str, session: SessionDep, orders: OrderDep) -> 
     return order
 
 
+@router.post("/move-orders/{order_id}/proceed")
+async def proceed_order(order_id: str, session: SessionDep, orders: OrderDep) -> MoveOrder:
+    """Operator opts a halted order into "proceed slowly" → crossing.
+
+    The sim then crawls the unit across the obstruction at a penalty and resumes normal
+    movement once it reaches a passable, sub-threat tile. Only a halted order may proceed.
+    """
+    order = await orders.get(session, order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail=f"move order {order_id!r} not found")
+    if order.status is not MoveOrderStatus.HALTED:
+        raise HTTPException(
+            status_code=409,
+            detail=f"move order {order_id!r} is {order.status.value}, not halted",
+        )
+    updated = await orders.set_status(session, order_id, MoveOrderStatus.CROSSING)
+    assert updated is not None  # existence just checked above
+    return updated
+
+
 @router.get("/move-orders")
 async def list_orders(session: SessionDep, orders: OrderDep) -> list[MoveOrder]:
     return list(await orders.list_all(session))
