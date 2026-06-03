@@ -17,7 +17,7 @@ from app.services.cost_model import TileFactors
 
 _EARTH_RADIUS_M = 6_371_000.0
 
-# Threat level (0–5) at/above which a tile counts as a combat ("red") sector for crossing rules.
+# Threat level (0-5) at/above which a tile counts as a combat ("red") sector for crossing rules.
 THREAT_L5: int = 5
 # "Proceed slowly" crossing penalties: a physical block is a heavy crawl, threat a lighter one.
 # Each is a speed_factor floor + a fuel-burn multiplier applied while crossing.

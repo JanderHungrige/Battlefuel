@@ -19,6 +19,7 @@ from app.api.ws import ConnectionManager
 from app.config import get_settings
 from app.db import get_session_maker
 from app.domain.combat_event import combat_event_frame
+from app.domain.move_order import MoveOrderStatus
 from app.models.unit_instance import UnitInstanceRow
 from app.providers.buy_orders import build_buy_order_provider
 from app.providers.combat_events import (
@@ -42,7 +43,7 @@ from app.services.buy_service import deliver_due_buy_orders
 from app.services.cost_model import TileFactors, tile_factors
 from app.services.event_engine import EventEngine
 from app.services.refuel_service import try_complete_refuel
-from app.services.sim import advance
+from app.services.sim import advance, advance_with_terrain
 from app.services.tile_grid import DEFAULT_RESOLUTION
 from app.services.tile_mutation import apply_tile_mutation, tile_update_frame
 
@@ -207,17 +208,37 @@ class SimEngine:
                 if row.current_fuel_liters is not None
                 else unit_type.fuel.capacity_liters
             )
-            tile = await tiles.get_tile(session, row.h3_index) if row.h3_index else None
-            factors = (
-                tile_factors(tile.terrain, tile.road_condition) if tile else _NEUTRAL_FACTORS
+            cur_tile = await tiles.get_tile(session, row.h3_index) if row.h3_index else None
+            cur_factors = (
+                tile_factors(cur_tile.terrain, cur_tile.road_condition)
+                if cur_tile
+                else _NEUTRAL_FACTORS
             )
-            step = advance(
+            # Look ahead one step at the current speed to find the tile the unit is *entering*,
+            # so we can halt at the obstruction edge rather than freezing on it.
+            nominal = advance(
                 order,
                 fuel,
                 unit_type,
                 dt_game_s,
-                speed_factor=factors.speed_factor,
-                fuel_factor=factors.fuel_factor,
+                speed_factor=cur_factors.speed_factor,
+                fuel_factor=cur_factors.fuel_factor,
+            )
+            enter_cell = h3.latlng_to_cell(nominal.lat, nominal.lon, DEFAULT_RESOLUTION)
+            enter_tile = await tiles.get_tile(session, enter_cell)
+            enter_factors = (
+                tile_factors(enter_tile.terrain, enter_tile.road_condition)
+                if enter_tile
+                else _NEUTRAL_FACTORS
+            )
+            enter_threat = enter_tile.threat_level if enter_tile else 0
+            step = advance_with_terrain(
+                order,
+                fuel,
+                unit_type,
+                dt_game_s,
+                factors=enter_factors,
+                threat_level=enter_threat,
             )
             await orders.set_progress(session, order.id, step.progress_m, step.status)
             await session.execute(
@@ -231,16 +252,30 @@ class SimEngine:
                 )
             )
             await session.commit()
-            await self._manager.broadcast(
-                {
-                    "type": "unit_update",
-                    "instance_id": order.instance_id,
-                    "order_id": order.id,
-                    "lat": step.lat,
-                    "lon": step.lon,
-                    "fuel_l": round(step.fuel_l, 1),
-                    "status": step.status.value,
-                    "progress_m": round(step.progress_m, 1),
-                    "distance_m": round(order.distance_m, 1),
-                }
-            )
+            frame: dict[str, object] = {
+                "type": "unit_update",
+                "instance_id": order.instance_id,
+                "order_id": order.id,
+                "lat": step.lat,
+                "lon": step.lon,
+                "fuel_l": round(step.fuel_l, 1),
+                "status": step.status.value,
+                "progress_m": round(step.progress_m, 1),
+                "distance_m": round(order.distance_m, 1),
+            }
+            if step.status is MoveOrderStatus.HALTED:
+                reason = "blocked" if not enter_factors.passable else "threat"
+                frame["reason"] = reason
+                await self._manager.broadcast(frame)
+                await self._manager.broadcast(
+                    {
+                        "type": "strategic_message",
+                        "text": (
+                            f"Unit {order.instance_id} halted — {reason} sector ahead "
+                            f"({step.lat:.4f}, {step.lon:.4f}). Proceed slowly or re-route."
+                        ),
+                        "category": "movement",
+                    }
+                )
+            else:
+                await self._manager.broadcast(frame)
