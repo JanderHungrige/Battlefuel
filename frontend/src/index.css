@@ -753,6 +753,71 @@ body {
   font-size: 12px;
   color: #f0c674;
 }
+.route-option-warning.combat {
+  color: #ff6b6b;
+  font-weight: 600;
+}
+
+/* Travel-mode selector (v2 Wave 10 F4) */
+.move-mode {
+  display: flex;
+  gap: 4px;
+  margin: 8px 0;
+}
+.move-mode-btn {
+  flex: 1;
+  padding: 6px 4px;
+  font-size: 12px;
+  border: 1px solid #3a4250;
+  border-radius: 4px;
+  background: #1c2230;
+  color: #c8d0dc;
+  cursor: pointer;
+}
+.move-mode-btn.selected {
+  background: #2f6fed;
+  border-color: #2f6fed;
+  color: #fff;
+}
+
+/* Halt banner (v2 Wave 10 F1/F4) */
+.halt-banner {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 90%;
+  padding: 10px 14px;
+  background: #3a1c1c;
+  border: 1px solid #ff6b6b;
+  border-radius: 6px;
+  color: #ffd9d9;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 40%);
+}
+.halt-banner-actions {
+  display: flex;
+  gap: 6px;
+}
+.halt-banner-actions button {
+  padding: 5px 10px;
+  border: 1px solid #ff6b6b;
+  border-radius: 4px;
+  background: #5a2a2a;
+  color: #fff;
+  cursor: pointer;
+}
+.halt-banner-actions button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.halt-banner-actions .halt-dismiss {
+  border-color: #6a4a4a;
+  background: transparent;
+}
 
 .move-confirm {
   display: block;

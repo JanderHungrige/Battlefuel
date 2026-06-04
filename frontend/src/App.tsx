@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { api } from './api/client'
+import { errorMessage } from './api/errors'
 import type { Recommendation, TileMutationRequest } from './api/types'
 import { AdvisorPanel } from './components/AdvisorPanel'
 import { ChatterLog } from './components/ChatterLog'
 import { GridLayoutControl } from './components/GridLayoutControl'
+import { HaltBanner } from './components/HaltBanner'
 import { InspectPanel, type InspectCell } from './components/InspectPanel'
 import { MoveRoutesPanel } from './components/MoveRoutesPanel'
+import { firstHaltedUnit } from './lib/halt'
 import { ObstacleKindPicker } from './components/ObstacleKindPicker'
 import type { ObstacleKind } from './components/obstacleKinds'
 import { RoleToggle } from './components/RoleToggle'
@@ -145,6 +149,42 @@ export default function App() {
     [planning],
   )
 
+  // A halted unit (v2 Wave 10 F1/F4): offer "Proceed slowly" or "Re-route".
+  const [proceeding, setProceeding] = useState(false)
+  const [dismissedHalt, setDismissedHalt] = useState<string | null>(null)
+  const halted = useMemo(() => firstHaltedUnit(live), [live])
+  const haltedName = useMemo(
+    () => units.find((u) => u.id === halted?.instanceId)?.name ?? halted?.instanceId ?? '',
+    [units, halted],
+  )
+  const proceedHalted = useCallback(() => {
+    if (!halted) return
+    setProceeding(true)
+    api
+      .proceedMoveOrder(halted.orderId)
+      .then(() => pushChatter(`Proceeding slowly: ${haltedName}`, 'order'))
+      .catch((e: unknown) => pushChatter(errorMessage(e), 'status'))
+      .finally(() => setProceeding(false))
+  }, [halted, haltedName, pushChatter])
+  const rerouteHalted = useCallback(() => {
+    if (!halted) return
+    setSelectedCell(null)
+    setHighlightEventId(null)
+    planning.resetPlanning()
+    setSelectedUnitId(halted.instanceId)
+  }, [halted, planning])
+
+  // Esc exits any active mode (planning / obstacle placement / selection).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      setObstacleMode(false)
+      clear()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [clear])
+
   const ready = theater !== null
   // Obstacle placement is an OF-4 tactical tool; never active in the OF-8 supply view.
   const obstacleActive = canShow(role, 'obstacleMode') && obstacleMode
@@ -265,10 +305,22 @@ export default function App() {
                 error={planning.planError}
                 options={planning.routeOptions}
                 selectedMetric={planning.selectedMetric}
+                mode={planning.mode}
+                onSelectMode={planning.setMode}
                 confirming={planning.confirming}
                 onSelectOption={planning.setSelectedMetric}
                 onConfirm={() => planning.confirmMove(clear)}
                 onCancel={clear}
+              />
+            )}
+            {halted && halted.orderId !== dismissedHalt && (
+              <HaltBanner
+                halted={halted}
+                unitName={haltedName}
+                proceeding={proceeding}
+                onProceed={proceedHalted}
+                onReroute={rerouteHalted}
+                onDismiss={() => setDismissedHalt(halted.orderId)}
               />
             )}
             {canShow(role, 'advisor') && advisor.open && (
