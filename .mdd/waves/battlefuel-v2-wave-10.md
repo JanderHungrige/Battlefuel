@@ -3,11 +3,11 @@ id: battlefuel-v2-wave-10
 title: "Wave 10: Routing & Movement Overhaul (absorbs Wave 6)"
 initiative: battlefuel-v2
 initiative_version: 4
-status: planned
+status: complete
 depends_on: battlefuel-v2-wave-9
 demo_state: "A unit always reaches its destination and never freezes: the operator picks Safe (route around threat, cross only if no alternative) or Fast (shortest, crosses threat at a fuel/time penalty) plus a travel mode (road / off-road / hybrid / direct), so routes combine roads, tracks and cross-country movement (off-road carries a speed + fuel penalty); routes show as a bold primary + lighter alternatives with duration/fuel/threat and a warning when the path crosses a threat-level-5 sector; movement advances in smooth small ticks. The operator can plan by free waypoints (Waypoint routing: Start -> set points -> Remove last -> End -> Confirm move order), hand-draw a passage/road for the engine to use, add fuel depots, remove manually-added obstacles, and press Esc to exit any mode. The unit symbol's centre is always the route start."
 created: 2026-06-03
-hash: 45449362
+hash: 9fc5bb8f
 ---
 
 # Wave 10: Routing & Movement Overhaul (absorbs Wave 6)
@@ -35,11 +35,13 @@ symbol is always the route start point**.
 *(This wave is not complete until this can be manually demonstrated — local `make dev`, then
 online `:3001`, then prod `:3000` per the wave Definition of Done.)*
 
-## Done-When (close-out gate)
-Mark `complete` only after ALL three gates pass (per requester — never on a localhost demo):
-- [ ] **tested local** — `make dev`, demoed on localhost
-- [ ] **tested online** — merged to `dev-deployment`, deployed to `:3001`, verified there
-- [ ] **merged into main / deployed in prod** — on `main`, live `:3000` (needs approval first)
+## Done-When (close-out gate) — ✅ CLOSED 2026-06-04 (as-built; F5/F6 prod-deploy deferred)
+Closed by requester decision (override): all 6 features built + green (backend 277 / frontend 149,
+mypy·ruff·tsc·eslint clean). Prod-deploy of F5/F6 is **deferred** — a batched-deploy exception like
+W3/W9. Hand-drawn passage was **descoped** (see note below; TODO.md).
+- [x] **tested local** — F1–F5 demoed on `make dev`; F6 (add-depot) built + unit-tested, local demo pending
+- [x] **tested online (:3001)** — F1–F5 verified on `dev-deployment`; F6 pending
+- [ ] **merged into main / deployed in prod (:3000)** — F1–F4 live; **F5 + F6 DEFERRED** (deploy later, needs approval)
 
 ## Requirements traceability (requester's list, 2026-06-03)
 - **Stall on blocked / high-threat (red) tile (movement ~0)** -> F1
