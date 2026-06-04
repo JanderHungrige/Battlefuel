@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
@@ -39,6 +40,20 @@ SessionDep = Annotated[AsyncSession, Depends(get_session)]
 SupplyDep = Annotated[SupplyProvider, Depends(get_supply_provider)]
 InstanceDep = Annotated[UnitInstanceProvider, Depends(get_instance_provider)]
 UnitDep = Annotated[UnitDataProvider, Depends(get_unit_provider)]
+
+
+class CreateDepotRequest(BaseModel):
+    name: str
+    lat: float
+    lon: float
+
+
+@router.post("/depots", status_code=201)
+async def create_depot(
+    req: CreateDepotRequest, session: SessionDep, supply: SupplyDep
+) -> FuelDepot:
+    """Manually place a fuel depot at a clicked point (v2 Wave 10, add-depot)."""
+    return await supply.create_depot(session, req.name, req.lat, req.lon)
 
 
 @router.get("/depots")

@@ -8,9 +8,11 @@ depot stock — buy delivery and any future drawdown go through it, never a raw 
 
 from __future__ import annotations
 
+import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 
+import h3
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,6 +20,7 @@ from app.config import Settings, get_settings
 from app.domain.supply import FuelDepot, FuelStock
 from app.domain.unit import FuelType
 from app.models.supply import FuelDepotRow, FuelStockRow
+from app.services.tile_grid import DEFAULT_RESOLUTION
 
 
 def _to_depot(row: FuelDepotRow) -> FuelDepot:
@@ -43,6 +46,12 @@ class SupplyProvider(ABC):
     @abstractmethod
     async def get_depot(self, session: AsyncSession, depot_id: str) -> FuelDepot | None:
         """Return a single depot by id, or ``None``."""
+
+    @abstractmethod
+    async def create_depot(
+        self, session: AsyncSession, name: str, lat: float, lon: float
+    ) -> FuelDepot:
+        """Create + persist a fuel depot at (lat, lon). Commits (v2 Wave 10, add-depot)."""
 
     @abstractmethod
     async def list_stocks(
@@ -78,6 +87,20 @@ class DbSupplyProvider(SupplyProvider):
     async def get_depot(self, session: AsyncSession, depot_id: str) -> FuelDepot | None:
         row = await session.get(FuelDepotRow, depot_id)
         return _to_depot(row) if row is not None else None
+
+    async def create_depot(
+        self, session: AsyncSession, name: str, lat: float, lon: float
+    ) -> FuelDepot:
+        row = FuelDepotRow(
+            id=uuid.uuid4().hex,
+            name=name,
+            h3_index=h3.latlng_to_cell(lat, lon, DEFAULT_RESOLUTION),
+            lat=lat,
+            lon=lon,
+        )
+        session.add(row)
+        await session.commit()
+        return _to_depot(row)
 
     async def list_stocks(
         self, session: AsyncSession, depot_id: str | None = None
