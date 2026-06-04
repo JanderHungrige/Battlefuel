@@ -5,6 +5,7 @@ import type {
   AdviceResult,
   BuyOrder,
   CreateBuyOrderRequest,
+  CreateDepotRequest,
   CreateMoveOrderRequest,
   CreateRefuelOrderRequest,
   CreateWaypointMoveOrderRequest,
@@ -101,6 +102,8 @@ export const api = {
 
   // Fuel supply (Wave 5).
   getDepots: (): Promise<FuelDepot[]> => getJson<FuelDepot[]>('/depots'),
+  createDepot: (req: CreateDepotRequest): Promise<FuelDepot> =>
+    postJson<FuelDepot>('/depots', req),
   getFuelStocks: (): Promise<FuelStock[]> => getJson<FuelStock[]>('/fuel-stocks'),
   getSupplyOverview: (): Promise<SupplyOverview> => getJson<SupplyOverview>('/supply/overview'),
   createBuyOrder: (req: CreateBuyOrderRequest): Promise<BuyOrder> =>

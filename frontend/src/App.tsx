@@ -54,6 +54,7 @@ export default function App() {
   const { obstacles, placeObstacle, removeObstacle, mutateTile } = useObstacleOps()
   const [obstacleMode, setObstacleMode] = useState(false)
   const [obstacleKind, setObstacleKind] = useState<ObstacleKind>('minefield')
+  const [depotMode, setDepotMode] = useState(false)
 
   // Tiles merged with their latest live tile_update (threat/road/situation/etc.).
   const displayedTiles = useMemo(() => {
@@ -174,11 +175,26 @@ export default function App() {
     setSelectedUnitId(halted.instanceId)
   }, [halted, planning])
 
-  // Esc exits any active mode (planning / obstacle placement / selection).
+  // Manually place a fuel depot at a clicked point (v2 Wave 10 F6).
+  const placeDepot = useCallback(
+    (lat: number, lon: number) => {
+      api
+        .createDepot({ name: `FWD depot ${Math.round(lat * 1000) % 1000}`, lat, lon })
+        .then((d) => {
+          pushChatter(`Fuel depot placed: ${d.name}`, 'order')
+          supply.refetch()
+        })
+        .catch((e: unknown) => pushChatter(errorMessage(e), 'status'))
+    },
+    [pushChatter, supply],
+  )
+
+  // Esc exits any active mode (planning / obstacle placement / depot placement / selection).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
       setObstacleMode(false)
+      setDepotMode(false)
       clear()
     }
     window.addEventListener('keydown', onKey)
@@ -222,6 +238,15 @@ export default function App() {
             {obstacleMode ? '🚧 Obstacle mode: ON' : 'Obstacle mode'}
           </button>
         )}
+        {theater && canShow(role, 'depotOverlay') && (
+          <button
+            className={`mode-toggle${depotMode ? ' active' : ''}`}
+            data-testid="depot-mode-toggle"
+            onClick={() => setDepotMode((m) => !m)}
+          >
+            {depotMode ? '⛽ Add depot: ON' : 'Add depot'}
+          </button>
+        )}
         <span className="spacer" />
         <span className="attribution">{OSM_ATTRIBUTION}</span>
       </header>
@@ -242,6 +267,8 @@ export default function App() {
               activeRoutes={planning.activeRouteGeometries}
               obstacles={obstacles}
               obstacleMode={obstacleActive}
+              depotMode={depotMode && canShow(role, 'depotOverlay')}
+              onPlaceDepot={placeDepot}
               combatEvents={Object.values(combatEvents)}
               highlightEventId={highlightEventId}
               enemyUnits={enemyUnits}

@@ -84,6 +84,8 @@ export interface MapViewProps {
   onPickDestination: (lat: number, lon: number) => void
   onPlaceObstacle: (lat: number, lon: number) => void
   onRemoveObstacle: (id: string) => void
+  depotMode: boolean
+  onPlaceDepot: (lat: number, lon: number) => void
   onClearSelection: () => void
 }
 
@@ -559,6 +561,10 @@ function wireReadout(map: maplibregl.Map, el: HTMLElement): void {
 function wireInteraction(map: maplibregl.Map, propsRef: { current: MapViewProps }): void {
   map.on('click', (e) => {
     const p = propsRef.current
+    if (p.depotMode) {
+      p.onPlaceDepot(e.lngLat.lat, e.lngLat.lng)
+      return
+    }
     if (p.obstacleMode) {
       const hitObs = map.queryRenderedFeatures(e.point, { layers: ['obstacles'] })
       if (hitObs.length > 0) {

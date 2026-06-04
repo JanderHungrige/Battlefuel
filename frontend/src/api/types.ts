@@ -205,6 +205,13 @@ export interface UnitUpdate {
   reason?: 'blocked' | 'threat' // why the unit halted, set when status === 'halted' (Wave 10 F1)
 }
 
+/** Operator-placed fuel depot request (v2 Wave 10 F6). */
+export interface CreateDepotRequest {
+  name: string
+  lat: number
+  lon: number
+}
+
 /** An operator-placed obstacle the router avoids (blocks an H3 cell). */
 export interface Obstacle {
   id: string
