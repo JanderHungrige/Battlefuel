@@ -75,6 +75,44 @@ describe('api client', () => {
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).mode).toBe('hybrid')
   })
 
+  it('planWaypoints POSTs waypoints + mode (v2 Wave 10 F5)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [] })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await api.planWaypoints({
+      instance_id: 'inst-1',
+      waypoints: [
+        { lat: 49.2, lon: 11.8 },
+        { lat: 49.3, lon: 11.9 },
+      ],
+      mode: 'offroad',
+    })
+
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toMatch(/\/routes\/plan-waypoints$/)
+    const body = JSON.parse(init.body)
+    expect(body.waypoints).toHaveLength(2)
+    expect(body.mode).toBe('offroad')
+  })
+
+  it('createWaypointMoveOrder POSTs to /move-orders/waypoints (v2 Wave 10 F5)', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, status: 201, json: async () => ({ id: 'o1', status: 'pending' }) })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const order = await api.createWaypointMoveOrder({
+      instance_id: 'inst-1',
+      waypoints: [{ lat: 49.2, lon: 11.8 }],
+      metric: 'safe',
+    })
+
+    expect(order.id).toBe('o1')
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toMatch(/\/move-orders\/waypoints$/)
+    expect(JSON.parse(init.body).metric).toBe('safe')
+  })
+
   it('proceedMoveOrder POSTs to the proceed path with no body (v2 Wave 10 F4)', async () => {
     const fetchMock = vi
       .fn()

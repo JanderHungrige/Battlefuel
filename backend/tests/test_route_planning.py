@@ -150,3 +150,45 @@ class TestPlanRouteApi:
         finally:
             await client.aclose()
             await engine.dispose()
+
+    async def test_plan_waypoints_stitches_legs(self) -> None:
+        """F5 (Wave 10): a 2-waypoint route is stitched and is >= the direct one."""
+        try:
+            client, engine = await _client_and_engine()
+        except SQLAlchemyError as exc:
+            pytest.skip(f"database unavailable: {exc}")
+        try:
+            if not await _graph_ready(engine):
+                pytest.skip("routing graph empty — run build_routing_graph.sh")
+            direct = await client.post(
+                "/api/v1/routes/plan-waypoints",
+                json={"instance_id": "inst-armor-1", "waypoints": [{"lat": 49.20, "lon": 11.83}]},
+            )
+            via = await client.post(
+                "/api/v1/routes/plan-waypoints",
+                json={
+                    "instance_id": "inst-armor-1",
+                    "waypoints": [{"lat": 49.22, "lon": 11.86}, {"lat": 49.20, "lon": 11.83}],
+                },
+            )
+            assert direct.status_code == 200 and via.status_code == 200
+            assert len(via.json()[0]["geometry"]) >= 2
+            assert via.json()[0]["distance_m"] >= direct.json()[0]["distance_m"]
+        finally:
+            await client.aclose()
+            await engine.dispose()
+
+    async def test_plan_waypoints_empty_422(self) -> None:
+        try:
+            client, engine = await _client_and_engine()
+        except SQLAlchemyError as exc:
+            pytest.skip(f"database unavailable: {exc}")
+        try:
+            resp = await client.post(
+                "/api/v1/routes/plan-waypoints",
+                json={"instance_id": "inst-armor-1", "waypoints": []},
+            )
+            assert resp.status_code == 422
+        finally:
+            await client.aclose()
+            await engine.dispose()

@@ -7,7 +7,7 @@ status: complete
 depends_on: battlefuel-v2-wave-2
 demo_state: "Threat is drawn as MGRS squares at a per-event precision (IED/mine → 100 m, enemy-spotted → 1–2 km) from located + categorised combat events; red is reserved for combat zones and blocked areas read light-yellow, with category hover icons (drone / checkpoint / enemy-near). Chatter messages are tagged with their MGRS coordinate + sender and click-to-locate the square. Enemy units render as red NATO (APP-6 hostile) symbols from a seeded stub, and OF-8 depots show the correct NATO sustainment symbol with 4 diesel / 4 JP8 colour-coded fuel-fill bars."
 created: 2026-06-03
-hash: d7cd5b91
+hash: eaa3af50
 ---
 
 # Wave 3: MGRS-native Threat & Symbology
@@ -20,7 +20,7 @@ are tested together on dev. The branch `feat/battlefuel-v2-wave-3` stays unmerge
 - [x] **tested local** — `make dev`, combat symbology + MGRS-tagged chatter verified on localhost
   (incl. the two review fixes: sticky-highlight + threat-laydown snapshot on connect)
 - [x] **tested online** — verified on `:3001` together with Wave 9 (hex→MGRS), 2026-06-03
-- [ ] **merged into main / deployed in prod** — DEFERRED: follows the online test (needs approval)
+- [x] **merged into main / deployed in prod** — `:3000`, batched with W9 + W10(F1-F4), 2026-06-04 (approved)
 
 > Frontend prod-build caveat (from Wave 2): smoke-test the **minified** build (`vite preview` +
 > headless Chrome), not just `make dev` — dev is unminified and mocks `MapView`.

@@ -7,12 +7,14 @@ import type {
   CreateBuyOrderRequest,
   CreateMoveOrderRequest,
   CreateRefuelOrderRequest,
+  CreateWaypointMoveOrderRequest,
   EnemyUnit,
   FuelDepot,
   FuelStock,
   MoveOrder,
   Obstacle,
   PlanRouteRequest,
+  PlanWaypointsRequest,
   RefuelOrder,
   RouteOption,
   SupplyOverview,
@@ -72,8 +74,13 @@ export const api = {
   // Routing & movement (Wave 3).
   planRoute: (req: PlanRouteRequest): Promise<RouteOption[]> =>
     postJson<RouteOption[]>('/routes/plan', req),
+  // Plan fastest+safest through an ordered list of waypoints (v2 Wave 10 F5).
+  planWaypoints: (req: PlanWaypointsRequest): Promise<RouteOption[]> =>
+    postJson<RouteOption[]>('/routes/plan-waypoints', req),
   createMoveOrder: (req: CreateMoveOrderRequest): Promise<MoveOrder> =>
     postJson<MoveOrder>('/move-orders', req),
+  createWaypointMoveOrder: (req: CreateWaypointMoveOrderRequest): Promise<MoveOrder> =>
+    postJson<MoveOrder>('/move-orders/waypoints', req),
   confirmMoveOrder: (id: string): Promise<MoveOrder> =>
     postJson<MoveOrder>(`/move-orders/${id}/confirm`),
   cancelMoveOrder: (id: string): Promise<MoveOrder> =>

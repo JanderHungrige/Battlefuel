@@ -171,3 +171,108 @@ async def plan_routes(
         if opt is not None:
             options.append(opt)
     return options
+
+
+def stitch_paths(paths: list[RoutePath]) -> RoutePath | None:
+    """Concatenate ordered route legs into one path (v2 Wave 10, waypoint-routing).
+
+    Drops a leg's first point when it duplicates the previous leg's last (the shared waypoint),
+    sums distance/effective/fuel, takes the max threat and the distance-weighted average threat.
+    Returns None if there are no legs.
+    """
+    legs = [p for p in paths if p is not None]
+    if not legs:
+        return None
+    geometry: list[list[float]] = []
+    for leg in legs:
+        pts = leg.geometry
+        if geometry and pts and pts[0] == geometry[-1]:
+            pts = pts[1:]
+        geometry.extend([list(p) for p in pts])
+    distance = sum(p.distance_m for p in legs)
+    effective = sum(p.effective_distance_m for p in legs)
+    fuel = sum(p.fuel_distance_m for p in legs)
+    threat_avg = (
+        sum(p.threat_avg * p.distance_m for p in legs) / distance
+        if distance > 0
+        else max((p.threat_avg for p in legs), default=0.0)
+    )
+    return RoutePath(
+        metric=legs[0].metric,
+        geometry=geometry,
+        distance_m=distance,
+        effective_distance_m=effective,
+        fuel_distance_m=fuel,
+        threat_max=max(p.threat_max for p in legs),
+        threat_avg=threat_avg,
+        degraded=any(p.degraded for p in legs),
+    )
+
+
+def waypoint_provider_and_speed(
+    routing: RoutingProvider, unit_type: UnitType, mode: RouteMode
+) -> tuple[RoutingProvider, float]:
+    """Pick the router + speed for waypoint legs. road/hybrid use the injected road provider;
+    offroad/direct use their terrain router at off-road speed. (Per-leg hybrid best-of is not
+    applied for waypoint routes — they use roads where the operator did not force terrain.)"""
+    if mode is RouteMode.OFFROAD or mode is RouteMode.DIRECT:
+        return build_routing_provider_for_mode(mode), unit_type.movement.speed_offroad_kph
+    return routing, unit_type.movement.speed_road_kph
+
+
+async def plan_legs(
+    session: AsyncSession,
+    provider: RoutingProvider,
+    start_lat: float,
+    start_lon: float,
+    waypoints: list[tuple[float, float]],
+    metric: RouteMetric,
+) -> list[RoutePath] | None:
+    """Plan each leg start→wp1→…→wpN for one metric. None if any leg is unroutable."""
+    legs: list[RoutePath] = []
+    cur_lat, cur_lon = start_lat, start_lon
+    for wlat, wlon in waypoints:
+        leg = await provider.shortest_path(session, cur_lat, cur_lon, wlat, wlon, metric)
+        if leg is None:
+            return None
+        legs.append(leg)
+        cur_lat, cur_lon = wlat, wlon
+    return legs
+
+
+async def plan_waypoint_routes(
+    session: AsyncSession,
+    routing: RoutingProvider,
+    instance: UnitInstance,
+    unit_type: UnitType,
+    waypoints: list[tuple[float, float]],
+    *,
+    mode: RouteMode = RouteMode.ROAD,
+) -> list[RouteOption]:
+    """Fastest + safest options for a multi-leg waypoint route (v2 Wave 10, waypoint-routing)."""
+    if not waypoints:
+        return []
+    provider, speed_kph = waypoint_provider_and_speed(routing, unit_type, mode)
+    start_fuel = (
+        instance.current_fuel_liters
+        if instance.current_fuel_liters is not None
+        else unit_type.fuel.capacity_liters
+    )
+    options: list[RouteOption] = []
+    for metric, label in _METRICS:
+        legs = await plan_legs(session, provider, instance.lat, instance.lon, waypoints, metric)
+        if legs is None:
+            continue
+        stitched = stitch_paths(legs)
+        if stitched is None:
+            continue
+        options.append(
+            build_option(
+                stitched,
+                label=label,
+                speed_road_kph=speed_kph,
+                consumption_normal_lph=unit_type.fuel.consumption_normal_lph,
+                start_fuel_l=start_fuel,
+            )
+        )
+    return options

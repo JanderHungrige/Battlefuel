@@ -172,6 +172,25 @@ export interface CreateMoveOrderRequest {
   mode?: RouteMode // default 'road' on the backend (v2 Wave 10)
 }
 
+/** An operator-placed waypoint (v2 Wave 10 F5). */
+export interface WaypointInput {
+  lat: number
+  lon: number
+}
+
+export interface PlanWaypointsRequest {
+  instance_id: string
+  waypoints: WaypointInput[]
+  mode?: RouteMode
+}
+
+export interface CreateWaypointMoveOrderRequest {
+  instance_id: string
+  waypoints: WaypointInput[]
+  metric: RouteMetric
+  mode?: RouteMode
+}
+
 /** A live per-unit frame broadcast by the sim engine over the WebSocket (server→client). */
 export interface UnitUpdate {
   type: 'unit_update'

@@ -11,6 +11,11 @@ interface MoveRoutesPanelProps {
   selectedMetric: RouteMetric | null
   mode: RouteMode
   onSelectMode: (mode: RouteMode) => void
+  waypointMode: boolean
+  waypointCount: number
+  onStartRouting: () => void
+  onRemoveLastWaypoint: () => void
+  onEndRouting: () => void
   confirming: boolean
   onSelectOption: (metric: RouteMetric) => void
   onConfirm: () => void
@@ -85,6 +90,11 @@ export function MoveRoutesPanel({
   selectedMetric,
   mode,
   onSelectMode,
+  waypointMode,
+  waypointCount,
+  onStartRouting,
+  onRemoveLastWaypoint,
+  onEndRouting,
   confirming,
   onSelectOption,
   onConfirm,
@@ -111,6 +121,45 @@ export function MoveRoutesPanel({
             {m.label}
           </button>
         ))}
+      </div>
+
+      <div className="move-waypoints">
+        {!waypointMode ? (
+          <button
+            type="button"
+            className="wp-btn"
+            data-testid="wp-start"
+            onClick={onStartRouting}
+          >
+            Waypoint routing — start
+          </button>
+        ) : (
+          <>
+            <span className="wp-hint" data-testid="wp-count">
+              Click the map to add waypoints ({waypointCount})
+            </span>
+            <div className="wp-actions">
+              <button
+                type="button"
+                className="wp-btn"
+                data-testid="wp-remove"
+                disabled={waypointCount === 0}
+                onClick={onRemoveLastWaypoint}
+              >
+                Remove last waypoint
+              </button>
+              <button
+                type="button"
+                className="wp-btn"
+                data-testid="wp-end"
+                disabled={waypointCount === 0}
+                onClick={onEndRouting}
+              >
+                End routing
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {loading && <div className="status">Planning route…</div>}

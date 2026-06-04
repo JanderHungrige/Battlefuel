@@ -7,6 +7,7 @@ import { api } from '../api/client'
 import { errorMessage } from '../api/errors'
 import type {
   ChatterMessage,
+  MoveOrder,
   RouteMetric,
   RouteMode,
   RouteOption,
@@ -22,6 +23,12 @@ export interface MovePlanningState {
   setSelectedMetric: (m: RouteMetric) => void
   mode: RouteMode
   setMode: (m: RouteMode) => void
+  waypoints: { lat: number; lon: number }[]
+  waypointMode: boolean
+  startRouting: () => void
+  addWaypoint: (lat: number, lon: number) => void
+  removeLastWaypoint: () => void
+  endRouting: () => void
   planLoading: boolean
   planError: string | null
   confirming: boolean
@@ -42,6 +49,8 @@ export function useMovePlanning(
   const [routeOptions, setRouteOptions] = useState<RouteOption[]>([])
   const [selectedMetric, setSelectedMetric] = useState<RouteMetric | null>(null)
   const [mode, setModeState] = useState<RouteMode>('road')
+  const [waypoints, setWaypoints] = useState<{ lat: number; lon: number }[]>([])
+  const [waypointMode, setWaypointMode] = useState(false)
   const [planLoading, setPlanLoading] = useState(false)
   const [planError, setPlanError] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
@@ -68,6 +77,8 @@ export function useMovePlanning(
     setSelectedMetric(null)
     setPlanError(null)
     setPlanLoading(false)
+    setWaypoints([])
+    setWaypointMode(false)
   }, [])
 
   // Plan (or re-plan) the route to a destination with a given travel mode.
@@ -99,29 +110,100 @@ export function useMovePlanning(
     [selectedUnitId, planFor, mode],
   )
 
-  // Changing the travel mode re-plans the same destination so the operator sees the new routes.
+  // Re-plan the route through the waypoints clicked so far, so the line builds live on the map as
+  // each point is dropped (unit → wp1, then unit → wp1 → wp2, …). Keeps the operator's
+  // fastest/safest choice across re-plans.
+  const planWaypointPreview = useCallback(
+    (wps: { lat: number; lon: number }[], m: RouteMode) => {
+      if (!selectedUnitId || wps.length === 0) {
+        setRouteOptions([])
+        setSelectedMetric(null)
+        return
+      }
+      setPlanError(null)
+      setPlanLoading(true)
+      api
+        .planWaypoints({ instance_id: selectedUnitId, waypoints: wps, mode: m })
+        .then((opts) => {
+          setRouteOptions(opts)
+          setSelectedMetric((prev) => prev ?? opts[0]?.metric ?? null)
+        })
+        .catch((e: unknown) => setPlanError(errorMessage(e)))
+        .finally(() => setPlanLoading(false))
+    },
+    [selectedUnitId],
+  )
+
+  // Changing the travel mode re-plans live — the waypoint route if one is being built, else the
+  // single destination.
   const setMode = useCallback(
     (m: RouteMode) => {
       setModeState(m)
-      if (destination) planFor(destination.lat, destination.lon, m)
+      if (waypoints.length > 0) planWaypointPreview(waypoints, m)
+      else if (destination) planFor(destination.lat, destination.lon, m)
     },
-    [destination, planFor],
+    [destination, planFor, waypoints, planWaypointPreview],
   )
+
+  // Waypoint routing (v2 Wave 10 F5): Start → drop waypoints (route extends to each new point
+  // live) → (Remove last) → End → Confirm.
+  const startRouting = useCallback(() => {
+    setWaypointMode(true)
+    setWaypoints([])
+    setDestination(null)
+    setRouteOptions([])
+    setSelectedMetric(null)
+    setPlanError(null)
+    setModeState('direct') // waypoint legs draw as straight cross-country lines, unit→point→point
+  }, [])
+
+  const addWaypoint = useCallback(
+    (lat: number, lon: number) => {
+      if (!selectedUnitId) return
+      const next = [...waypoints, { lat, lon }]
+      setWaypoints(next)
+      planWaypointPreview(next, mode)
+    },
+    [selectedUnitId, waypoints, mode, planWaypointPreview],
+  )
+
+  const removeLastWaypoint = useCallback(() => {
+    const next = waypoints.slice(0, -1)
+    setWaypoints(next)
+    planWaypointPreview(next, mode)
+  }, [waypoints, mode, planWaypointPreview])
+
+  const endRouting = useCallback(() => {
+    setWaypointMode(false)
+    planWaypointPreview(waypoints, mode)
+  }, [waypoints, mode, planWaypointPreview])
 
   const confirmMove = useCallback(
     (onDone: () => void) => {
-      if (!selectedUnitId || !destination || !selectedMetric) return
-      setConfirming(true)
-      setPlanError(null)
-      const name = selectedUnitName ?? selectedUnitId
-      api
-        .createMoveOrder({
+      if (!selectedUnitId || !selectedMetric) return
+      const isWaypoint = waypoints.length > 0
+      let create: Promise<MoveOrder> | null = null
+      if (isWaypoint) {
+        create = api.createWaypointMoveOrder({
+          instance_id: selectedUnitId,
+          waypoints,
+          metric: selectedMetric,
+          mode,
+        })
+      } else if (destination) {
+        create = api.createMoveOrder({
           instance_id: selectedUnitId,
           dest_lat: destination.lat,
           dest_lon: destination.lon,
           metric: selectedMetric,
           mode,
         })
+      }
+      if (!create) return
+      setConfirming(true)
+      setPlanError(null)
+      const name = selectedUnitName ?? selectedUnitId
+      create
         .then((order) => api.confirmMoveOrder(order.id))
         .then((order) => {
           setActiveRoutes((prev) => ({ ...prev, [order.instance_id]: order.geometry }))
@@ -131,7 +213,7 @@ export function useMovePlanning(
         .catch((e: unknown) => setPlanError(errorMessage(e)))
         .finally(() => setConfirming(false))
     },
-    [selectedUnitId, selectedUnitName, destination, selectedMetric, mode, pushChatter],
+    [selectedUnitId, selectedUnitName, destination, selectedMetric, mode, waypoints, pushChatter],
   )
 
   return {
@@ -141,6 +223,12 @@ export function useMovePlanning(
     setSelectedMetric,
     mode,
     setMode,
+    waypoints,
+    waypointMode,
+    startRouting,
+    addWaypoint,
+    removeLastWaypoint,
+    endRouting,
     planLoading,
     planError,
     confirming,
