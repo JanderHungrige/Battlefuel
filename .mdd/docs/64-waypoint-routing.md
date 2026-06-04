@@ -37,7 +37,7 @@ path: Map/Movement
 integration_contracts: []
 satisfies_contracts: []
 known_issues:
-  - "The dropped waypoints are not yet rendered as markers on the map — the panel shows the count and the stitched route previews after 'End routing'. Waypoint-dot rendering is a live-gate polish item (MapView source/layer)."
+  - "The route builds live as each waypoint is dropped (re-planned through the points so far via planWaypointPreview), so the path is visible incrementally on the map. Individual waypoint dot markers are still not drawn — the live route line + the panel count convey the points; dedicated markers are optional polish."
   - "Hybrid waypoint routes use the road provider for every leg (no per-leg best-of road/off-road). offroad/direct waypoint routes use the terrain router. Per-leg hybrid fusion can follow."
 ---
 
