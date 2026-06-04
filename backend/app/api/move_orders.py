@@ -15,7 +15,7 @@ from app.providers.factory import build_unit_provider
 from app.providers.move_orders import MoveOrderProvider, build_move_order_provider
 from app.providers.routing import RoutingProvider, build_routing_provider
 from app.providers.unit_instances import UnitInstanceProvider, build_unit_instance_provider
-from app.services.move_order_service import create_move_order
+from app.services.move_order_service import create_move_order, create_move_order_waypoints
 
 router = APIRouter(tags=["move-orders"])
 
@@ -74,6 +74,50 @@ async def create_order(
     )
     if order is None:
         raise HTTPException(status_code=422, detail="no route to destination")
+    return order
+
+
+class Waypoint(BaseModel):
+    lat: float
+    lon: float
+
+
+class CreateWaypointMoveOrderRequest(BaseModel):
+    instance_id: str
+    waypoints: list[Waypoint]
+    metric: RouteMetric = RouteMetric.FAST
+    mode: RouteMode = RouteMode.ROAD
+
+
+@router.post("/move-orders/waypoints", status_code=201)
+async def create_waypoint_order(
+    req: CreateWaypointMoveOrderRequest,
+    session: SessionDep,
+    routing: RoutingDep,
+    instances: InstanceDep,
+    orders: OrderDep,
+) -> MoveOrder:
+    """Create a pending move order from an ordered waypoint route (v2 Wave 10, waypoint-routing)."""
+    if not req.waypoints:
+        raise HTTPException(status_code=422, detail="at least one waypoint is required")
+    instance = await instances.get_instance(session, req.instance_id)
+    if instance is None:
+        raise HTTPException(status_code=404, detail=f"unit instance {req.instance_id!r} not found")
+    unit_type = build_unit_provider().get_unit(instance.unit_type_id)
+    if unit_type is None:
+        raise HTTPException(status_code=409, detail=f"unit type {instance.unit_type_id!r} missing")
+    order = await create_move_order_waypoints(
+        session,
+        routing,
+        orders,
+        instance,
+        unit_type,
+        [(w.lat, w.lon) for w in req.waypoints],
+        req.metric,
+        mode=req.mode,
+    )
+    if order is None:
+        raise HTTPException(status_code=422, detail="no route through the given waypoints")
     return order
 
 
