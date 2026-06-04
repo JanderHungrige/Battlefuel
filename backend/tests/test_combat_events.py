@@ -79,9 +79,10 @@ class TestClassify:
         )
 
     def test_air_threat_is_graded_threat_at_2km(self) -> None:
-        assert classify(
-            "Threat Events", "Air threat detected (drone/fixed-wing/helo)", 4
-        ) == (2000, EventZone.THREAT)
+        assert classify("Threat Events", "Air threat detected (drone/fixed-wing/helo)", 4) == (
+            2000,
+            EventZone.THREAT,
+        )
 
     def test_hostile_spotted_is_threat_at_2km(self) -> None:
         assert classify("Threat Events", "Hostile unit spotted / identified", 3) == (
@@ -134,17 +135,13 @@ class TestDueCombatEvents:
 
 class TestCombatEventFeedFactory:
     def test_scripted_covers_all_three_zones(self) -> None:
-        provider = build_combat_event_feed_provider(
-            Settings(combat_event_feed_provider="scripted")
-        )
+        provider = build_combat_event_feed_provider(Settings(combat_event_feed_provider="scripted"))
         assert isinstance(provider, ScriptedCombatEventFeedProvider)
         zones = {classify(e.category, e.event, e.estimated_threat)[1] for e in provider.events()}
         assert zones == {EventZone.COMBAT, EventZone.BLOCKED, EventZone.THREAT}
 
     def test_scripted_ids_are_unique(self) -> None:
-        provider = build_combat_event_feed_provider(
-            Settings(combat_event_feed_provider="scripted")
-        )
+        provider = build_combat_event_feed_provider(Settings(combat_event_feed_provider="scripted"))
         ids = [e.id for e in provider.events()]
         assert len(ids) == len(set(ids))
 

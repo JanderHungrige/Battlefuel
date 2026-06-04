@@ -78,10 +78,7 @@ async def seed_fuel_supply(session: AsyncSession) -> int:
 
     # Best-effort: tag each depot's tile as a supply point (no-op if the tile row is absent).
     await session.execute(
-        text(
-            "UPDATE tiles SET situation = 'supply_point' "
-            "WHERE h3_index = ANY(:cells)"
-        ),
+        text("UPDATE tiles SET situation = 'supply_point' WHERE h3_index = ANY(:cells)"),
         {"cells": [r["h3_index"] for r in depot_rows]},
     )
 

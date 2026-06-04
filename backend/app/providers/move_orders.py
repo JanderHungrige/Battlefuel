@@ -86,9 +86,7 @@ class DbMoveOrderProvider(MoveOrderProvider):
         # ACTIVE and CROSSING orders are both advanced by the sim (a CROSSING order is crawling
         # across an obstruction the operator chose to push through).
         stmt = select(MoveOrderRow).where(
-            MoveOrderRow.status.in_(
-                [MoveOrderStatus.ACTIVE.value, MoveOrderStatus.CROSSING.value]
-            )
+            MoveOrderRow.status.in_([MoveOrderStatus.ACTIVE.value, MoveOrderStatus.CROSSING.value])
         )
         rows = (await session.execute(stmt)).scalars().all()
         return [_to_order(r) for r in rows]

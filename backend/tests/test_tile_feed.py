@@ -63,8 +63,10 @@ class TestFeedFactory:
     def test_scripted_provider_has_a_schedule(self) -> None:
         events = build_tile_feed_provider(Settings(tile_feed_provider="scripted")).events()
         assert len(events) >= 1
-        assert isinstance(build_tile_feed_provider(Settings(tile_feed_provider="scripted")),
-                          ScriptedTileFeedProvider)
+        assert isinstance(
+            build_tile_feed_provider(Settings(tile_feed_provider="scripted")),
+            ScriptedTileFeedProvider,
+        )
 
     def test_none_provider_is_empty(self) -> None:
         provider = build_tile_feed_provider(Settings(tile_feed_provider="none"))
