@@ -5,7 +5,7 @@ initiative: battlefuel-v2
 initiative_version: 5
 status: planned
 depends_on: battlefuel-v2-wave-10
-demo_state: "In the OF-8 Joint-Force Supply view the operator orders fuel end-to-end: pick a fuel-management platform (World Fuel DFMS default / Shell FM / add new), hit 'Order fuel' (renamed from Buy fuel) to open a branded order mask with fuel type / destination / amount prefilled, tick who to inform (JLSG, JTF HQ), and Place order — posting a confirmation + an entry in a new Order History panel that tracks each order through the NATO stages (placed -> JLSG -> JTF -> provider -> on route -> reached JLSG -> reached OPCON). The initial main-supply-point order dropdown is populated (bug fixed). Supply points are clickable to locate on the map; the operator can add typed logistic sites (BSA / CSSBN / DOB / FLS / TLB). Refuel is started by clicking a unit. On the map in OF-8, each unit shows a colour-coded fuel bar + an ammo bar (selected unit on top), toggleable via an on-map-info-bars selector. An Info Docs tab surfaces the official PDFs."
+demo_state: "In the OF-8 Joint-Force Supply view the operator orders fuel end-to-end: pick a fuel-management platform (World Fuel DFMS default / Shell FM / add new), hit 'Order fuel' (renamed from Buy fuel) to open a branded order mask with fuel type / destination / amount prefilled, tick who to inform (JLSG, JTF HQ), and Place order — posting a confirmation + an entry in a new Order History panel that tracks each order through the NATO stages (placed -> JLSG -> JTF -> provider -> on route -> reached JLSG -> reached OPCON). The initial main-supply-point order dropdown is populated (bug fixed). Supply points are clickable to locate on the map; the operator can add typed logistic sites (BSA / CSSBN / DOB / FLS / TLB) that carry fuel stock and can be refueled — and when a site runs low it proposes a refuel/redistribution order. Refuel is started by clicking a unit. On the map in OF-8, each unit shows a colour-coded fuel bar (selected unit on top), toggleable via an on-map-info-bars selector. An Info Docs tab surfaces the official PDFs from the folder. Order status auto-advances on the sim clock (30 s per stage)."
 created: 2026-06-05
 hash:
 ---
@@ -56,39 +56,42 @@ Build order: 1 → 2 → 3 → 4 (the order-fuel chain); 5, 6, 7, 8 are independ
 - **F4 order-history-panel** — a **"Order history" button** on the Joint-Force Supply panel opens a
   panel listing **all historic + current orders + status**, tracking each through stages:
   **order placed → confirmed by JLSG → confirmed by JTF → confirmed by Fuel Provider → Fuel on
-  route → Fuel reached JLSG → Fuel reached OPCON**.
+  route → Fuel reached JLSG → Fuel reached OPCON**. Status **auto-advances on the sim clock at
+  30 game-seconds per stage** (deterministic, clock-driven; the order history persists).
 - **F5 logistic-sites** — make supply points (Main supply point, …) **clickable to mark/locate on
   the map**. Allow **adding typed logistic sites** (extends W10 add-depot) with NATO JLSG types
   from *AJP-4.6* (Fig 2.1 / ch.3): **BSA** (Brigade Support Area), **CSSBN** (LCC Combat Service
   Support Battalion), **DOB** (Deployable Operating Base, ACC), **FLS** (Forward Logistic Site,
-  MCC), **TLB** (Theatre Logistic Base).
+  MCC), **TLB** (Theatre Logistic Base). **Sites carry fuel stock** (depot-like `FuelStock`) and
+  **can be refueled** (receive a buy/transfer); **when a site runs low it proposes a
+  refuel/redistribution order** — reuse the Wave-6 redistribution optimizer/advisor to generate the
+  proposal. (This grows the W10 add-depot from a bare marker into a stocked, typed, advisable site.)
 - **F6 refuel-by-unit-click** — in OF-8, **click a unit** to start its refuel flow (entry point in
   addition to the existing refuel panel).
-- **F7 of8-on-map-info-bars** — in OF-8, draw **info bars next to each unit** (like the depot
-  gauges): **one colour-coded fuel bar** + **one ammo bar**. Overlapping bars for nearby units →
-  render the **selected unit's bars on top**. Add a **radio/toggle to enable/disable the on-map
-  info bars**.
-- **F8 official-docs-tab** — an **"Info docs" tab** that lists/opens the PDFs from the
-  **`Official logistic documents/`** folder (note: it also contains non-logistics docs — show all,
-  ideally grouped).
+- **F7 of8-on-map-info-bars** — in OF-8, draw a **single colour-coded fuel bar next to each unit**
+  (like the depot gauges). **Ammo is dropped** (requester 2026-06-05) — fuel only. Overlapping bars
+  for nearby units → render the **selected unit's bar on top**. Add a **radio/toggle to
+  enable/disable the on-map info bars**.
+- **F8 official-docs-tab** — an **"Info docs" tab** that lists/opens **the PDFs from the
+  `Official logistic documents/` folder** (confirmed: include them all; the folder also has
+  non-logistics docs — show all, grouped). The PDFs are committed + served statically.
 
-## Open Research / decisions to confirm at plan-execute
-- **Ammo data** — units have no ammo attribute today. F7's ammo bar needs a (seeded/fake) ammo
-  level on the unit/instance model + provider; confirm source + whether it's persisted.
-- **Shell FM logo asset** — only `World-Fuel-Services-Logo.png` + `eraneos_…` exist in
-  `company Logos/`. Need a Shell FM logo (or a text/placeholder badge) for F2/F3 branding.
-- **Order status state machine** — the orders are faked; decide whether the 7 stages advance on a
-  timer/sim-clock (auto-progress) or are demo-stepped, and whether the order history persists
-  (backend table) or is frontend session state. Existing `buy_orders` (W5) likely renames/extends
-  to "order fuel".
-- **PDF serving** — `Official logistic documents/` is currently untracked; the PDFs must be
-  committed + served statically (frontend `public/` or a backend static route). Confirm which PDFs
-  ship and the size/licensing.
-- **Logistic-site semantics** — are typed sites (BSA/CSSBN/…) just placed markers with the NATO
-  symbol + type label (extending depots), or do they carry stock / affect supply/routing? Default
-  assumption: typed supply markers extending the W10 depot model.
-- **Overlap with original W4/W5** — W5 covers tiles/panels + the request-data redesign; this wave
-  takes the OF-8 fuel-order + refuel-click + optics. Keep panels coordinated so W5 doesn't re-do
-  the supply panel.
-- **"inform JLSG/JTF HQ"** — does ticking these just annotate the order / history, or also emit a
-  chatter/strategic message? Default: annotate the order + a chatter line.
+## Resolved decisions (requester, 2026-06-05)
+- **Ammo — DROPPED.** F7 is the fuel bar only; no ammo bar / no ammo model.
+- **Shell FM logo — will be provided** by the requester (drop into `company Logos/`); World Fuel +
+  Eraneos already present.
+- **Order status — sim-clock timer, 30 game-seconds per stage** (auto-advance through the 7
+  stages); order history **persists** (extend the existing `buy_orders` model/flow → "order fuel").
+- **PDFs — include them all** from `Official logistic documents/` (logistics + non-logistics);
+  commit them and serve statically (frontend `public/` or a backend static route).
+- **Logistic sites — carry stock + refuelable.** Typed sites are **stocked depots** (reuse
+  `FuelStock`); they can receive fuel (buy/transfer), and **a low-fuel site proposes a
+  refuel/redistribution order** via the Wave-6 redistribution advisor.
+
+## Open Research (residual — confirm at plan-execute)
+- **Low-fuel threshold** for the redistribution proposal (e.g. % of capacity) and whether the
+  proposal is auto-surfaced (chatter/advisor) or on-demand.
+- **"inform JLSG/JTF HQ"** — annotate the order/history only, or also emit a chatter line? (default:
+  annotate + chatter.)
+- **Overlap with original W4/W5** — keep the OF-8 supply panel coordinated so W5 (request-data /
+  panels) doesn't re-do it.
