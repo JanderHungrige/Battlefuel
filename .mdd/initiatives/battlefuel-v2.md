@@ -2,8 +2,8 @@
 id: battlefuel-v2
 title: BattleFuel v2 — Combat UX, Routing, Scenarios & Onboarding
 status: planned
-version: 4
-hash: 3d80c32a
+version: 5
+hash: 87166ac0
 created: 2026-06-02
 ---
 
@@ -74,6 +74,7 @@ pass — track them as a checklist **in each wave doc** (not here — this is th
 | Wave 8 | waves/battlefuel-v2-wave-8.md | Landing page (Eraneos + World Fuel branding from `company Logos/`, product pitch) plus a technical data-integration section explaining the DB/data model, expected columns/types, and how to add a new source (Excel connector / mapping table). Login deferred to TODO.md. | planned |
 | Wave 9 | waves/battlefuel-v2-wave-9.md | MGRS-native inspection (retire the hex tile from the UX): clicking selects the MGRS cell at the current precision and the panel shows its MGRS coordinate + aggregated situation (highest/last threat, terrain mix, road, intel, units-in-cell), with no hex/H3 vocabulary in the UI; aggregation runs client-side from live tile data; the backend MGRS-cell data layer is deferred to a future data wave; terrain routing stays on H3. | complete |
 | Wave 10 | waves/battlefuel-v2-wave-10.md | Routing & movement overhaul (absorbs Wave 6): a unit always reaches its destination and never freezes — Safe (route around threat, cross only if no alternative) vs Fast (shortest, crosses at a penalty) posture + a road/off-road/hybrid/direct travel mode (off-road carries a speed+fuel penalty); bold primary + lighter alternative routes with duration/fuel/threat and a warning when crossing a threat-level-5 sector; smooth small movement ticks; waypoint routing (Start → set points → Remove last → End → Confirm); hand-draw a passage the engine uses; add fuel depots; remove manual obstacles; Esc exits any mode; unit-symbol centre = route start. | complete |
+| Wave 11 | waves/battlefuel-v2-wave-11.md | OF-8 fuel ordering & supply UX (immediate, 2026-06-05): order fuel (renamed from buy) with a fuel-management-platform selector (World Fuel DFMS default / Shell FM / add new) + a faked branded order mask (prefilled, inform JLSG/JTF HQ, Place order); Order History panel tracking the NATO stages (placed->JLSG->JTF->provider->on route->reached JLSG->reached OPCON); fix the initial main-supply-point empty-dropdown bug; clickable supply points + add typed logistic sites (BSA/CSSBN/DOB/FLS/TLB, AJP-4.6); refuel-by-unit-click; OF-8 on-map per-unit fuel + ammo bars (selected on top, toggleable); Official Info Docs tab. | planned |
 | Advanced | waves/battlefuel-v2-advanced.md | 3D terrain elevation on the map with an on/off switch (offline DEM). | planned |
 
 > Item→wave traceability for every line of the original request is kept in
