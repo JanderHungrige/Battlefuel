@@ -5,7 +5,13 @@
 import { useCallback, useMemo, useState } from 'react'
 import { api } from '../api/client'
 import { errorMessage } from '../api/errors'
-import type { ChatterMessage, RouteMetric, RouteOption, UnitUpdate } from '../api/types'
+import type {
+  ChatterMessage,
+  RouteMetric,
+  RouteMode,
+  RouteOption,
+  UnitUpdate,
+} from '../api/types'
 
 type PushChatter = (text: string, kind?: ChatterMessage['kind'], h3Index?: string) => void
 
@@ -14,6 +20,8 @@ export interface MovePlanningState {
   routeOptions: RouteOption[]
   selectedMetric: RouteMetric | null
   setSelectedMetric: (m: RouteMetric) => void
+  mode: RouteMode
+  setMode: (m: RouteMode) => void
   planLoading: boolean
   planError: string | null
   confirming: boolean
@@ -33,6 +41,7 @@ export function useMovePlanning(
   const [destination, setDestination] = useState<{ lat: number; lon: number } | null>(null)
   const [routeOptions, setRouteOptions] = useState<RouteOption[]>([])
   const [selectedMetric, setSelectedMetric] = useState<RouteMetric | null>(null)
+  const [mode, setModeState] = useState<RouteMode>('road')
   const [planLoading, setPlanLoading] = useState(false)
   const [planError, setPlanError] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
@@ -61,16 +70,16 @@ export function useMovePlanning(
     setPlanLoading(false)
   }, [])
 
-  const pickDestination = useCallback(
-    (lat: number, lon: number) => {
+  // Plan (or re-plan) the route to a destination with a given travel mode.
+  const planFor = useCallback(
+    (lat: number, lon: number, m: RouteMode) => {
       if (!selectedUnitId) return
-      setDestination({ lat, lon })
       setRouteOptions([])
       setSelectedMetric(null)
       setPlanError(null)
       setPlanLoading(true)
       api
-        .planRoute({ instance_id: selectedUnitId, dest_lat: lat, dest_lon: lon })
+        .planRoute({ instance_id: selectedUnitId, dest_lat: lat, dest_lon: lon, mode: m })
         .then((opts) => {
           setRouteOptions(opts)
           setSelectedMetric(opts[0]?.metric ?? null)
@@ -79,6 +88,24 @@ export function useMovePlanning(
         .finally(() => setPlanLoading(false))
     },
     [selectedUnitId],
+  )
+
+  const pickDestination = useCallback(
+    (lat: number, lon: number) => {
+      if (!selectedUnitId) return
+      setDestination({ lat, lon })
+      planFor(lat, lon, mode)
+    },
+    [selectedUnitId, planFor, mode],
+  )
+
+  // Changing the travel mode re-plans the same destination so the operator sees the new routes.
+  const setMode = useCallback(
+    (m: RouteMode) => {
+      setModeState(m)
+      if (destination) planFor(destination.lat, destination.lon, m)
+    },
+    [destination, planFor],
   )
 
   const confirmMove = useCallback(
@@ -93,6 +120,7 @@ export function useMovePlanning(
           dest_lat: destination.lat,
           dest_lon: destination.lon,
           metric: selectedMetric,
+          mode,
         })
         .then((order) => api.confirmMoveOrder(order.id))
         .then((order) => {
@@ -103,7 +131,7 @@ export function useMovePlanning(
         .catch((e: unknown) => setPlanError(errorMessage(e)))
         .finally(() => setConfirming(false))
     },
-    [selectedUnitId, selectedUnitName, destination, selectedMetric, pushChatter],
+    [selectedUnitId, selectedUnitName, destination, selectedMetric, mode, pushChatter],
   )
 
   return {
@@ -111,6 +139,8 @@ export function useMovePlanning(
     routeOptions,
     selectedMetric,
     setSelectedMetric,
+    mode,
+    setMode,
     planLoading,
     planError,
     confirming,

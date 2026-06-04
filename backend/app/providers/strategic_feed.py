@@ -44,12 +44,8 @@ _SCRIPTED: tuple[StrategicEvent, ...] = (
     StrategicEvent(
         180.0, "INTEL: interdiction expected on northern MSR — expect demand spikes.", "intel"
     ),
-    StrategicEvent(
-        360.0, "SUSTAINMENT: corps approves emergency fuel buy authority.", "logistics"
-    ),
-    StrategicEvent(
-        600.0, "OPS: prioritize refuel of forward armor before next phase line.", "ops"
-    ),
+    StrategicEvent(360.0, "SUSTAINMENT: corps approves emergency fuel buy authority.", "logistics"),
+    StrategicEvent(600.0, "OPS: prioritize refuel of forward armor before next phase line.", "ops"),
 )
 
 

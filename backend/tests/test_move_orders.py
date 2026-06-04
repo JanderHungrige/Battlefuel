@@ -102,3 +102,67 @@ class TestMoveOrders:
         finally:
             await client.aclose()
             await engine.dispose()
+
+
+@pytest.mark.db
+class TestProceedSlowly:
+    """F1 (Wave 10, doc 60): the operator opts a HALTED order into 'proceed slowly' — it
+    flips to 'crossing' and the sim crawls it across the obstruction. RED until F1 is built.
+    """
+
+    async def _create_and_confirm(self, client: AsyncClient) -> str:
+        created = await client.post("/api/v1/move-orders", json=_BODY)
+        assert created.status_code == 201
+        oid: str = created.json()["id"]
+        await client.post(f"/api/v1/move-orders/{oid}/confirm")
+        return oid
+
+    async def test_proceed_on_halted_order_sets_crossing(self) -> None:
+        try:
+            client, engine, maker = await _client_and_engine()
+        except SQLAlchemyError as exc:
+            pytest.skip(f"database unavailable: {exc}")
+        try:
+            if not await _graph_ready(maker):
+                pytest.skip("routing graph empty — run build_routing_graph.sh")
+            oid = await self._create_and_confirm(client)
+            # Force the order into 'halted' (as the sim would on hitting a block).
+            async with maker() as s:
+                await s.execute(
+                    text("UPDATE move_orders SET status='halted' WHERE id=:id"), {"id": oid}
+                )
+                await s.commit()
+
+            resp = await client.post(f"/api/v1/move-orders/{oid}/proceed")
+            assert resp.status_code == 200
+            assert resp.json()["status"] == "crossing"
+        finally:
+            await client.aclose()
+            await engine.dispose()
+
+    async def test_proceed_on_active_order_409(self) -> None:
+        try:
+            client, engine, maker = await _client_and_engine()
+        except SQLAlchemyError as exc:
+            pytest.skip(f"database unavailable: {exc}")
+        try:
+            if not await _graph_ready(maker):
+                pytest.skip("routing graph empty — run build_routing_graph.sh")
+            oid = await self._create_and_confirm(client)  # status == active
+            resp = await client.post(f"/api/v1/move-orders/{oid}/proceed")
+            assert resp.status_code == 409  # only a halted order can proceed-slowly
+        finally:
+            await client.aclose()
+            await engine.dispose()
+
+    async def test_proceed_unknown_order_404(self) -> None:
+        try:
+            client, engine, _ = await _client_and_engine()
+        except SQLAlchemyError as exc:
+            pytest.skip(f"database unavailable: {exc}")
+        try:
+            resp = await client.post("/api/v1/move-orders/does-not-exist/proceed")
+            assert resp.status_code == 404
+        finally:
+            await client.aclose()
+            await engine.dispose()

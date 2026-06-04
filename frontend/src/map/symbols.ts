@@ -16,3 +16,10 @@ export function sidcToImage(sidc: string, size = 28): SymbolImage | null {
   if (ctx === null || canvas.width === 0 || canvas.height === 0) return null
   return { data: ctx.getImageData(0, 0, canvas.width, canvas.height), width: canvas.width, height: canvas.height }
 }
+
+/** The raw milsymbol canvas for a SIDC, for compositing into a larger icon (e.g. depot + bars). */
+export function sidcToCanvas(sidc: string, size = 26): HTMLCanvasElement | null {
+  if (!sidc) return null
+  const canvas = new ms.Symbol(sidc, { size }).asCanvas() as HTMLCanvasElement
+  return canvas.width > 0 && canvas.height > 0 ? canvas : null
+}

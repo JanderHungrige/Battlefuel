@@ -2,8 +2,8 @@
 id: battlefuel-v2
 title: BattleFuel v2 — Combat UX, Routing, Scenarios & Onboarding
 status: planned
-version: 2
-hash: c75041f0
+version: 4
+hash: 2db689cf
 created: 2026-06-02
 ---
 
@@ -66,13 +66,21 @@ pass — track them as a checklist **in each wave doc** (not here — this is th
 |------|------|------------|--------|
 | Wave 1 | waves/battlefuel-v2-wave-1.md | Routing engine fixed + extended: a unit reliably routes to a destination and traverses it (no "no route" / no back-and-forth / no stall), AND a new full terrain (off-road / by-foot) router lets units move cross-country with terrain cost, not just on roads. | complete |
 | Wave 2 | waves/battlefuel-v2-wave-2.md | Map foundations: a lighter classic offline style (no legend), the whole map framed in the viewport with crisp non-overlapping hexes, accent recoloured cyan→#FFD9BD, selected unit in a darker blue, and a selectable grid layout — MGRS grid (default, drawn 100km–100m / 1km default, readout to 1m) ↔ H3 hex grid. | complete |
-| Wave 3 | waves/battlefuel-v2-wave-3.md | MGRS-native threat & symbology: **threat rendered as MGRS squares at a per-event precision** (event type → grid size, e.g. IED/mine→100 m, enemy spotted→1–2 km), driven by located+categorised events (CSV catalog categories), with **chatter messages tagged with their MGRS coordinate**; red reserved for combat zones, blocked areas light-yellow, hover icons (drone/checkpoint/enemy-near…); enemy units in red NATO symbols; OF-8 depots use the correct NATO symbol + 4 diesel/4 JP8 colour-coded fuel bars. (Needs a backend event-model change: events carry category + location + precision; coordinate with the Wave-4 chatter/CSV overhaul.) | planned |
+| Wave 3 | waves/battlefuel-v2-wave-3.md | MGRS-native threat & symbology: **threat rendered as MGRS squares at a per-event precision** (event type → grid size, e.g. IED/mine→100 m, enemy spotted→1–2 km), driven by located+categorised events (CSV catalog categories), with **chatter messages tagged with their MGRS coordinate**; red reserved for combat zones, blocked areas light-yellow, hover icons (drone/checkpoint/enemy-near…); enemy units in red NATO symbols; OF-8 depots use the correct NATO symbol + 4 diesel/4 JP8 colour-coded fuel bars. (Needs a backend event-model change: events carry category + location + precision; coordinate with the Wave-4 chatter/CSV overhaul.) | complete |
 | Wave 4 | waves/battlefuel-v2-wave-4.md | Events/chatter overhaul: catalog from combat_zone_events.csv; messages as "location – headline"; configurable arrival rate (default ≤1/15s); click-to-expand detail (heading, sector, est. threat, sender); supply/threat highlight toggles (yellow/red/adjustable threshold); supply events → advisor → create order; obstacle mode uses the same list via dropdown+search. | planned |
 | Wave 5 | waves/battlefuel-v2-wave-5.md | Tiles & panels: tile click shows last+highest threat, intel button (all tile messages), units-in-tile; tile panel persistent + updates on route-point click; Unit Overview tab (area, threat, fuel, orders) with click-to-locate; unit-overview and advisor panels no longer overlap; the request-data flow rebuilt (fix the dead button → manual entry + request → async values via chatter → apply, status "update requested: <ts>" + re-request). | planned |
-| Wave 6 | waves/battlefuel-v2-wave-6.md | Routing/movement UX (engine from Wave 1): Esc exits the current mode; smaller movement ticks; multiple routes (primary bold + lighter alternatives); manual route planning with fuel results; precise free-waypoint vs move-to-area modes; on/off road choice surfaced in the UI; remove manually-added obstacles; manually add fuel depots. | planned |
+| Wave 6 | waves/battlefuel-v2-wave-6.md | Routing/movement UX (engine from Wave 1): Esc exits the current mode; smaller movement ticks; multiple routes (primary bold + lighter alternatives); manual route planning with fuel results; precise free-waypoint vs move-to-area modes; on/off road choice surfaced in the UI; remove manually-added obstacles; manually add fuel depots. | superseded → Wave 10 |
 | Wave 7 | waves/battlefuel-v2-wave-7.md | Scenario builder: build and save a custom start setting — place units, set their attributes, and reload the saved scenario. | planned |
 | Wave 8 | waves/battlefuel-v2-wave-8.md | Landing page (Eraneos + World Fuel branding from `company Logos/`, product pitch) plus a technical data-integration section explaining the DB/data model, expected columns/types, and how to add a new source (Excel connector / mapping table). Login deferred to TODO.md. | planned |
+| Wave 9 | waves/battlefuel-v2-wave-9.md | MGRS-native inspection (retire the hex tile from the UX): clicking selects the MGRS cell at the current precision and the panel shows its MGRS coordinate + aggregated situation (highest/last threat, terrain mix, road, intel, units-in-cell), with no hex/H3 vocabulary in the UI; aggregation runs client-side from live tile data; the backend MGRS-cell data layer is deferred to a future data wave; terrain routing stays on H3. | complete |
+| Wave 10 | waves/battlefuel-v2-wave-10.md | Routing & movement overhaul (absorbs Wave 6): a unit always reaches its destination and never freezes — Safe (route around threat, cross only if no alternative) vs Fast (shortest, crosses at a penalty) posture + a road/off-road/hybrid/direct travel mode (off-road carries a speed+fuel penalty); bold primary + lighter alternative routes with duration/fuel/threat and a warning when crossing a threat-level-5 sector; smooth small movement ticks; waypoint routing (Start → set points → Remove last → End → Confirm); hand-draw a passage the engine uses; add fuel depots; remove manual obstacles; Esc exits any mode; unit-symbol centre = route start. | planned |
 | Advanced | waves/battlefuel-v2-advanced.md | 3D terrain elevation on the map with an on/off switch (offline DEM). | planned |
 
 > Item→wave traceability for every line of the original request is kept in
 > `.mdd/docs/` once each wave is planned; this table is the index.
+
+> **Build-order resequencing (2026-06-03, requester):** after Wave 3, build **Wave 9
+> (hex→MGRS inspection)** next, then the **routing/movement overhaul** (**Wave 10**, now
+> planned — fixes unit-stall-on-blocked-tile and absorbs the whole of Wave 6, which is therefore
+> `superseded`), then the original **W4–W8**. The wave *numbers* are creation ids, not build
+> order — `Status` tracks what's done.

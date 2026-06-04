@@ -3,7 +3,19 @@
 
 import type { FeatureCollection } from 'geojson'
 import { cellToLatLng } from 'h3-js'
-import type { BBox, FuelDepot, Obstacle, TerrainType, Tile, UnitInstance } from '../api/types'
+import type {
+  BBox,
+  CombatEvent,
+  DepotFuel,
+  EnemyUnit,
+  Obstacle,
+  TerrainType,
+  Tile,
+  UnitInstance,
+} from '../api/types'
+import { depotIconKey } from './depotSymbol'
+import { iconForEvent } from './eventIcons'
+import { cellIdFor, squareCornersFromCenter } from './mgrsGrid'
 
 // Light classic terrain tints — soft, distinct fills that read on the parchment basemap (45).
 export const TERRAIN_COLORS: Record<TerrainType, string> = {
@@ -81,6 +93,80 @@ export function unitsToGeoJSON(
   }
 }
 
+/**
+ * Located combat events → Polygon FeatureCollection, one MGRS-grid-aligned square per event at its
+ * `precision_m` (v2 Wave 3, threat-mgrs-squares). Properties carry `zone` + `estimated_threat` for
+ * styling and `category`/`event`/`sender` for the F3 hover / F4 chatter consumers.
+ */
+export function combatEventsToGeoJSON(events: CombatEvent[]): FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: events.map((ev) => ({
+      type: 'Feature',
+      geometry: {
+        type: 'Polygon',
+        coordinates: [squareCornersFromCenter(ev.lat, ev.lon, ev.precision_m)],
+      },
+      properties: {
+        id: ev.id,
+        zone: ev.zone,
+        estimated_threat: ev.estimated_threat,
+        category: ev.category,
+        event: ev.event,
+        sender: ev.sender,
+        precision_m: ev.precision_m,
+        icon: iconForEvent(ev.category, ev.event).key,
+      },
+    })),
+  }
+}
+
+/**
+ * Enemy units → point FeatureCollection carrying the hostile APP-6 SIDC (v2 Wave 3). Rendered red
+ * by milsymbol via the same icon pipeline as friendly units, on a separate (non-orderable) layer.
+ */
+export function enemyUnitsToGeoJSON(enemies: EnemyUnit[]): FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: enemies.map((e) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [e.lon, e.lat] },
+      properties: { id: e.id, name: e.name, sidc: e.sidc, echelon: e.echelon },
+    })),
+  }
+}
+
+/**
+ * Ambient threat as shaded MGRS cells (v2 Wave 9, mgrs-threat-shading) — replaces the hex threat
+ * wash. Groups tiles by their MGRS cell at `precisionM`, takes each cell's max threat, and emits one
+ * square Polygon per cell with `threat > 0` (carrying `threat` for the opacity ramp).
+ */
+export function cellThreatToGeoJSON(tiles: Tile[], precisionM: number): FeatureCollection {
+  const cells = new Map<string, { lat: number; lon: number; threat: number }>()
+  for (const t of tiles) {
+    const id = cellIdFor(t.center_lat, t.center_lon, precisionM)
+    const prev = cells.get(id)
+    if (prev === undefined) {
+      cells.set(id, { lat: t.center_lat, lon: t.center_lon, threat: t.threat_level })
+    } else if (t.threat_level > prev.threat) {
+      prev.threat = t.threat_level
+    }
+  }
+  return {
+    type: 'FeatureCollection',
+    features: [...cells.values()]
+      .filter((c) => c.threat > 0)
+      .map((c) => ({
+        type: 'Feature',
+        geometry: {
+          type: 'Polygon',
+          coordinates: [squareCornersFromCenter(c.lat, c.lon, precisionM)],
+        },
+        properties: { threat: c.threat },
+      })),
+  }
+}
+
 /** Obstacles → point FeatureCollection at each blocked cell's center. */
 export function obstaclesToGeoJSON(obstacles: Obstacle[]): FeatureCollection {
   return {
@@ -96,14 +182,18 @@ export function obstaclesToGeoJSON(obstacles: Obstacle[]): FeatureCollection {
   }
 }
 
-/** Fuel depots → point FeatureCollection at each depot's location. */
-export function depotsToGeoJSON(depots: FuelDepot[]): FeatureCollection {
+/**
+ * Fuel depots → point FeatureCollection. Each feature references a composited icon (NATO sustainment
+ * symbol + per-fuel gauges) by a fill-encoded key, so MapView can register/look up the right image
+ * (v2 Wave 3, depot-nato-symbol-fuelbars).
+ */
+export function depotsToGeoJSON(depots: DepotFuel[]): FeatureCollection {
   return {
     type: 'FeatureCollection',
     features: depots.map((d) => ({
       type: 'Feature',
-      geometry: { type: 'Point', coordinates: [d.lon, d.lat] },
-      properties: { id: d.id, name: d.name },
+      geometry: { type: 'Point', coordinates: [d.depot.lon, d.depot.lat] },
+      properties: { id: d.depot.id, name: d.depot.name, icon: depotIconKey(d) },
     })),
   }
 }

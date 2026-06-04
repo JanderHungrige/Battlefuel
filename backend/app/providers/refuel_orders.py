@@ -81,9 +81,7 @@ class DbRefuelOrderProvider(RefuelOrderProvider):
         return [_to_order(r) for r in rows]
 
     async def list_active(self, session: AsyncSession) -> Sequence[RefuelOrder]:
-        stmt = select(RefuelOrderRow).where(
-            RefuelOrderRow.status == RefuelOrderStatus.ACTIVE.value
-        )
+        stmt = select(RefuelOrderRow).where(RefuelOrderRow.status == RefuelOrderStatus.ACTIVE.value)
         rows = (await session.execute(stmt)).scalars().all()
         return [_to_order(r) for r in rows]
 

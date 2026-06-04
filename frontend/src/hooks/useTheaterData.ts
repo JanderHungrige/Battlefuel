@@ -3,7 +3,7 @@
 
 import { type Dispatch, type SetStateAction, useEffect, useState } from 'react'
 import { api } from '../api/client'
-import type { Theater, Tile, UnitInstance, UnitType } from '../api/types'
+import type { EnemyUnit, Theater, Tile, UnitInstance, UnitType } from '../api/types'
 
 export interface TheaterData {
   theater: Theater | null
@@ -11,6 +11,7 @@ export interface TheaterData {
   units: UnitInstance[]
   setUnits: Dispatch<SetStateAction<UnitInstance[]>>
   unitTypes: UnitType[]
+  enemyUnits: EnemyUnit[]
   error: string | null
 }
 
@@ -19,17 +20,25 @@ export function useTheaterData(): TheaterData {
   const [tiles, setTiles] = useState<Tile[]>([])
   const [units, setUnits] = useState<UnitInstance[]>([])
   const [unitTypes, setUnitTypes] = useState<UnitType[]>([])
+  const [enemyUnits, setEnemyUnits] = useState<EnemyUnit[]>([])
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
-    Promise.all([api.getTheater(), api.getTiles(), api.getUnitInstances(), api.getUnitTypes()])
-      .then(([t, ti, u, ut]) => {
+    Promise.all([
+      api.getTheater(),
+      api.getTiles(),
+      api.getUnitInstances(),
+      api.getUnitTypes(),
+      api.getEnemyUnits(),
+    ])
+      .then(([t, ti, u, ut, eu]) => {
         if (!active) return
         setTheater(t)
         setTiles(ti)
         setUnits(u)
         setUnitTypes(ut)
+        setEnemyUnits(eu)
       })
       .catch((e: unknown) => {
         if (active) setError(e instanceof Error ? e.message : String(e))
@@ -39,5 +48,5 @@ export function useTheaterData(): TheaterData {
     }
   }, [])
 
-  return { theater, tiles, units, setUnits, unitTypes, error }
+  return { theater, tiles, units, setUnits, unitTypes, enemyUnits, error }
 }

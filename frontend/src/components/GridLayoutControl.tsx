@@ -5,10 +5,8 @@ interface Props {
   onPrecision: (precisionM: number) => void
 }
 
-/** On-map control for the MGRS grid precision (drawn square size).
- *
- * The hex-grid layout option is archived (the rendering code is retained in MapView via the
- * `GridLayout` type + `applyGridLayout`, but is no longer exposed in the UI). */
+/** On-map control for the MGRS grid precision (drawn square size). MGRS is the only grid
+ * (v2 Wave 9 — the hex grid was retired from the UX). */
 export function GridLayoutControl({ precisionM, onPrecision }: Props) {
   return (
     <div className="grid-control" data-testid="grid-control">

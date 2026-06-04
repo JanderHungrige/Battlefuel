@@ -57,6 +57,12 @@ export interface ChatterMessage {
   kind: 'status' | 'order'
   text: string
   h3_index?: string
+  /** Combat-event tagging (v2 Wave 3): MGRS coord + sender, and click-to-locate target. */
+  mgrs?: string
+  sender?: string
+  event_id?: string
+  lat?: number
+  lon?: number
 }
 
 export type InstanceStatus =
@@ -74,6 +80,16 @@ export interface UnitInstance {
   h3_index: string
   status: InstanceStatus
   current_fuel_liters: number | null
+}
+
+/** A placed enemy unit, rendered as a red APP-6 hostile symbol (v2 Wave 3). Render-only. */
+export interface EnemyUnit {
+  id: string
+  name: string
+  sidc: string
+  lat: number
+  lon: number
+  echelon: string | null
 }
 
 export interface FuelProfile {
@@ -102,7 +118,17 @@ export interface UnitType {
 /** Which cost the route was optimised for. */
 export type RouteMetric = 'fast' | 'safe'
 
-export type MoveOrderStatus = 'pending' | 'active' | 'complete' | 'cancelled'
+/** Travel mode — how the unit moves (v2 Wave 10). road = pgRouting; offroad = terrain A*;
+ *  hybrid = better of road/off-road; direct = near-straight cross-country line. */
+export type RouteMode = 'road' | 'offroad' | 'hybrid' | 'direct'
+
+export type MoveOrderStatus =
+  | 'pending'
+  | 'active'
+  | 'complete'
+  | 'cancelled'
+  | 'halted' // stopped at an obstruction; awaiting operator (Wave 10 F1)
+  | 'crossing' // operator chose "proceed slowly": crawling across the obstruction (Wave 10 F1)
 
 /** One planning option returned by POST /routes/plan. geometry is [lon, lat] pairs. */
 export interface RouteOption {
@@ -122,6 +148,7 @@ export interface PlanRouteRequest {
   instance_id: string
   dest_lat: number
   dest_lon: number
+  mode?: RouteMode // default 'road' on the backend (v2 Wave 10)
 }
 
 /** A persisted, server-authoritative move order. geometry is [lon, lat] pairs. */
@@ -142,6 +169,7 @@ export interface CreateMoveOrderRequest {
   dest_lat: number
   dest_lon: number
   metric: RouteMetric
+  mode?: RouteMode // default 'road' on the backend (v2 Wave 10)
 }
 
 /** A live per-unit frame broadcast by the sim engine over the WebSocket (server→client). */
@@ -155,6 +183,7 @@ export interface UnitUpdate {
   status: MoveOrderStatus
   progress_m: number
   distance_m: number
+  reason?: 'blocked' | 'threat' // why the unit halted, set when status === 'halted' (Wave 10 F1)
 }
 
 /** An operator-placed obstacle the router avoids (blocks an H3 cell). */
@@ -313,4 +342,26 @@ export interface TileUpdate {
   cover: Tile['cover']
   situation: SectorSituation | null
   note: string | null
+}
+
+/** Colour semantics for a located combat event (v2 Wave 3). */
+export type CombatEventZone = 'combat' | 'blocked' | 'threat'
+
+/**
+ * A located, categorised, precision-tagged combat event (v2 Wave 3 located-event-model).
+ * `precision_m` is the drawn MGRS-square side in metres; `zone` drives the colour
+ * (combat → red, blocked → light-yellow, threat → graded by `estimated_threat`).
+ */
+export interface CombatEvent {
+  type: 'combat_event'
+  id: string
+  category: string
+  event: string
+  lat: number
+  lon: number
+  precision_m: number
+  estimated_threat: number
+  sender: string
+  zone: CombatEventZone
+  game_s: number
 }

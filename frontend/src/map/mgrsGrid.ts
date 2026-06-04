@@ -111,6 +111,49 @@ export function gridLines(bbox: BBox, precisionM: number): number[][][] {
   return lines
 }
 
+/**
+ * The MGRS-grid-aligned square of side `precisionM` (metres, zone 32U) that contains `(lat, lon)`,
+ * as a closed ring of 5 `[lon, lat]` points. Snaps the point's UTM easting/northing down to the
+ * `precisionM` lattice — the same lattice `gridLines` draws — so an event renders in its containing
+ * MGRS cell, not an arbitrary centred box. (v2 Wave 3, threat-mgrs-squares.)
+ */
+export function squareCornersFromCenter(lat: number, lon: number, precisionM: number): number[][] {
+  const [e, n] = toUtm(lon, lat)
+  const e0 = Math.floor(e / precisionM) * precisionM
+  const n0 = Math.floor(n / precisionM) * precisionM
+  const e1 = e0 + precisionM
+  const n1 = n0 + precisionM
+  return [
+    toLonLat(e0, n0),
+    toLonLat(e1, n0),
+    toLonLat(e1, n1),
+    toLonLat(e0, n1),
+    toLonLat(e0, n0),
+  ]
+}
+
+/**
+ * Stable id of the MGRS cell (side `precisionM`, zone 32U) containing `(lat, lon)`: the point's UTM
+ * easting/northing snapped down to the lattice, as `"<precisionM>:<e0>:<n0>"`. Same lattice as
+ * `squareCornersFromCenter`, so the id matches the drawn square. Robust for non-decade precisions
+ * (2 km / 5 km) where an MGRS digit-string can't uniquely name the cell. (v2 Wave 9, mgrs-cell-index.)
+ */
+export function cellIdFor(lat: number, lon: number, precisionM: number): string {
+  const [e, n] = toUtm(lon, lat)
+  const e0 = Math.floor(e / precisionM) * precisionM
+  const n0 = Math.floor(n / precisionM) * precisionM
+  return `${precisionM}:${e0}:${n0}`
+}
+
+/** Formatted MGRS coordinate of the cell's centre — one label shared by every point in the cell. */
+export function cellMgrsLabel(lat: number, lon: number, precisionM: number): string {
+  const [e, n] = toUtm(lon, lat)
+  const cE = Math.floor(e / precisionM) * precisionM + precisionM / 2
+  const cN = Math.floor(n / precisionM) * precisionM + precisionM / 2
+  const [clon, clat] = toLonLat(cE, cN)
+  return formatMgrs(toMgrs(clat, clon))
+}
+
 export interface GridLabel {
   lon: number
   lat: number

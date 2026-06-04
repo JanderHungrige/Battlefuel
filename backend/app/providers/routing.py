@@ -208,6 +208,30 @@ class TerrainRoutingProvider(RoutingProvider):
         return terrain_path(tile_map, start_lat, start_lon, dest_lat, dest_lon, metric)
 
 
+class DirectRoutingProvider(RoutingProvider):
+    """Direct (near-straight) cross-country router (v2 Wave 10, hybrid-direct-routing-modes).
+
+    Walks the H3 grid line from start to destination over the terrain grid — follows the
+    landscape's terrain cost but does not avoid threat or obstacles. Same ``RoutePath`` shape.
+    """
+
+    async def shortest_path(
+        self,
+        session: AsyncSession,
+        start_lat: float,
+        start_lon: float,
+        dest_lat: float,
+        dest_lon: float,
+        metric: RouteMetric,
+    ) -> RoutePath | None:
+        from app.providers.tiles import build_tile_provider
+        from app.services.terrain_router import direct_path
+
+        tiles = await build_tile_provider().list_tiles(session)
+        tile_map = {t.h3_index: (t.terrain, t.threat_level) for t in tiles}
+        return direct_path(tile_map, start_lat, start_lon, dest_lat, dest_lon, metric)
+
+
 RoutingProviderBuilder = Callable[[], RoutingProvider]
 _REGISTRY: dict[str, RoutingProviderBuilder] = {}
 
@@ -234,13 +258,17 @@ def build_routing_provider(settings: Settings | None = None) -> RoutingProvider:
 
 register_routing_provider("pgrouting", PgRoutingProvider)
 register_routing_provider("terrain", TerrainRoutingProvider)
+register_routing_provider("direct", DirectRoutingProvider)
 
 
 def build_routing_provider_for_mode(
     mode: RouteMode, settings: Settings | None = None
 ) -> RoutingProvider:
-    """Select the router for a travel mode: ``road`` → the configured road provider (pgRouting),
-    ``offroad`` → the terrain A* provider."""
+    """Select the router for a travel mode: ``offroad`` → terrain A*, ``direct`` → straight
+    cross-country line, anything else → the configured road provider (pgRouting). ``hybrid`` is
+    composed in the planner from the road + off-road providers, so it is not a single provider."""
     if mode is RouteMode.OFFROAD:
         return _REGISTRY["terrain"]()
+    if mode is RouteMode.DIRECT:
+        return _REGISTRY["direct"]()
     return build_routing_provider(settings)
