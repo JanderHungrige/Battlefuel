@@ -19,7 +19,9 @@ from app.api.ws import ConnectionManager
 from app.config import get_settings
 from app.db import get_session_maker
 from app.domain.combat_event import combat_event_frame
+from app.domain.move_order import MoveOrder, MoveOrderStatus
 from app.models.unit_instance import UnitInstanceRow
+from app.providers.base import UnitDataProvider
 from app.providers.buy_orders import build_buy_order_provider
 from app.providers.combat_events import (
     CombatEventFeedProvider,
@@ -27,7 +29,7 @@ from app.providers.combat_events import (
     due_combat_events,
 )
 from app.providers.factory import build_unit_provider
-from app.providers.move_orders import build_move_order_provider
+from app.providers.move_orders import MoveOrderProvider, build_move_order_provider
 from app.providers.refuel_orders import build_refuel_order_provider
 from app.providers.strategic_feed import (
     StrategicFeedProvider,
@@ -36,17 +38,19 @@ from app.providers.strategic_feed import (
 )
 from app.providers.supply import build_supply_provider
 from app.providers.tile_feed import TileFeedProvider, build_tile_feed_provider, due_events
-from app.providers.tiles import build_tile_provider
+from app.providers.tiles import TileDataProvider, build_tile_provider
 from app.providers.unit_instances import build_unit_instance_provider
 from app.services.buy_service import deliver_due_buy_orders
 from app.services.cost_model import TileFactors, tile_factors
 from app.services.event_engine import EventEngine
 from app.services.refuel_service import try_complete_refuel
-from app.services.sim import advance
+from app.services.sim import SimStep, advance, advance_with_terrain, substep_dt
 from app.services.tile_grid import DEFAULT_RESOLUTION
 from app.services.tile_mutation import apply_tile_mutation, tile_update_frame
 
 _NEUTRAL_FACTORS = TileFactors(speed_factor=1.0, fuel_factor=1.0)
+# Safety bound on sub-steps per tick; a unit completes its route well before this (v2 Wave 10).
+_MAX_SUBSTEPS = 256
 
 
 class SimEngine:
@@ -195,52 +199,126 @@ class SimEngine:
         orders = build_move_order_provider()
         units = build_unit_provider()
         tiles = build_tile_provider()
+        max_step_m = get_settings().sim_max_step_m
         for order in await orders.list_active(session):
-            row = await session.get(UnitInstanceRow, order.instance_id)
-            if row is None:
-                continue
-            unit_type = units.get_unit(row.unit_type_id)
-            if unit_type is None:
-                continue
-            fuel = (
-                row.current_fuel_liters
-                if row.current_fuel_liters is not None
-                else unit_type.fuel.capacity_liters
+            await self._advance_order(session, orders, units, tiles, order, dt_game_s, max_step_m)
+
+    async def _advance_order(
+        self,
+        session: AsyncSession,
+        orders: MoveOrderProvider,
+        units: UnitDataProvider,
+        tiles: TileDataProvider,
+        order: MoveOrder,
+        dt_game_s: float,
+        max_step_m: float,
+    ) -> None:
+        """Advance one order across the tick in sub-steps of ≤ ``max_step_m`` so movement is
+        smooth, re-running the look-ahead/halt check per sub-step (v2 Wave 10, F1 + F3)."""
+        row = await session.get(UnitInstanceRow, order.instance_id)
+        if row is None:
+            return
+        unit_type = units.get_unit(row.unit_type_id)
+        if unit_type is None:
+            return
+        fuel = (
+            row.current_fuel_liters
+            if row.current_fuel_liters is not None
+            else unit_type.fuel.capacity_liters
+        )
+        working = order
+        remaining = dt_game_s
+        guard = 0
+        while remaining > 1e-9 and guard < _MAX_SUBSTEPS:
+            guard += 1
+            cur_tile = await tiles.get_tile(session, row.h3_index) if row.h3_index else None
+            cur_factors = (
+                tile_factors(cur_tile.terrain, cur_tile.road_condition)
+                if cur_tile
+                else _NEUTRAL_FACTORS
             )
-            tile = await tiles.get_tile(session, row.h3_index) if row.h3_index else None
-            factors = (
-                tile_factors(tile.terrain, tile.road_condition) if tile else _NEUTRAL_FACTORS
+            speed_mps = (
+                unit_type.movement.speed_road_kph * cur_factors.speed_factor * 1000.0 / 3600.0
             )
-            step = advance(
-                order,
+            sub_dt = substep_dt(remaining, speed_mps, max_step_m)
+            # Look ahead at the current speed to find the tile the unit is *entering* this sub-step.
+            nominal = advance(
+                working,
                 fuel,
                 unit_type,
-                dt_game_s,
-                speed_factor=factors.speed_factor,
-                fuel_factor=factors.fuel_factor,
+                sub_dt,
+                speed_factor=cur_factors.speed_factor,
+                fuel_factor=cur_factors.fuel_factor,
             )
-            await orders.set_progress(session, order.id, step.progress_m, step.status)
-            await session.execute(
-                update(UnitInstanceRow)
-                .where(UnitInstanceRow.id == order.instance_id)
-                .values(
-                    lat=step.lat,
-                    lon=step.lon,
-                    h3_index=h3.latlng_to_cell(step.lat, step.lon, DEFAULT_RESOLUTION),
-                    current_fuel_liters=step.fuel_l,
-                )
+            enter_cell = h3.latlng_to_cell(nominal.lat, nominal.lon, DEFAULT_RESOLUTION)
+            enter_tile = await tiles.get_tile(session, enter_cell)
+            enter_factors = (
+                tile_factors(enter_tile.terrain, enter_tile.road_condition)
+                if enter_tile
+                else _NEUTRAL_FACTORS
             )
-            await session.commit()
+            enter_threat = enter_tile.threat_level if enter_tile else 0
+            step = advance_with_terrain(
+                working, fuel, unit_type, sub_dt, factors=enter_factors, threat_level=enter_threat
+            )
+            await self._persist_and_broadcast(session, orders, working, step, enter_factors)
+            fuel = step.fuel_l
+            remaining -= sub_dt
+            working = working.model_copy(
+                update={"progress_m": step.progress_m, "status": step.status}
+            )
+            if step.status in (MoveOrderStatus.COMPLETE, MoveOrderStatus.HALTED):
+                break
+            row = await session.get(UnitInstanceRow, order.instance_id)
+            if row is None:
+                break
+
+    async def _persist_and_broadcast(
+        self,
+        session: AsyncSession,
+        orders: MoveOrderProvider,
+        order: MoveOrder,
+        step: SimStep,
+        enter_factors: TileFactors,
+    ) -> None:
+        """Persist a sub-step's progress/position/fuel and broadcast the unit_update (plus a
+        chatter line on a halt)."""
+        await orders.set_progress(session, order.id, step.progress_m, step.status)
+        await session.execute(
+            update(UnitInstanceRow)
+            .where(UnitInstanceRow.id == order.instance_id)
+            .values(
+                lat=step.lat,
+                lon=step.lon,
+                h3_index=h3.latlng_to_cell(step.lat, step.lon, DEFAULT_RESOLUTION),
+                current_fuel_liters=step.fuel_l,
+            )
+        )
+        await session.commit()
+        frame: dict[str, object] = {
+            "type": "unit_update",
+            "instance_id": order.instance_id,
+            "order_id": order.id,
+            "lat": step.lat,
+            "lon": step.lon,
+            "fuel_l": round(step.fuel_l, 1),
+            "status": step.status.value,
+            "progress_m": round(step.progress_m, 1),
+            "distance_m": round(order.distance_m, 1),
+        }
+        if step.status is MoveOrderStatus.HALTED:
+            reason = "blocked" if not enter_factors.passable else "threat"
+            frame["reason"] = reason
+            await self._manager.broadcast(frame)
             await self._manager.broadcast(
                 {
-                    "type": "unit_update",
-                    "instance_id": order.instance_id,
-                    "order_id": order.id,
-                    "lat": step.lat,
-                    "lon": step.lon,
-                    "fuel_l": round(step.fuel_l, 1),
-                    "status": step.status.value,
-                    "progress_m": round(step.progress_m, 1),
-                    "distance_m": round(order.distance_m, 1),
+                    "type": "strategic_message",
+                    "text": (
+                        f"Unit {order.instance_id} halted — {reason} sector ahead "
+                        f"({step.lat:.4f}, {step.lon:.4f}). Proceed slowly or re-route."
+                    ),
+                    "category": "movement",
                 }
             )
+        else:
+            await self._manager.broadcast(frame)

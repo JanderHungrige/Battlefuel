@@ -66,6 +66,30 @@ describe('api client', () => {
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).metric).toBe('safe')
   })
 
+  it('planRoute forwards the travel mode (v2 Wave 10 F4)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [] })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await api.planRoute({ instance_id: 'inst-1', dest_lat: 49.2, dest_lon: 11.8, mode: 'hybrid' })
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).mode).toBe('hybrid')
+  })
+
+  it('proceedMoveOrder POSTs to the proceed path with no body (v2 Wave 10 F4)', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, status: 200, json: async () => ({ id: 'o1', status: 'crossing' }) })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const order = await api.proceedMoveOrder('o1')
+
+    expect(order.status).toBe('crossing')
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toMatch(/\/move-orders\/o1\/proceed$/)
+    expect(init.method).toBe('POST')
+    expect(init.body).toBeUndefined()
+  })
+
   it('confirmMoveOrder POSTs to the confirm path with no body', async () => {
     const fetchMock = vi
       .fn()

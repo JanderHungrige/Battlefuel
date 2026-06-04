@@ -1,7 +1,7 @@
 // Planning panel: shows fastest/safest route options for the selected unit and
 // confirms a move order. All numeric values come straight from the backend planner.
 
-import type { RouteMetric, RouteOption } from '../api/types'
+import type { RouteMetric, RouteMode, RouteOption } from '../api/types'
 
 interface MoveRoutesPanelProps {
   unitName: string
@@ -9,6 +9,8 @@ interface MoveRoutesPanelProps {
   error: string | null
   options: RouteOption[]
   selectedMetric: RouteMetric | null
+  mode: RouteMode
+  onSelectMode: (mode: RouteMode) => void
   confirming: boolean
   onSelectOption: (metric: RouteMetric) => void
   onConfirm: () => void
@@ -16,6 +18,14 @@ interface MoveRoutesPanelProps {
 }
 
 const THREAT_WARN = 3 // route options at/above this max threat get a sector warning
+const THREAT_COMBAT = 5 // a level-5 (combat) sector — the requester's "over level 4" hard warning
+
+const MODES: { id: RouteMode; label: string }[] = [
+  { id: 'road', label: 'Road' },
+  { id: 'offroad', label: 'Off-road' },
+  { id: 'hybrid', label: 'Hybrid' },
+  { id: 'direct', label: 'Direct' },
+]
 
 const km = (m: number): string => `${(m / 1000).toFixed(1)} km`
 const min = (s: number): string => `${Math.round(s / 60)} min`
@@ -46,11 +56,18 @@ function OptionCard({
         <span>left {liters(option.fuel_remaining_l)}</span>
         <span>threat {option.threat_max}</span>
       </span>
-      {option.threat_max >= THREAT_WARN && (
+      {option.threat_max >= THREAT_COMBAT ? (
+        <span
+          className="route-option-warning combat"
+          data-testid={`route-threat-${option.metric}`}
+        >
+          ⚠ crosses COMBAT sector (threat {option.threat_max}/5)
+        </span>
+      ) : option.threat_max >= THREAT_WARN ? (
         <span className="route-option-warning" data-testid={`route-threat-${option.metric}`}>
           ⚠ crosses threat sector ({option.threat_max}/5)
         </span>
-      )}
+      ) : null}
       {!option.sufficient_fuel && (
         <span className="route-option-warning" data-testid={`route-low-fuel-${option.metric}`}>
           ⚠ insufficient fuel
@@ -66,6 +83,8 @@ export function MoveRoutesPanel({
   error,
   options,
   selectedMetric,
+  mode,
+  onSelectMode,
   confirming,
   onSelectOption,
   onConfirm,
@@ -78,6 +97,21 @@ export function MoveRoutesPanel({
       </button>
       <h2>Plan move</h2>
       <div className="move-panel-unit">{unitName}</div>
+
+      <div className="move-mode" role="group" aria-label="Travel mode">
+        {MODES.map((m) => (
+          <button
+            key={m.id}
+            type="button"
+            className={`move-mode-btn${mode === m.id ? ' selected' : ''}`}
+            data-testid={`move-mode-${m.id}`}
+            aria-pressed={mode === m.id}
+            onClick={() => onSelectMode(m.id)}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
 
       {loading && <div className="status">Planning route…</div>}
       {error && <div className="status error" data-testid="move-error">{error}</div>}

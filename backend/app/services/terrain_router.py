@@ -108,25 +108,8 @@ def _a_star(tiles: TileMap, start: str, dest: str, metric: RouteMetric) -> list[
     return path
 
 
-def terrain_path(
-    tiles: TileMap,
-    start_lat: float,
-    start_lon: float,
-    dest_lat: float,
-    dest_lon: float,
-    metric: RouteMetric,
-) -> RoutePath | None:
-    """Off-road path over the H3 grid as a `RoutePath`, or None if start/dest are the same cell."""
-    if not tiles:
-        return None
-    start = _nearest_cell(tiles, start_lat, start_lon)
-    dest = _nearest_cell(tiles, dest_lat, dest_lon)
-    if start == dest:
-        return None
-    path = _a_star(tiles, start, dest, metric)
-    if path is None or len(path) < 2:
-        return None
-
+def _route_path_over_cells(path: list[str], tiles: TileMap, metric: RouteMetric) -> RoutePath:
+    """Build a RoutePath by accumulating terrain cost along an ordered list of H3 cells."""
     distance_m = effective_m = fuel_m = 0.0
     for frm, to in pairwise(path):
         a, b = _lonlat(frm), _lonlat(to)
@@ -148,3 +131,51 @@ def terrain_path(
         threat_avg=sum(threats) / len(threats),
         degraded=False,
     )
+
+
+def direct_path(
+    tiles: TileMap,
+    start_lat: float,
+    start_lon: float,
+    dest_lat: float,
+    dest_lon: float,
+    metric: RouteMetric,
+) -> RoutePath | None:
+    """Near-straight cross-country line over the H3 grid (v2 Wave 10, hybrid-direct-routing-modes).
+
+    Walks the H3 grid line from start to destination (``h3.grid_path_cells``) and accumulates
+    terrain time/fuel cost — it follows the landscape but does **not** avoid threat or detour
+    around obstacles (that is what offroad/road SAFE are for). Cells off the line's theater are
+    skipped so the cost reflects only known terrain. Pure — no I/O.
+    """
+    if not tiles:
+        return None
+    start = _nearest_cell(tiles, start_lat, start_lon)
+    dest = _nearest_cell(tiles, dest_lat, dest_lon)
+    if start == dest:
+        return None
+    line: list[str] = [c for c in h3.grid_path_cells(start, dest) if c in tiles]
+    if len(line) < 2:
+        return None
+    return _route_path_over_cells(line, tiles, metric)
+
+
+def terrain_path(
+    tiles: TileMap,
+    start_lat: float,
+    start_lon: float,
+    dest_lat: float,
+    dest_lon: float,
+    metric: RouteMetric,
+) -> RoutePath | None:
+    """Off-road path over the H3 grid as a `RoutePath`, or None if start/dest are the same cell."""
+    if not tiles:
+        return None
+    start = _nearest_cell(tiles, start_lat, start_lon)
+    dest = _nearest_cell(tiles, dest_lat, dest_lon)
+    if start == dest:
+        return None
+    path = _a_star(tiles, start, dest, metric)
+    if path is None or len(path) < 2:
+        return None
+    return _route_path_over_cells(path, tiles, metric)

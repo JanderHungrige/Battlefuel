@@ -78,6 +78,9 @@ export const api = {
     postJson<MoveOrder>(`/move-orders/${id}/confirm`),
   cancelMoveOrder: (id: string): Promise<MoveOrder> =>
     postJson<MoveOrder>(`/move-orders/${id}/cancel`),
+  // "Proceed slowly" across an obstruction a unit halted at: halted → crossing (v2 Wave 10 F1).
+  proceedMoveOrder: (id: string): Promise<MoveOrder> =>
+    postJson<MoveOrder>(`/move-orders/${id}/proceed`),
   listMoveOrders: (): Promise<MoveOrder[]> => getJson<MoveOrder[]>('/move-orders'),
 
   // Operator ops (Wave 4).

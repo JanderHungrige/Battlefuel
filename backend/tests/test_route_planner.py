@@ -56,3 +56,56 @@ class TestBuildOption:
         opt = _opt(path, consumption=600.0, fuel=100.0)
         assert opt.sufficient_fuel is False
         assert opt.fuel_remaining_l == 0.0
+
+
+def _option(*, duration_s: float, threat_max: int, label: str = "x") -> RouteOption:
+    return RouteOption(
+        label=label,
+        metric=RouteMetric.FAST,
+        geometry=_GEOM,
+        distance_m=1000.0,
+        duration_s=duration_s,
+        threat_max=threat_max,
+        threat_avg=float(threat_max),
+        fuel_consumed_l=10.0,
+        fuel_remaining_l=990.0,
+        sufficient_fuel=True,
+    )
+
+
+class TestHybridSelection:
+    """F2 (Wave 10, doc 61): hybrid picks, per metric, the better of the road vs off-road option.
+    FAST → lower duration; SAFE → lower threat, then lower duration. RED until pick_route_option
+    exists."""
+
+    def test_fast_picks_faster_option(self) -> None:
+        from app.services.route_planner import pick_route_option
+
+        road = _option(duration_s=600, threat_max=4, label="road")
+        offroad = _option(duration_s=900, threat_max=0, label="offroad")
+        best = pick_route_option(RouteMetric.FAST, road, offroad)
+        assert best is not None and best.label == "road"  # FAST ignores threat → faster wins
+
+    def test_safe_picks_lower_threat_even_if_slower(self) -> None:
+        from app.services.route_planner import pick_route_option
+
+        road = _option(duration_s=600, threat_max=5, label="road")
+        offroad = _option(duration_s=900, threat_max=0, label="offroad")
+        best = pick_route_option(RouteMetric.SAFE, road, offroad)
+        assert best is not None and best.label == "offroad"  # SAFE dodges the threat road
+
+    def test_safe_tie_on_threat_breaks_by_duration(self) -> None:
+        from app.services.route_planner import pick_route_option
+
+        road = _option(duration_s=600, threat_max=2, label="road")
+        offroad = _option(duration_s=900, threat_max=2, label="offroad")
+        best = pick_route_option(RouteMetric.SAFE, road, offroad)
+        assert best is not None and best.label == "road"
+
+    def test_missing_side_returns_the_other(self) -> None:
+        from app.services.route_planner import pick_route_option
+
+        only = _option(duration_s=600, threat_max=0, label="only")
+        assert pick_route_option(RouteMetric.FAST, only, None) is only
+        assert pick_route_option(RouteMetric.FAST, None, only) is only
+        assert pick_route_option(RouteMetric.FAST, None, None) is None

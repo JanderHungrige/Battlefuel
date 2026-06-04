@@ -14,6 +14,8 @@ class MoveOrderStatus(StrEnum):
     ACTIVE = "active"  # confirmed; the sim is advancing it
     COMPLETE = "complete"  # unit has arrived
     CANCELLED = "cancelled"
+    HALTED = "halted"  # stopped at an obstruction (block, or threat-L5 in Safe); awaiting operator
+    CROSSING = "crossing"  # operator chose "proceed slowly": crawling across the obstruction
 
 
 class MoveOrder(BaseModel):

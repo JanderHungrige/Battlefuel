@@ -24,6 +24,8 @@ class RouteMode(StrEnum):
 
     ROAD = "road"  # pgRouting over the road graph at the unit's road speed (default)
     OFFROAD = "offroad"  # A* over the H3 terrain grid at the unit's off-road / by-foot speed
+    HYBRID = "hybrid"  # per metric, the better of the road vs off-road route (v2 Wave 10)
+    DIRECT = "direct"  # near-straight cross-country line over the terrain grid (v2 Wave 10)
 
 
 class RoutePath(BaseModel):

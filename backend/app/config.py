@@ -76,6 +76,9 @@ class Settings(BaseSettings):
     sim_time_scale: float = 60.0
     # Simulation tick interval in real seconds.
     sim_tick_seconds: float = 1.0
+    # Max metres a unit advances per broadcast frame. A tick's movement is split into sub-steps
+    # of at most this distance so on-screen movement is smooth (v2 Wave 10, smaller-movement-ticks).
+    sim_max_step_m: float = 200.0
 
     # Browser origins allowed to call the API (CORS). Dev defaults to the Vite server.
     cors_origins: list[str] = [

@@ -118,7 +118,17 @@ export interface UnitType {
 /** Which cost the route was optimised for. */
 export type RouteMetric = 'fast' | 'safe'
 
-export type MoveOrderStatus = 'pending' | 'active' | 'complete' | 'cancelled'
+/** Travel mode — how the unit moves (v2 Wave 10). road = pgRouting; offroad = terrain A*;
+ *  hybrid = better of road/off-road; direct = near-straight cross-country line. */
+export type RouteMode = 'road' | 'offroad' | 'hybrid' | 'direct'
+
+export type MoveOrderStatus =
+  | 'pending'
+  | 'active'
+  | 'complete'
+  | 'cancelled'
+  | 'halted' // stopped at an obstruction; awaiting operator (Wave 10 F1)
+  | 'crossing' // operator chose "proceed slowly": crawling across the obstruction (Wave 10 F1)
 
 /** One planning option returned by POST /routes/plan. geometry is [lon, lat] pairs. */
 export interface RouteOption {
@@ -138,6 +148,7 @@ export interface PlanRouteRequest {
   instance_id: string
   dest_lat: number
   dest_lon: number
+  mode?: RouteMode // default 'road' on the backend (v2 Wave 10)
 }
 
 /** A persisted, server-authoritative move order. geometry is [lon, lat] pairs. */
@@ -158,6 +169,7 @@ export interface CreateMoveOrderRequest {
   dest_lat: number
   dest_lon: number
   metric: RouteMetric
+  mode?: RouteMode // default 'road' on the backend (v2 Wave 10)
 }
 
 /** A live per-unit frame broadcast by the sim engine over the WebSocket (server→client). */
@@ -171,6 +183,7 @@ export interface UnitUpdate {
   status: MoveOrderStatus
   progress_m: number
   distance_m: number
+  reason?: 'blocked' | 'threat' // why the unit halted, set when status === 'halted' (Wave 10 F1)
 }
 
 /** An operator-placed obstacle the router avoids (blocks an H3 cell). */
