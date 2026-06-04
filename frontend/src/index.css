@@ -780,6 +780,38 @@ body {
   color: #fff;
 }
 
+/* Waypoint routing controls (v2 Wave 10 F5) */
+.move-waypoints {
+  margin: 8px 0;
+  padding: 8px;
+  border: 1px dashed #3a4250;
+  border-radius: 4px;
+}
+.wp-hint {
+  display: block;
+  font-size: 12px;
+  color: #9aa6b6;
+  margin-bottom: 6px;
+}
+.wp-actions {
+  display: flex;
+  gap: 6px;
+}
+.wp-btn {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 12px;
+  border: 1px solid #3a4250;
+  border-radius: 4px;
+  background: #1c2230;
+  color: #c8d0dc;
+  cursor: pointer;
+}
+.wp-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* Halt banner (v2 Wave 10 F1/F4) */
 .halt-banner {
   position: absolute;

@@ -267,7 +267,11 @@ export default function App() {
                 planning.resetPlanning()
                 setSelectedUnitId(id)
               }}
-              onPickDestination={planning.pickDestination}
+              onPickDestination={(lat, lon) =>
+                planning.waypointMode
+                  ? planning.addWaypoint(lat, lon)
+                  : planning.pickDestination(lat, lon)
+              }
               onClearSelection={clear}
             />
             <GridLayoutControl precisionM={gridPrecisionM} onPrecision={setGridPrecisionM} />
@@ -307,6 +311,11 @@ export default function App() {
                 selectedMetric={planning.selectedMetric}
                 mode={planning.mode}
                 onSelectMode={planning.setMode}
+                waypointMode={planning.waypointMode}
+                waypointCount={planning.waypoints.length}
+                onStartRouting={planning.startRouting}
+                onRemoveLastWaypoint={planning.removeLastWaypoint}
+                onEndRouting={planning.endRouting}
                 confirming={planning.confirming}
                 onSelectOption={planning.setSelectedMetric}
                 onConfirm={() => planning.confirmMove(clear)}
