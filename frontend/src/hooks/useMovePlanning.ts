@@ -154,7 +154,7 @@ export function useMovePlanning(
     setRouteOptions([])
     setSelectedMetric(null)
     setPlanError(null)
-    setModeState('offroad') // waypoint routing goes cross-country by default, not street-bound
+    setModeState('direct') // waypoint legs draw as straight cross-country lines, unit→point→point
   }, [])
 
   const addWaypoint = useCallback(

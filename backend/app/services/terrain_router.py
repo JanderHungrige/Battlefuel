@@ -108,29 +108,19 @@ def _a_star(tiles: TileMap, start: str, dest: str, metric: RouteMetric) -> list[
     return path
 
 
-def _route_path_over_cells(path: list[str], tiles: TileMap, metric: RouteMetric) -> RoutePath:
-    """Build a RoutePath by accumulating terrain cost along an ordered list of H3 cells."""
+def _cost_over_cells(path: list[str], tiles: TileMap) -> tuple[float, float, float, int, float]:
+    """Accumulate (distance, effective, fuel, threat_max, threat_avg) along an ordered cell list."""
     distance_m = effective_m = fuel_m = 0.0
     for frm, to in pairwise(path):
         a, b = _lonlat(frm), _lonlat(to)
-        terrain, _threat = tiles[to]
-        factors = _terrain_factors(terrain)
+        factors = _terrain_factors(tiles[to][0])
         step_d = haversine_m(a[0], a[1], b[0], b[1])
         step_t = edge_time_cost(step_d, factors)
         distance_m += step_d
         effective_m += step_t
         fuel_m += factors.fuel_factor * step_t
     threats = [tiles[c][1] for c in path]
-    return RoutePath(
-        metric=metric,
-        geometry=[_lonlat(c) for c in path],
-        distance_m=distance_m,
-        effective_distance_m=effective_m,
-        fuel_distance_m=fuel_m,
-        threat_max=max(threats),
-        threat_avg=sum(threats) / len(threats),
-        degraded=False,
-    )
+    return distance_m, effective_m, fuel_m, max(threats), sum(threats) / len(threats)
 
 
 def direct_path(
@@ -141,23 +131,36 @@ def direct_path(
     dest_lon: float,
     metric: RouteMetric,
 ) -> RoutePath | None:
-    """Near-straight cross-country line over the H3 grid (v2 Wave 10, hybrid-direct-routing-modes).
+    """A straight cross-country line from the exact start to the exact destination (v2 Wave 10).
 
-    Walks the H3 grid line from start to destination (``h3.grid_path_cells``) and accumulates
-    terrain time/fuel cost — it follows the landscape but does **not** avoid threat or detour
-    around obstacles (that is what offroad/road SAFE are for). Cells off the line's theater are
-    skipped so the cost reflects only known terrain. Pure — no I/O.
+    The geometry is the **two exact endpoints** (unit centre → clicked point) — not snapped to the
+    H3 grid — so it draws as a clean straight line. Distance is the straight-line distance; the
+    time/fuel/threat cost is taken from the terrain of the cells the line crosses (it follows the
+    landscape's cost but does not avoid threat or detour). Pure — no I/O.
     """
     if not tiles:
         return None
+    if start_lat == dest_lat and start_lon == dest_lon:
+        return None
     start = _nearest_cell(tiles, start_lat, start_lon)
     dest = _nearest_cell(tiles, dest_lat, dest_lon)
-    if start == dest:
-        return None
-    line: list[str] = [c for c in h3.grid_path_cells(start, dest) if c in tiles]
-    if len(line) < 2:
-        return None
-    return _route_path_over_cells(line, tiles, metric)
+    line: list[str] = [c for c in h3.grid_path_cells(start, dest) if c in tiles] or [start]
+    factors = [_terrain_factors(tiles[c][0]) for c in line]
+    avg_speed = sum(f.speed_factor for f in factors) / len(factors)
+    avg_fuel = sum(f.fuel_factor for f in factors) / len(factors)
+    threats = [tiles[c][1] for c in line]
+    distance_m = haversine_m(start_lon, start_lat, dest_lon, dest_lat)
+    effective_m = distance_m / avg_speed if avg_speed > 0 else distance_m
+    return RoutePath(
+        metric=metric,
+        geometry=[[start_lon, start_lat], [dest_lon, dest_lat]],
+        distance_m=distance_m,
+        effective_distance_m=effective_m,
+        fuel_distance_m=avg_fuel * effective_m,
+        threat_max=max(threats),
+        threat_avg=sum(threats) / len(threats),
+        degraded=False,
+    )
 
 
 def terrain_path(
@@ -168,7 +171,12 @@ def terrain_path(
     dest_lon: float,
     metric: RouteMetric,
 ) -> RoutePath | None:
-    """Off-road path over the H3 grid as a `RoutePath`, or None if start/dest are the same cell."""
+    """Off-road path over the H3 grid as a `RoutePath`, or None if start/dest are the same cell.
+
+    The path is found cell-by-cell (terrain-following A*), but the geometry's **endpoints are the
+    exact start and destination** (unit centre / clicked point) rather than the snapped hex
+    centres, so the route begins at the unit and ends exactly where the operator clicked.
+    """
     if not tiles:
         return None
     start = _nearest_cell(tiles, start_lat, start_lon)
@@ -178,4 +186,17 @@ def terrain_path(
     path = _a_star(tiles, start, dest, metric)
     if path is None or len(path) < 2:
         return None
-    return _route_path_over_cells(path, tiles, metric)
+    distance_m, effective_m, fuel_m, threat_max, threat_avg = _cost_over_cells(path, tiles)
+    geometry = [_lonlat(c) for c in path]
+    geometry[0] = [start_lon, start_lat]  # anchor exactly at the unit centre
+    geometry[-1] = [dest_lon, dest_lat]  # anchor exactly at the clicked point
+    return RoutePath(
+        metric=metric,
+        geometry=geometry,
+        distance_m=distance_m,
+        effective_distance_m=effective_m,
+        fuel_distance_m=fuel_m,
+        threat_max=threat_max,
+        threat_avg=threat_avg,
+        degraded=False,
+    )
