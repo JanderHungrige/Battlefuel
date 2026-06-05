@@ -184,8 +184,8 @@ describe('SupplyPanel', () => {
     expect(onAddPlatform).toHaveBeenCalledWith('NATO Fuel Cell')
   })
 
-  it('locates a supply point and shows its site-type tag (W11 F5)', () => {
-    const onLocateDepot = vi.fn()
+  it('locates a supply point (by coords) and shows its site-type tag (W11 F5)', () => {
+    const onLocate = vi.fn()
     const lowOverview: SupplyOverview = {
       depots: [
         {
@@ -204,12 +204,21 @@ describe('SupplyPanel', () => {
         {...baseProps}
         overview={lowOverview}
         depots={lowOverview.depots.map((d) => d.depot)}
-        onLocateDepot={onLocateDepot}
+        onLocate={onLocate}
       />,
     )
     expect(screen.getByTestId('depot-site-tag')).toHaveTextContent('BSA')
     fireEvent.click(screen.getByTestId('depot-locate-site-bsa'))
-    expect(onLocateDepot).toHaveBeenCalledWith('site-bsa')
+    expect(onLocate).toHaveBeenCalledWith(49.2, 11.8)
+  })
+
+  it('locates a fuel truck from the Supply fleet tab (W11)', () => {
+    const onLocate = vi.fn()
+    render(<SupplyPanel {...baseProps} onLocate={onLocate} />)
+    fireEvent.click(screen.getByTestId('supply-tab-fleet'))
+    // baseProps TANKER is at (49.2, 11.83).
+    fireEvent.click(screen.getByTestId('truck-locate-inst-fuel-1'))
+    expect(onLocate).toHaveBeenCalledWith(49.2, 11.83)
   })
 
   it('offers a refuel proposal for a low site only (W11 F5)', () => {

@@ -65,7 +65,7 @@ export default function App() {
   // Site type for the next placed depot ('' = plain depot/marker); v2 Wave 11 F5.
   const [depotSiteType, setDepotSiteType] = useState('')
   // Depot the operator asked to locate on the map (v2 Wave 11 F5).
-  const [locateDepotId, setLocateDepotId] = useState<string | null>(null)
+  const [locatePoint, setLocatePoint] = useState<{ lat: number; lon: number } | null>(null)
   // OF-8 on-map per-unit fuel bars (v2 Wave 11 F7); on by default.
   const [infoBarsOn, setInfoBarsOn] = useState(true)
 
@@ -151,6 +151,7 @@ export default function App() {
     setSelectedUnitId(null)
     setHighlightH3(null)
     setHighlightEventId(null)
+    setLocatePoint(null)
     planning.resetPlanning()
   }, [planning])
 
@@ -212,13 +213,11 @@ export default function App() {
   )
 
   // Locate a supply point on the map (v2 Wave 11 F5). Pulse the id so MapView re-eases each click.
-  const locateDepot = useCallback(
-    (depotId: string) => {
-      setLocateDepotId(null)
-      setLocateDepotId(depotId)
-    },
-    [],
-  )
+  // Mark + locate any supply entity (depot, fuel truck, …) on the map. A fresh object each call
+  // so re-clicking the same point still re-eases (v2 Wave 11).
+  const locate = useCallback((lat: number, lon: number) => {
+    setLocatePoint({ lat, lon })
+  }, [])
 
   // Ask the Wave-6 redistribution advisor to propose a refuel for a low site (v2 Wave 11 F5).
   const proposeSiteRefuel = useCallback(
@@ -346,7 +345,7 @@ export default function App() {
               highlightEventId={highlightEventId}
               enemyUnits={enemyUnits}
               depots={canShow(role, 'depotOverlay') ? (supply.overview?.depots ?? []) : []}
-              locateDepotId={locateDepotId}
+              locatePoint={locatePoint}
               showUnitFuelBars={canShow(role, 'depotOverlay') && infoBarsOn}
               rendezvous={canShow(role, 'supplyPanel') ? supplyOrders.rendezvous : null}
               adviceArrow={adviceMarker.arrow}
@@ -411,7 +410,7 @@ export default function App() {
                 onAddPlatform={(name) => void fuelPlatforms.addPlatform(name)}
                 onShowHistory={() => setOrderHistoryOpen(true)}
                 onShowDocs={() => setInfoDocsOpen(true)}
-                onLocateDepot={locateDepot}
+                onLocate={locate}
                 onProposeRefuel={proposeSiteRefuel}
                 onBuy={supplyOrders.placeBuy}
                 onRefuel={supplyOrders.placeRefuel}
