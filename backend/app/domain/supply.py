@@ -78,6 +78,9 @@ class TruckFuel(BaseModel):
     lat: float
     lon: float
     h3_index: str
+    # Unit this truck is tasked to refuel via an open (pending/active) refuel order, else None
+    # (= on standby / available). v2 Wave 11 supply-fleet tab.
+    assigned_unit_id: str | None = None
 
 
 class SupplyOverview(BaseModel):

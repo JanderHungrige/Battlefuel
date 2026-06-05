@@ -266,6 +266,8 @@ export interface TruckFuel {
   lat: number
   lon: number
   h3_index: string
+  // Unit this truck is tasked to refuel (open order), else null = on standby (v2 Wave 11).
+  assigned_unit_id?: string | null
 }
 
 export interface SupplyOverview {

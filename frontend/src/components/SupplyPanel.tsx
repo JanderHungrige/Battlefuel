@@ -68,8 +68,13 @@ export function SupplyPanel({
   const [addingPlatform, setAddingPlatform] = useState(false)
   const [newPlatformName, setNewPlatformName] = useState('')
   const [maskOpen, setMaskOpen] = useState(false)
-  // Two tabs: a read-only status Overview and the fuel-ordering actions (v2 Wave 11).
-  const [tab, setTab] = useState<'overview' | 'order'>('overview')
+  // Three tabs: read-only status Overview, the Supply fleet (trucks + availability), and the
+  // fuel-ordering actions (v2 Wave 11).
+  const [tab, setTab] = useState<'overview' | 'fleet' | 'order'>('overview')
+
+  const trucks = overview?.trucks ?? []
+  const standbyCount = trucks.filter((t) => !t.assigned_unit_id).length
+  const unitName = (id: string): string => refuelTargets.find((u) => u.id === id)?.name ?? id
 
   const selectedPlatform = platforms.find((p) => p.id === selectedPlatformId) ?? null
 
@@ -137,6 +142,16 @@ export function SupplyPanel({
         <button
           type="button"
           role="tab"
+          aria-selected={tab === 'fleet'}
+          className={tab === 'fleet' ? 'active' : ''}
+          data-testid="supply-tab-fleet"
+          onClick={() => setTab('fleet')}
+        >
+          Supply fleet
+        </button>
+        <button
+          type="button"
+          role="tab"
           aria-selected={tab === 'order'}
           className={tab === 'order' ? 'active' : ''}
           data-testid="supply-tab-order"
@@ -198,19 +213,77 @@ export function SupplyPanel({
           </div>
           )
         })}
-        <div className="trucks">
-          <div className="depot-name">Fuel trucks</div>
-          {overview?.trucks.map((t) => (
-            <div key={t.instance_id} className="truck-row">
-              <span>{t.name}</span>
-              <span className="stock-val">
-                {t.current_fuel_liters == null
-                  ? 'no telemetry'
-                  : `${fmt(t.current_fuel_liters)} / ${fmt(t.capacity_liters)} L ${t.fuel_type}`}
-              </span>
-            </div>
-          ))}
+        <div className="fleet-summary" data-testid="fleet-summary">
+          <div className="depot-name">Supply fleet</div>
+          <div className="truck-row">
+            <span>Fuel trucks total</span>
+            <span className="stock-val" data-testid="fleet-total">
+              {trucks.length}
+            </span>
+          </div>
+          <div className="truck-row">
+            <span>On standby</span>
+            <span className="stock-val" data-testid="fleet-standby">
+              {standbyCount}
+            </span>
+          </div>
+          <button
+            type="button"
+            className="depot-name link"
+            data-testid="fleet-open"
+            onClick={() => setTab('fleet')}
+          >
+            View supply fleet →
+          </button>
         </div>
+      </section>
+      )}
+
+      {tab === 'fleet' && (
+      <section className="supply-dist" data-testid="supply-fleet">
+        {trucks.length === 0 ? (
+          <p className="supply-msg" data-testid="fleet-empty">
+            No fuel trucks.
+          </p>
+        ) : (
+          trucks.map((t) => (
+            <div key={t.instance_id} className="truck-fleet-row">
+              <div className="truck-fleet-head">
+                <span className="depot-name">{t.name}</span>
+                <span
+                  className={`truck-status ${t.assigned_unit_id ? 'tasked' : 'standby'}`}
+                  data-testid={`truck-status-${t.instance_id}`}
+                >
+                  {t.assigned_unit_id ? `Tasked → ${unitName(t.assigned_unit_id)}` : 'On standby'}
+                </span>
+              </div>
+              <div className="stock-row">
+                <span className="stock-label">{t.fuel_type}</span>
+                {t.current_fuel_liters == null ? (
+                  <span className="stock-val">no telemetry</span>
+                ) : (
+                  <>
+                    <span className="stock-bar">
+                      <span
+                        className="stock-fill"
+                        style={{
+                          width: `${
+                            t.capacity_liters > 0
+                              ? (t.current_fuel_liters / t.capacity_liters) * 100
+                              : 0
+                          }%`,
+                        }}
+                      />
+                    </span>
+                    <span className="stock-val">
+                      {fmt(t.current_fuel_liters)} / {fmt(t.capacity_liters)} L
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+          ))
+        )}
       </section>
       )}
 
