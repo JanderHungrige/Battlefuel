@@ -17,6 +17,7 @@ import { SupplyPanel } from './components/SupplyPanel'
 import { UnitOverview } from './components/UnitOverview'
 import { OSM_ATTRIBUTION } from './config'
 import { LOGISTIC_SITE_TYPES, logisticSiteLabel } from './lib/logisticSite'
+import { shouldRefuelOnClick } from './lib/refuelOnClick'
 import { canShow, type Role } from './roles'
 import { useObstacleOps } from './hooks/useObstacleOps'
 import { useSimSocket } from './hooks/useSimSocket'
@@ -349,6 +350,17 @@ export default function App() {
                 setHighlightEventId(null)
                 planning.resetPlanning()
                 setSelectedUnitId(id)
+                // OF-8: clicking a refuelable unit starts its refuel flow (v2 Wave 11 F6) —
+                // an entry point in addition to the supply panel's "Request refuel".
+                if (
+                  shouldRefuelOnClick(
+                    role,
+                    supplyOrders.refuelTargets.map((u) => u.id),
+                    id,
+                  )
+                ) {
+                  supplyOrders.placeRefuel(id)
+                }
               }}
               onPickDestination={(lat, lon) =>
                 planning.waypointMode
