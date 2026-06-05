@@ -50,9 +50,25 @@ describe('SupplyPanel', () => {
     expect(screen.getByTestId('supply-panel')).toBeInTheDocument()
   })
 
+  it('defaults to the Overview tab and switches to Order fuel (W11)', () => {
+    render(<SupplyPanel {...baseProps} />)
+    // Overview (status) is the default tab: distribution visible, order form hidden.
+    // "Fuel trucks" is overview-only (depot names also appear as <option>s on the order tab).
+    expect(screen.getByText('Fuel trucks')).toBeInTheDocument()
+    expect(screen.queryByTestId('buy-submit')).not.toBeInTheDocument()
+    // Switch to Order fuel: order form appears, distribution hides.
+    fireEvent.click(screen.getByTestId('supply-tab-order'))
+    expect(screen.getByTestId('buy-submit')).toBeInTheDocument()
+    expect(screen.queryByText('Fuel trucks')).not.toBeInTheDocument()
+    // Back to Overview.
+    fireEvent.click(screen.getByTestId('supply-tab-overview'))
+    expect(screen.getByText('Fuel trucks')).toBeInTheDocument()
+  })
+
   it('opens the order mask and places the order through it (W11 F3)', () => {
     const onBuy = vi.fn()
     render(<SupplyPanel {...baseProps} onBuy={onBuy} />)
+    fireEvent.click(screen.getByTestId('supply-tab-order'))
     fireEvent.change(screen.getByTestId('buy-quantity'), { target: { value: '5000' } })
     // "Order fuel" now opens the branded mask instead of placing directly.
     fireEvent.click(screen.getByTestId('buy-submit'))
@@ -70,6 +86,7 @@ describe('SupplyPanel', () => {
 
   it('renames the action to "Order fuel"', () => {
     render(<SupplyPanel {...baseProps} />)
+    fireEvent.click(screen.getByTestId('supply-tab-order'))
     expect(screen.getByTestId('buy-submit')).toHaveTextContent('Order fuel')
     expect(screen.queryByText('Buy fuel')).not.toBeInTheDocument()
   })
@@ -85,6 +102,7 @@ describe('SupplyPanel', () => {
       <SupplyPanel {...baseProps} depots={[]} overview={null} onBuy={onBuy} />,
     )
     rerender(<SupplyPanel {...baseProps} onBuy={onBuy} />)
+    fireEvent.click(screen.getByTestId('supply-tab-order'))
     const submit = screen.getByTestId('buy-submit')
     expect(submit).not.toBeDisabled()
     fireEvent.click(submit)
@@ -99,6 +117,7 @@ describe('SupplyPanel', () => {
 
   it('hides the platform selector when no platforms are provided', () => {
     render(<SupplyPanel {...baseProps} />)
+    fireEvent.click(screen.getByTestId('supply-tab-order'))
     expect(screen.queryByTestId('platform-selector')).not.toBeInTheDocument()
   })
 
@@ -117,6 +136,7 @@ describe('SupplyPanel', () => {
         onAddPlatform={onAddPlatform}
       />,
     )
+    fireEvent.click(screen.getByTestId('supply-tab-order'))
     expect(screen.getByTestId('platform-selector')).toBeInTheDocument()
     expect(screen.getByTestId('platform-select')).toHaveValue('platform-world-fuel-dfms')
 
@@ -190,6 +210,7 @@ describe('SupplyPanel', () => {
   it('requests a refuel for the chosen unit', () => {
     const onRefuel = vi.fn()
     render(<SupplyPanel {...baseProps} onRefuel={onRefuel} />)
+    fireEvent.click(screen.getByTestId('supply-tab-order'))
     fireEvent.click(screen.getByTestId('refuel-submit'))
     expect(onRefuel).toHaveBeenCalledWith('inst-armor-1')
   })
@@ -217,6 +238,7 @@ describe('SupplyPanel', () => {
         onConfirmRefuel={onConfirmRefuel}
       />,
     )
+    fireEvent.click(screen.getByTestId('supply-tab-order'))
     const rec = screen.getByTestId('refuel-recommendation')
     expect(within(rec).getByText(/TANKER/)).toBeInTheDocument()
     fireEvent.click(screen.getByTestId('refuel-confirm'))

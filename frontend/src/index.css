@@ -116,6 +116,32 @@ body {
   color: var(--accent);
 }
 
+/* Joint-Force Supply tabs: Overview (status) | Order fuel (v2 Wave 11). */
+.supply-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 4px 0 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.supply-tabs button {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  padding: 6px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+}
+
+.supply-tabs button.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
 .supply-panel h3 {
   margin: 12px 0 6px;
   font-size: 12px;
