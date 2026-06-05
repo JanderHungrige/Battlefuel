@@ -1380,3 +1380,12 @@ body {
   cursor: pointer;
 }
 
+/* On-map info-bars toggle (v2 Wave 11 F7). */
+.info-bars-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  cursor: pointer;
+}
+

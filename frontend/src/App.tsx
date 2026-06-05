@@ -64,6 +64,8 @@ export default function App() {
   const [depotSiteType, setDepotSiteType] = useState('')
   // Depot the operator asked to locate on the map (v2 Wave 11 F5).
   const [locateDepotId, setLocateDepotId] = useState<string | null>(null)
+  // OF-8 on-map per-unit fuel bars (v2 Wave 11 F7); on by default.
+  const [infoBarsOn, setInfoBarsOn] = useState(true)
 
   // Tiles merged with their latest live tile_update (threat/road/situation/etc.).
   const displayedTiles = useMemo(() => {
@@ -128,9 +130,9 @@ export default function App() {
   })
 
   const livePositions = useMemo(() => {
-    const out: Record<string, { lat: number; lon: number }> = {}
+    const out: Record<string, { lat: number; lon: number; fuel_l?: number }> = {}
     for (const u of Object.values(live)) {
-      if (u.status !== 'cancelled') out[u.instance_id] = { lat: u.lat, lon: u.lon }
+      if (u.status !== 'cancelled') out[u.instance_id] = { lat: u.lat, lon: u.lon, fuel_l: u.fuel_l }
     }
     return out
   }, [live])
@@ -303,6 +305,16 @@ export default function App() {
             ))}
           </select>
         )}
+        {theater && canShow(role, 'depotOverlay') && (
+          <label className="info-bars-toggle" data-testid="info-bars-toggle">
+            <input
+              type="checkbox"
+              checked={infoBarsOn}
+              onChange={(e) => setInfoBarsOn(e.target.checked)}
+            />
+            Fuel bars
+          </label>
+        )}
         <span className="spacer" />
         <span className="attribution">{OSM_ATTRIBUTION}</span>
       </header>
@@ -330,6 +342,7 @@ export default function App() {
               enemyUnits={enemyUnits}
               depots={canShow(role, 'depotOverlay') ? (supply.overview?.depots ?? []) : []}
               locateDepotId={locateDepotId}
+              showUnitFuelBars={canShow(role, 'depotOverlay') && infoBarsOn}
               rendezvous={canShow(role, 'supplyPanel') ? supplyOrders.rendezvous : null}
               adviceArrow={adviceMarker.arrow}
               adviceDest={adviceMarker.dest}
