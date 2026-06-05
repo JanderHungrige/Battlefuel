@@ -73,8 +73,8 @@ export interface MapViewProps {
   highlightEventId: string | null
   enemyUnits: EnemyUnit[]
   depots: DepotFuel[]
-  /** When set, ease the map to this depot (locate). v2 Wave 11 F5. */
-  locateDepotId?: string | null
+  /** When set, mark + ease the map to this point (locate a depot / truck / etc.). v2 Wave 11. */
+  locatePoint?: { lat: number; lon: number } | null
   rendezvous: { lat: number; lon: number } | null
   adviceArrow: { from: { lat: number; lon: number }; to: { lat: number; lon: number } } | null
   adviceDest: { lat: number; lon: number } | null
@@ -419,6 +419,20 @@ function initLayers(map: maplibregl.Map): void {
       'circle-color': '#ffd23f',
       'circle-stroke-width': 2,
       'circle-stroke-color': '#0e1116',
+    },
+  })
+
+  // "Locate" marker (v2 Wave 11): a bright ring dropped on a clicked depot / truck / etc.
+  map.addSource('locate-marker', { type: 'geojson', data: EMPTY })
+  map.addLayer({
+    id: 'locate-marker',
+    type: 'circle',
+    source: 'locate-marker',
+    paint: {
+      'circle-radius': 14,
+      'circle-color': 'rgba(63,208,255,0.18)',
+      'circle-stroke-width': 3,
+      'circle-stroke-color': '#3fd0ff',
     },
   })
 }
@@ -788,6 +802,7 @@ export function MapView(props: MapViewProps) {
       setData(map, 'rendezvous', destinationToGeoJSON(p.rendezvous))
       setData(map, 'advice-arrow', adviceArrowToGeoJSON(p.adviceArrow?.from, p.adviceArrow?.to))
       setData(map, 'advice-dest', destinationToGeoJSON(p.adviceDest))
+      setData(map, 'locate-marker', destinationToGeoJSON(p.locatePoint ?? null))
       wireInteraction(map, propsRef)
       wireHover(map)
       wireCombatHover(map)
@@ -861,11 +876,12 @@ export function MapView(props: MapViewProps) {
     if (readyRef.current && mapRef.current) syncDepots(mapRef.current, props.depots)
   }, [props.depots])
   useEffect(() => {
-    // Locate a supply point on the map (v2 Wave 11 F5).
-    if (!readyRef.current || !mapRef.current || !props.locateDepotId) return
-    const d = propsRef.current.depots.find((x) => x.depot.id === props.locateDepotId)
-    if (d) mapRef.current.easeTo({ center: [d.depot.lon, d.depot.lat], duration: 600, zoom: 12 })
-  }, [props.locateDepotId])
+    // Mark + ease to a located point — a clicked depot, fuel truck, etc. (v2 Wave 11).
+    if (!readyRef.current || !mapRef.current) return
+    const p = props.locatePoint
+    setData(mapRef.current, 'locate-marker', destinationToGeoJSON(p ?? null))
+    if (p) mapRef.current.easeTo({ center: [p.lon, p.lat], duration: 600, zoom: 12 })
+  }, [props.locatePoint])
   useEffect(() => {
     if (readyRef.current && mapRef.current)
       setData(mapRef.current, 'rendezvous', destinationToGeoJSON(props.rendezvous))

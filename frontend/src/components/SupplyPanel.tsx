@@ -30,8 +30,8 @@ export interface SupplyPanelProps {
   onShowHistory?: () => void
   /** Open the Info Docs panel (v2 Wave 11 F8). */
   onShowDocs?: () => void
-  /** Locate a supply point on the map (v2 Wave 11 F5). */
-  onLocateDepot?: (depotId: string) => void
+  /** Mark + locate a supply entity (depot / fuel truck / …) on the map (v2 Wave 11). */
+  onLocate?: (lat: number, lon: number) => void
   /** Ask the advisor to propose a refuel for a low site (v2 Wave 11 F5). */
   onProposeRefuel?: (depotId: string) => void
   onBuy: (depotId: string, fuelType: string, quantityLiters: number, meta?: OrderMeta) => void
@@ -55,7 +55,7 @@ export function SupplyPanel({
   onAddPlatform,
   onShowHistory,
   onShowDocs,
-  onLocateDepot,
+  onLocate,
   onProposeRefuel,
   onBuy,
   onRefuel,
@@ -174,8 +174,8 @@ export function SupplyPanel({
                 type="button"
                 className="depot-name link"
                 data-testid={`depot-locate-${d.depot.id}`}
-                onClick={() => onLocateDepot?.(d.depot.id)}
-                title="Locate on map"
+                onClick={() => onLocate?.(d.depot.lat, d.depot.lon)}
+                title="Mark + locate on map"
               >
                 {d.depot.name}
               </button>
@@ -249,7 +249,15 @@ export function SupplyPanel({
           trucks.map((t) => (
             <div key={t.instance_id} className="truck-fleet-row">
               <div className="truck-fleet-head">
-                <span className="depot-name">{t.name}</span>
+                <button
+                  type="button"
+                  className="depot-name link"
+                  data-testid={`truck-locate-${t.instance_id}`}
+                  onClick={() => onLocate?.(t.lat, t.lon)}
+                  title="Mark + locate on map"
+                >
+                  {t.name}
+                </button>
                 <span
                   className={`truck-status ${t.assigned_unit_id ? 'tasked' : 'standby'}`}
                   data-testid={`truck-status-${t.instance_id}`}
