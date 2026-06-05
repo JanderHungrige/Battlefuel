@@ -142,6 +142,56 @@ body {
   border-bottom-color: var(--accent);
 }
 
+/* Supply fleet tab + overview summary (v2 Wave 11). */
+.fleet-summary {
+  margin-top: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
+.fleet-summary .link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  padding: 4px 0 0;
+  cursor: pointer;
+}
+
+.truck-fleet-row {
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+}
+
+.truck-fleet-row:first-child {
+  border-top: none;
+}
+
+.truck-fleet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.truck-status {
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 4px;
+  padding: 1px 7px;
+}
+
+.truck-status.standby {
+  background: rgba(58, 143, 79, 0.25);
+  color: #8fe0a4;
+}
+
+.truck-status.tasked {
+  background: rgba(211, 154, 43, 0.25);
+  color: #f0c878;
+}
+
 .supply-panel h3 {
   margin: 12px 0 6px;
   font-size: 12px;

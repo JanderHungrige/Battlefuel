@@ -26,6 +26,9 @@ SEED_PLACEMENTS: tuple[tuple[str, str, str, float, float, str, float | None], ..
     ("inst-mech-1", "VIPER", "mech-inf-coy", 49.211, 11.840, "operational", 7000.0),
     ("inst-recon-1", "HAWK", "recon-troop", 49.252, 11.885, "degraded", None),
     ("inst-fuel-1", "TANKER", "fuel-supply-pl", 49.201, 11.831, "operational", 3800.0),
+    # Two more fuel trucks for the OF-8 supply fleet (v2 Wave 11).
+    ("inst-fuel-2", "BOWSER", "fuel-supply-pl", 49.207, 11.838, "operational", 4000.0),
+    ("inst-fuel-3", "CISTERN", "fuel-supply-pl", 49.198, 11.828, "operational", 1500.0),
 )
 
 

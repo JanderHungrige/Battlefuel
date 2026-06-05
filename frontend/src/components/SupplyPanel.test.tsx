@@ -43,26 +43,57 @@ const baseProps = {
 }
 
 describe('SupplyPanel', () => {
-  it('shows the distribution: depot, truck, and totals', () => {
+  it('shows the overview: depot distribution + a fleet summary', () => {
     render(<SupplyPanel {...baseProps} />)
     expect(screen.getAllByText(/Main Supply Point/).length).toBeGreaterThan(0)
-    expect(screen.getAllByText(/TANKER/).length).toBeGreaterThan(0)
+    // The full truck list moved to the Supply fleet tab; the overview shows counts.
+    expect(screen.getByTestId('fleet-total')).toHaveTextContent('1')
+    expect(screen.getByTestId('fleet-standby')).toHaveTextContent('1')
     expect(screen.getByTestId('supply-panel')).toBeInTheDocument()
   })
 
   it('defaults to the Overview tab and switches to Order fuel (W11)', () => {
     render(<SupplyPanel {...baseProps} />)
-    // Overview (status) is the default tab: distribution visible, order form hidden.
-    // "Fuel trucks" is overview-only (depot names also appear as <option>s on the order tab).
-    expect(screen.getByText('Fuel trucks')).toBeInTheDocument()
+    // Overview (status) is the default tab: fleet summary visible, order form hidden.
+    expect(screen.getByTestId('fleet-summary')).toBeInTheDocument()
     expect(screen.queryByTestId('buy-submit')).not.toBeInTheDocument()
-    // Switch to Order fuel: order form appears, distribution hides.
+    // Switch to Order fuel: order form appears, summary hides.
     fireEvent.click(screen.getByTestId('supply-tab-order'))
     expect(screen.getByTestId('buy-submit')).toBeInTheDocument()
-    expect(screen.queryByText('Fuel trucks')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('fleet-summary')).not.toBeInTheDocument()
     // Back to Overview.
     fireEvent.click(screen.getByTestId('supply-tab-overview'))
-    expect(screen.getByText('Fuel trucks')).toBeInTheDocument()
+    expect(screen.getByTestId('fleet-summary')).toBeInTheDocument()
+  })
+
+  it('Supply fleet tab lists trucks with their availability (W11)', () => {
+    const fleetOverview: SupplyOverview = {
+      ...overview,
+      trucks: [
+        { ...overview.trucks[0] }, // TANKER, no assignment → standby
+        {
+          instance_id: 'inst-fuel-2',
+          name: 'BOWSER',
+          unit_type_id: 'fuel-supply-pl',
+          fuel_type: 'diesel',
+          current_fuel_liters: 4000,
+          capacity_liters: 4000,
+          lat: 49.2,
+          lon: 11.84,
+          h3_index: 'z',
+          assigned_unit_id: 'inst-armor-1',
+        },
+      ],
+    }
+    render(<SupplyPanel {...baseProps} overview={fleetOverview} />)
+    // Overview summary reflects 2 trucks, 1 on standby.
+    expect(screen.getByTestId('fleet-total')).toHaveTextContent('2')
+    expect(screen.getByTestId('fleet-standby')).toHaveTextContent('1')
+    // The fleet tab lists each truck with availability (assigned unit resolved via refuelTargets).
+    fireEvent.click(screen.getByTestId('supply-tab-fleet'))
+    expect(screen.getByTestId('supply-fleet')).toBeInTheDocument()
+    expect(screen.getByTestId('truck-status-inst-fuel-1')).toHaveTextContent('On standby')
+    expect(screen.getByTestId('truck-status-inst-fuel-2')).toHaveTextContent('Tasked → TIGER')
   })
 
   it('opens the order mask and places the order through it (W11 F3)', () => {

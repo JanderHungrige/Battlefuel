@@ -17,6 +17,7 @@ from app.domain.supply import FuelDepot, FuelStock, LogisticSiteType, SupplyOver
 from app.domain.unit import FuelType
 from app.providers.base import UnitDataProvider
 from app.providers.factory import build_unit_provider
+from app.providers.refuel_orders import RefuelOrderProvider, build_refuel_order_provider
 from app.providers.supply import SupplyProvider, build_supply_provider
 from app.providers.unit_instances import UnitInstanceProvider, build_unit_instance_provider
 from app.services.supply_overview import build_supply_overview
@@ -36,10 +37,15 @@ def get_unit_provider() -> UnitDataProvider:
     return build_unit_provider()
 
 
+def get_refuel_order_provider() -> RefuelOrderProvider:
+    return build_refuel_order_provider()
+
+
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 SupplyDep = Annotated[SupplyProvider, Depends(get_supply_provider)]
 InstanceDep = Annotated[UnitInstanceProvider, Depends(get_instance_provider)]
 UnitDep = Annotated[UnitDataProvider, Depends(get_unit_provider)]
+RefuelDep = Annotated[RefuelOrderProvider, Depends(get_refuel_order_provider)]
 
 
 class CreateDepotRequest(BaseModel):
@@ -90,5 +96,6 @@ async def supply_overview(
     supply: SupplyDep,
     instances: InstanceDep,
     units: UnitDep,
+    refuel_orders: RefuelDep,
 ) -> SupplyOverview:
-    return await build_supply_overview(session, supply, instances, units)
+    return await build_supply_overview(session, supply, instances, units, refuel_orders)
