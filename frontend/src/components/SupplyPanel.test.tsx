@@ -133,6 +133,60 @@ describe('SupplyPanel', () => {
     expect(onAddPlatform).toHaveBeenCalledWith('NATO Fuel Cell')
   })
 
+  it('locates a supply point and shows its site-type tag (W11 F5)', () => {
+    const onLocateDepot = vi.fn()
+    const lowOverview: SupplyOverview = {
+      depots: [
+        {
+          depot: { id: 'site-bsa', name: 'BSA 12', h3_index: 'z', lat: 49.2, lon: 11.8, site_type: 'bsa' },
+          stocks: [
+            { depot_id: 'site-bsa', fuel_type: 'diesel', quantity_liters: 5000, capacity_liters: 20000 },
+          ],
+        },
+      ],
+      trucks: [],
+      total_depot_liters_by_type: { diesel: 5000 },
+      total_truck_liters: 0,
+    }
+    render(
+      <SupplyPanel
+        {...baseProps}
+        overview={lowOverview}
+        depots={lowOverview.depots.map((d) => d.depot)}
+        onLocateDepot={onLocateDepot}
+      />,
+    )
+    expect(screen.getByTestId('depot-site-tag')).toHaveTextContent('BSA')
+    fireEvent.click(screen.getByTestId('depot-locate-site-bsa'))
+    expect(onLocateDepot).toHaveBeenCalledWith('site-bsa')
+  })
+
+  it('offers a refuel proposal for a low site only (W11 F5)', () => {
+    const onProposeRefuel = vi.fn()
+    const lowOverview: SupplyOverview = {
+      depots: [
+        {
+          depot: { id: 'site-low', name: 'FLS 3', h3_index: 'z', lat: 49.2, lon: 11.8, site_type: 'fls' },
+          stocks: [
+            { depot_id: 'site-low', fuel_type: 'diesel', quantity_liters: 2000, capacity_liters: 20000 },
+          ],
+        },
+      ],
+      trucks: [],
+      total_depot_liters_by_type: { diesel: 2000 },
+      total_truck_liters: 0,
+    }
+    render(<SupplyPanel {...baseProps} overview={lowOverview} onProposeRefuel={onProposeRefuel} />)
+    fireEvent.click(screen.getByTestId('depot-propose-site-low'))
+    expect(onProposeRefuel).toHaveBeenCalledWith('site-low')
+  })
+
+  it('does not offer a refuel proposal for a well-stocked depot', () => {
+    // baseProps depot-main is 60000/80000 (75% — above the low threshold).
+    render(<SupplyPanel {...baseProps} onProposeRefuel={vi.fn()} />)
+    expect(screen.queryByTestId('depot-propose-depot-main')).not.toBeInTheDocument()
+  })
+
   it('requests a refuel for the chosen unit', () => {
     const onRefuel = vi.fn()
     render(<SupplyPanel {...baseProps} onRefuel={onRefuel} />)

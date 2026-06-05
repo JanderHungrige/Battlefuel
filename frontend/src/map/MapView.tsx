@@ -72,6 +72,8 @@ export interface MapViewProps {
   highlightEventId: string | null
   enemyUnits: EnemyUnit[]
   depots: DepotFuel[]
+  /** When set, ease the map to this depot (locate). v2 Wave 11 F5. */
+  locateDepotId?: string | null
   rendezvous: { lat: number; lon: number } | null
   adviceArrow: { from: { lat: number; lon: number }; to: { lat: number; lon: number } } | null
   adviceDest: { lat: number; lon: number } | null
@@ -747,6 +749,12 @@ export function MapView(props: MapViewProps) {
   useEffect(() => {
     if (readyRef.current && mapRef.current) syncDepots(mapRef.current, props.depots)
   }, [props.depots])
+  useEffect(() => {
+    // Locate a supply point on the map (v2 Wave 11 F5).
+    if (!readyRef.current || !mapRef.current || !props.locateDepotId) return
+    const d = propsRef.current.depots.find((x) => x.depot.id === props.locateDepotId)
+    if (d) mapRef.current.easeTo({ center: [d.depot.lon, d.depot.lat], duration: 600, zoom: 12 })
+  }, [props.locateDepotId])
   useEffect(() => {
     if (readyRef.current && mapRef.current)
       setData(mapRef.current, 'rendezvous', destinationToGeoJSON(props.rendezvous))

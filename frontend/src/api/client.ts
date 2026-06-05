@@ -129,6 +129,9 @@ export const api = {
   getReposition: (): Promise<AdviceResult> => getJson<AdviceResult>('/advice/reposition'),
   getRefuelPlan: (): Promise<AdviceResult> => getJson<AdviceResult>('/advice/refuel-plan'),
   getRedistribution: (): Promise<AdviceResult> => getJson<AdviceResult>('/advice/redistribution'),
+  // Per-site low-fuel refuel proposal (v2 Wave 11 F5).
+  getSiteRefuel: (depotId: string): Promise<AdviceResult> =>
+    getJson<AdviceResult>(`/advice/site-refuel/${encodeURIComponent(depotId)}`),
   getRouteAdvice: (instanceId: string, destLat: number, destLon: number): Promise<AdviceResult> =>
     getJson<AdviceResult>(
       `/advice/route?instance_id=${encodeURIComponent(instanceId)}&dest_lat=${destLat}&dest_lon=${destLon}`,

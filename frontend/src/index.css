@@ -1331,3 +1331,52 @@ body {
   opacity: 0.7;
 }
 
+/* Typed logistic sites (v2 Wave 11 F5). */
+.site-type-select {
+  background: #1c222b;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.depot-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.depot-name.link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.depot-site-tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: var(--accent);
+  color: #05080c;
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.depot-propose {
+  margin-left: auto;
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+

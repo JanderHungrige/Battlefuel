@@ -20,6 +20,8 @@ class FuelDepotRow(Base):
     h3_index: Mapped[str]
     lat: Mapped[float]
     lon: Mapped[float]
+    # NATO JLSG site type (v2 Wave 11 F5); NULL for a plain depot/marker.
+    site_type: Mapped[str | None] = mapped_column(default=None)
 
 
 class FuelStockRow(Base):

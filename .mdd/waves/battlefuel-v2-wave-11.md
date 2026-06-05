@@ -7,7 +7,7 @@ status: planned
 depends_on: battlefuel-v2-wave-10
 demo_state: "In the OF-8 Joint-Force Supply view the operator orders fuel end-to-end: pick a fuel-management platform (World Fuel DFMS default / Shell FM / add new), hit 'Order fuel' (renamed from Buy fuel) to open a branded order mask with fuel type / destination / amount prefilled, tick who to inform (JLSG, JTF HQ), and Place order — posting a confirmation + an entry in a new Order History panel that tracks each order through the NATO stages (placed -> JLSG -> JTF -> provider -> on route -> reached JLSG -> reached OPCON). The initial main-supply-point order dropdown is populated (bug fixed). Supply points are clickable to locate on the map; the operator can add typed logistic sites (BSA / CSSBN / DOB / FLS / TLB) that carry fuel stock and can be refueled — and when a site runs low it proposes a refuel/redistribution order. Refuel is started by clicking a unit. On the map in OF-8, each unit shows a colour-coded fuel bar (selected unit on top), toggleable via an on-map-info-bars selector. An Info Docs tab surfaces the official PDFs from the folder. Order status auto-advances on the sim clock (30 s per stage)."
 created: 2026-06-05
-hash: 2b1b3d5b
+hash: ff7a2aa9
 ---
 
 # Wave 11: OF-8 Fuel Ordering, Logistic Sites & Supply Optics
@@ -33,7 +33,7 @@ Mark `complete` only after ALL three gates pass (never on a localhost demo):
 | 2 | fuel-platform-selector | docs/67-fuel-platform-selector.md | complete | order-fuel-rename-and-dropdown-bug |
 | 3 | order-fuel-mask | docs/68-order-fuel-mask.md | complete | fuel-platform-selector |
 | 4 | order-history-panel | docs/69-order-history-panel.md | complete | order-fuel-mask |
-| 5 | logistic-sites | — | planned | — |
+| 5 | logistic-sites | docs/70-logistic-sites.md | complete | — |
 | 6 | refuel-by-unit-click | — | planned | — |
 | 7 | of8-on-map-info-bars | — | planned | — |
 | 8 | official-docs-tab | — | planned | — |

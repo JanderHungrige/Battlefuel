@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
-from app.domain.supply import FuelDepot, FuelStock, SupplyOverview
+from app.domain.supply import FuelDepot, FuelStock, LogisticSiteType, SupplyOverview
 from app.domain.unit import FuelType
 from app.providers.base import UnitDataProvider
 from app.providers.factory import build_unit_provider
@@ -46,14 +46,16 @@ class CreateDepotRequest(BaseModel):
     name: str
     lat: float
     lon: float
+    # NATO JLSG site type (v2 Wave 11 F5); None places a plain depot/marker.
+    site_type: LogisticSiteType | None = None
 
 
 @router.post("/depots", status_code=201)
 async def create_depot(
     req: CreateDepotRequest, session: SessionDep, supply: SupplyDep
 ) -> FuelDepot:
-    """Manually place a fuel depot at a clicked point (v2 Wave 10, add-depot)."""
-    return await supply.create_depot(session, req.name, req.lat, req.lon)
+    """Manually place a fuel depot, or a typed stocked logistic site (v2 Wave 10 / W11 F5)."""
+    return await supply.create_depot(session, req.name, req.lat, req.lon, req.site_type)
 
 
 @router.get("/depots")

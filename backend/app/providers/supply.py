@@ -17,14 +17,28 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings, get_settings
-from app.domain.supply import FuelDepot, FuelStock
+from app.domain.supply import FuelDepot, FuelStock, LogisticSiteType
 from app.domain.unit import FuelType
 from app.models.supply import FuelDepotRow, FuelStockRow
 from app.services.tile_grid import DEFAULT_RESOLUTION
 
+# Default stock a typed logistic site is created with (v2 Wave 11 F5): low enough (below the
+# redistribution target fill) that the site immediately proposes a refuel.
+SITE_SEED_STOCKS: tuple[tuple[FuelType, float, float], ...] = (
+    (FuelType.DIESEL, 5000.0, 20000.0),
+    (FuelType.JP8, 2000.0, 10000.0),
+)
+
 
 def _to_depot(row: FuelDepotRow) -> FuelDepot:
-    return FuelDepot(id=row.id, name=row.name, h3_index=row.h3_index, lat=row.lat, lon=row.lon)
+    return FuelDepot(
+        id=row.id,
+        name=row.name,
+        h3_index=row.h3_index,
+        lat=row.lat,
+        lon=row.lon,
+        site_type=LogisticSiteType(row.site_type) if row.site_type is not None else None,
+    )
 
 
 def _to_stock(row: FuelStockRow) -> FuelStock:
@@ -49,9 +63,18 @@ class SupplyProvider(ABC):
 
     @abstractmethod
     async def create_depot(
-        self, session: AsyncSession, name: str, lat: float, lon: float
+        self,
+        session: AsyncSession,
+        name: str,
+        lat: float,
+        lon: float,
+        site_type: LogisticSiteType | None = None,
     ) -> FuelDepot:
-        """Create + persist a fuel depot at (lat, lon). Commits (v2 Wave 10, add-depot)."""
+        """Create + persist a fuel depot at (lat, lon). Commits (v2 Wave 10, add-depot).
+
+        A typed logistic site (``site_type`` set, v2 Wave 11 F5) is additionally seeded with
+        default diesel/JP8 stock so it is stocked and refuelable.
+        """
 
     @abstractmethod
     async def list_stocks(
@@ -89,16 +112,34 @@ class DbSupplyProvider(SupplyProvider):
         return _to_depot(row) if row is not None else None
 
     async def create_depot(
-        self, session: AsyncSession, name: str, lat: float, lon: float
+        self,
+        session: AsyncSession,
+        name: str,
+        lat: float,
+        lon: float,
+        site_type: LogisticSiteType | None = None,
     ) -> FuelDepot:
+        depot_id = uuid.uuid4().hex
         row = FuelDepotRow(
-            id=uuid.uuid4().hex,
+            id=depot_id,
             name=name,
             h3_index=h3.latlng_to_cell(lat, lon, DEFAULT_RESOLUTION),
             lat=lat,
             lon=lon,
+            site_type=site_type.value if site_type is not None else None,
         )
         session.add(row)
+        # A typed logistic site is stocked + refuelable: seed default stock rows (v2 Wave 11 F5).
+        if site_type is not None:
+            for fuel_type, quantity, capacity in SITE_SEED_STOCKS:
+                session.add(
+                    FuelStockRow(
+                        depot_id=depot_id,
+                        fuel_type=fuel_type.value,
+                        quantity_liters=quantity,
+                        capacity_liters=capacity,
+                    )
+                )
         await session.commit()
         return _to_depot(row)
 

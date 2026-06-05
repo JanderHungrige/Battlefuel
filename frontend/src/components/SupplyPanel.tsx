@@ -2,7 +2,12 @@
 
 import { useMemo, useState } from 'react'
 import type { FuelDepot, FuelPlatform, RefuelOrder, SupplyOverview } from '../api/types'
+import { logisticSiteShort } from '../lib/logisticSite'
 import { type OrderMeta, OrderFuelMask } from './OrderFuelMask'
+
+// A depot is "low" (eligible for a refuel proposal) when any stock is below half capacity —
+// matching the redistribution advisor's 0.5 target fill (v2 Wave 11 F5).
+const LOW_FILL = 0.5
 
 export interface RecommendationView {
   order: RefuelOrder
@@ -23,6 +28,10 @@ export interface SupplyPanelProps {
   onAddPlatform?: (name: string) => void
   /** Open the Order History panel (v2 Wave 11 F4). */
   onShowHistory?: () => void
+  /** Locate a supply point on the map (v2 Wave 11 F5). */
+  onLocateDepot?: (depotId: string) => void
+  /** Ask the advisor to propose a refuel for a low site (v2 Wave 11 F5). */
+  onProposeRefuel?: (depotId: string) => void
   onBuy: (depotId: string, fuelType: string, quantityLiters: number, meta?: OrderMeta) => void
   onRefuel: (unitId: string) => void
   onConfirmRefuel: () => void
@@ -43,6 +52,8 @@ export function SupplyPanel({
   onSelectPlatform,
   onAddPlatform,
   onShowHistory,
+  onLocateDepot,
+  onProposeRefuel,
   onBuy,
   onRefuel,
   onConfirmRefuel,
@@ -96,9 +107,39 @@ export function SupplyPanel({
       </div>
 
       <section className="supply-dist">
-        {overview?.depots.map((d) => (
+        {overview?.depots.map((d) => {
+          const isLow = d.stocks.some(
+            (s) => s.capacity_liters > 0 && s.quantity_liters / s.capacity_liters < LOW_FILL,
+          )
+          return (
           <div key={d.depot.id} className="depot-row">
-            <div className="depot-name">{d.depot.name}</div>
+            <div className="depot-name-row">
+              <button
+                type="button"
+                className="depot-name link"
+                data-testid={`depot-locate-${d.depot.id}`}
+                onClick={() => onLocateDepot?.(d.depot.id)}
+                title="Locate on map"
+              >
+                {d.depot.name}
+              </button>
+              {d.depot.site_type && (
+                <span className="depot-site-tag" data-testid="depot-site-tag">
+                  {logisticSiteShort(d.depot.site_type)}
+                </span>
+              )}
+              {isLow && onProposeRefuel && (
+                <button
+                  type="button"
+                  className="ghost depot-propose"
+                  data-testid={`depot-propose-${d.depot.id}`}
+                  onClick={() => onProposeRefuel(d.depot.id)}
+                  title="Propose a refuel/redistribution order"
+                >
+                  Propose refuel
+                </button>
+              )}
+            </div>
             {d.stocks.map((s) => {
               const pct = s.capacity_liters > 0 ? (s.quantity_liters / s.capacity_liters) * 100 : 0
               return (
@@ -114,7 +155,8 @@ export function SupplyPanel({
               )
             })}
           </div>
-        ))}
+          )
+        })}
         <div className="trucks">
           <div className="depot-name">Fuel trucks</div>
           {overview?.trucks.map((t) => (

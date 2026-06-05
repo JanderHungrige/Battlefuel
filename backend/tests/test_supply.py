@@ -13,7 +13,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import Settings
-from app.domain.supply import FuelDepot, FuelStock
+from app.domain.supply import FuelDepot, FuelStock, LogisticSiteType
 from app.domain.unit import FuelType
 from app.providers.supply import (
     DbSupplyProvider,
@@ -76,6 +76,16 @@ def _maker() -> async_sessionmaker[AsyncSession]:
     return async_sessionmaker(engine, expire_on_commit=False)
 
 
+async def _delete_depot(maker: async_sessionmaker[AsyncSession], depot_id: str) -> None:
+    """Remove a test-created depot + its stock so the shared DB stays clean for sibling tests."""
+    async with maker() as session:
+        await session.execute(
+            text("DELETE FROM fuel_stocks WHERE depot_id = :id"), {"id": depot_id}
+        )
+        await session.execute(text("DELETE FROM fuel_depots WHERE id = :id"), {"id": depot_id})
+        await session.commit()
+
+
 @pytest.mark.db
 class TestDbSupplyProvider:
     async def _seeded(self) -> async_sessionmaker[AsyncSession]:
@@ -97,6 +107,46 @@ class TestDbSupplyProvider:
             assert one is not None
             assert one.id == depots[0].id
             assert await provider.get_depot(session, "no-such-depot") is None
+
+    async def test_create_typed_site_seeds_stock(self) -> None:
+        # v2 Wave 11 F5: a typed logistic site is created stocked + refuelable.
+        try:
+            maker = await self._seeded()
+        except SQLAlchemyError as exc:
+            pytest.skip(f"database unavailable: {exc}")
+        provider = DbSupplyProvider()
+        async with maker() as session:
+            site = await provider.create_depot(
+                session, "Bravo BSA", 49.21, 11.84, LogisticSiteType.BSA
+            )
+        try:
+            async with maker() as session:
+                fetched = await provider.get_depot(session, site.id)
+                assert fetched is not None and fetched.site_type is LogisticSiteType.BSA
+                stocks = await provider.list_stocks(session, depot_id=site.id)
+                kinds = {s.fuel_type for s in stocks}
+                assert FuelType.DIESEL in kinds and FuelType.JP8 in kinds
+                # Seeded below capacity so the site can propose a refuel.
+                diesel = next(s for s in stocks if s.fuel_type is FuelType.DIESEL)
+                assert 0 < diesel.quantity_liters < diesel.capacity_liters
+        finally:
+            await _delete_depot(maker, site.id)
+
+    async def test_create_plain_depot_has_no_stock(self) -> None:
+        try:
+            maker = await self._seeded()
+        except SQLAlchemyError as exc:
+            pytest.skip(f"database unavailable: {exc}")
+        provider = DbSupplyProvider()
+        async with maker() as session:
+            depot = await provider.create_depot(session, "Bare marker", 49.22, 11.85)
+        try:
+            async with maker() as session:
+                fetched = await provider.get_depot(session, depot.id)
+                assert fetched is not None and fetched.site_type is None
+                assert await provider.list_stocks(session, depot_id=depot.id) == []
+        finally:
+            await _delete_depot(maker, depot.id)
 
     async def test_stocks_listed_per_depot(self) -> None:
         try:

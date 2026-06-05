@@ -212,6 +212,8 @@ export interface CreateDepotRequest {
   name: string
   lat: number
   lon: number
+  // NATO JLSG site type (v2 Wave 11 F5); omit for a plain depot/marker.
+  site_type?: string | null
 }
 
 /** An operator-placed obstacle the router avoids (blocks an H3 cell). */
@@ -238,6 +240,8 @@ export interface FuelDepot {
   h3_index: string
   lat: number
   lon: number
+  // NATO JLSG site type (v2 Wave 11 F5); null/absent for a plain depot.
+  site_type?: string | null
 }
 
 export interface FuelStock {
