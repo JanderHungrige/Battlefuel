@@ -257,6 +257,7 @@ export default function App() {
         <span className="brand">BattleFuel</span>
         {theater && <span className="theater">{theater.name}</span>}
         {theater && <RoleToggle role={role} onChange={setRole} />}
+        {theater && <GridLayoutControl precisionM={gridPrecisionM} onPrecision={setGridPrecisionM} />}
         {theater && canShow(role, 'unitOverview') && (
           <button
             className={`mode-toggle${roster.open ? ' active' : ''}`}
@@ -386,7 +387,6 @@ export default function App() {
               }
               onClearSelection={clear}
             />
-            <GridLayoutControl precisionM={gridPrecisionM} onPrecision={setGridPrecisionM} />
             <ChatterLog messages={chatter} onSelect={setHighlightH3} onSelectEvent={locateEvent} />
             {canShow(role, 'strategicFeed') && (
               <ChatterLog

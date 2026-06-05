@@ -518,16 +518,14 @@ body {
 }
 
 /* Grid-layout control (Wave 2): MGRS ↔ Hex toggle + precision select. */
+/* Lives inline in the top toolbar (v2 Wave 11) — no longer an absolute map overlay (it
+   overlapped the supply panel in the top-left corner). */
 .grid-control {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  z-index: 16;
-  display: flex;
+  display: inline-flex;
   gap: 6px;
   align-items: center;
-  padding: 6px 8px;
-  background: var(--panel);
+  padding: 3px 8px;
+  background: #1c222b;
   border: 1px solid var(--border);
   border-radius: 6px;
 }
