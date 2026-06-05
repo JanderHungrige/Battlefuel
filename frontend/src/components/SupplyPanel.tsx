@@ -68,6 +68,8 @@ export function SupplyPanel({
   const [addingPlatform, setAddingPlatform] = useState(false)
   const [newPlatformName, setNewPlatformName] = useState('')
   const [maskOpen, setMaskOpen] = useState(false)
+  // Two tabs: a read-only status Overview and the fuel-ordering actions (v2 Wave 11).
+  const [tab, setTab] = useState<'overview' | 'order'>('overview')
 
   const selectedPlatform = platforms.find((p) => p.id === selectedPlatformId) ?? null
 
@@ -121,6 +123,30 @@ export function SupplyPanel({
         </div>
       </div>
 
+      <div className="supply-tabs" role="tablist">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'overview'}
+          className={tab === 'overview' ? 'active' : ''}
+          data-testid="supply-tab-overview"
+          onClick={() => setTab('overview')}
+        >
+          Overview
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'order'}
+          className={tab === 'order' ? 'active' : ''}
+          data-testid="supply-tab-order"
+          onClick={() => setTab('order')}
+        >
+          Order fuel
+        </button>
+      </div>
+
+      {tab === 'overview' && (
       <section className="supply-dist">
         {overview?.depots.map((d) => {
           const isLow = d.stocks.some(
@@ -186,7 +212,10 @@ export function SupplyPanel({
           ))}
         </div>
       </section>
+      )}
 
+      {tab === 'order' && (
+      <>
       {platforms.length > 0 && (
         <section className="supply-form platform-selector" data-testid="platform-selector">
           <h3>Fuel-management platform</h3>
@@ -335,6 +364,8 @@ export function SupplyPanel({
           </div>
         )}
       </section>
+      </>
+      )}
 
       {message && <div className="supply-msg">{message}</div>}
     </aside>
