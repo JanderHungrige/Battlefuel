@@ -28,6 +28,8 @@ export interface SupplyPanelProps {
   onAddPlatform?: (name: string) => void
   /** Open the Order History panel (v2 Wave 11 F4). */
   onShowHistory?: () => void
+  /** Open the Info Docs panel (v2 Wave 11 F8). */
+  onShowDocs?: () => void
   /** Locate a supply point on the map (v2 Wave 11 F5). */
   onLocateDepot?: (depotId: string) => void
   /** Ask the advisor to propose a refuel for a low site (v2 Wave 11 F5). */
@@ -52,6 +54,7 @@ export function SupplyPanel({
   onSelectPlatform,
   onAddPlatform,
   onShowHistory,
+  onShowDocs,
   onLocateDepot,
   onProposeRefuel,
   onBuy,
@@ -94,16 +97,28 @@ export function SupplyPanel({
     <aside className="supply-panel" data-testid="supply-panel">
       <div className="supply-head">
         <h2>Joint-Force Supply</h2>
-        {onShowHistory && (
-          <button
-            type="button"
-            className="ghost"
-            data-testid="order-history-open"
-            onClick={onShowHistory}
-          >
-            Order history
-          </button>
-        )}
+        <div className="supply-head-actions">
+          {onShowHistory && (
+            <button
+              type="button"
+              className="ghost"
+              data-testid="order-history-open"
+              onClick={onShowHistory}
+            >
+              Order history
+            </button>
+          )}
+          {onShowDocs && (
+            <button
+              type="button"
+              className="ghost"
+              data-testid="info-docs-open"
+              onClick={onShowDocs}
+            >
+              Info docs
+            </button>
+          )}
+        </div>
       </div>
 
       <section className="supply-dist">

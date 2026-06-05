@@ -12,6 +12,7 @@ import { firstHaltedUnit } from './lib/halt'
 import { ObstacleKindPicker } from './components/ObstacleKindPicker'
 import type { ObstacleKind } from './components/obstacleKinds'
 import { RoleToggle } from './components/RoleToggle'
+import { InfoDocsPanel } from './components/InfoDocsPanel'
 import { OrderHistoryPanel } from './components/OrderHistoryPanel'
 import { SupplyPanel } from './components/SupplyPanel'
 import { UnitOverview } from './components/UnitOverview'
@@ -25,6 +26,7 @@ import { useAdviceMarker } from './hooks/useAdviceMarker'
 import { useAdvisor } from './hooks/useAdvisor'
 import { useMovePlanning } from './hooks/useMovePlanning'
 import { useFuelPlatforms } from './hooks/useFuelPlatforms'
+import { useInfoDocs } from './hooks/useInfoDocs'
 import { useOrderHistory } from './hooks/useOrderHistory'
 import { useSupply } from './hooks/useSupply'
 import { useSupplyOrders } from './hooks/useSupplyOrders'
@@ -123,6 +125,8 @@ export default function App() {
   const fuelPlatforms = useFuelPlatforms(role === 'OF8')
   const orderHistory = useOrderHistory(role === 'OF8', supplyTick)
   const [orderHistoryOpen, setOrderHistoryOpen] = useState(false)
+  const infoDocs = useInfoDocs(role === 'OF8')
+  const [infoDocsOpen, setInfoDocsOpen] = useState(false)
   const roster = useUnitOverview(setUnits)
   const advisor = useAdvisor(pushChatter, supply.refetch, {
     instanceId: selectedUnitId,
@@ -406,6 +410,7 @@ export default function App() {
                 onSelectPlatform={fuelPlatforms.setSelectedId}
                 onAddPlatform={(name) => void fuelPlatforms.addPlatform(name)}
                 onShowHistory={() => setOrderHistoryOpen(true)}
+                onShowDocs={() => setInfoDocsOpen(true)}
                 onLocateDepot={locateDepot}
                 onProposeRefuel={proposeSiteRefuel}
                 onBuy={supplyOrders.placeBuy}
@@ -419,6 +424,9 @@ export default function App() {
                 orders={orderHistory.orders}
                 onClose={() => setOrderHistoryOpen(false)}
               />
+            )}
+            {canShow(role, 'supplyPanel') && infoDocsOpen && (
+              <InfoDocsPanel groups={infoDocs.groups} onClose={() => setInfoDocsOpen(false)} />
             )}
             {obstacleActive && (
               <ObstacleKindPicker selected={obstacleKind} onSelect={setObstacleKind} />

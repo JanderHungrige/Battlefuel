@@ -3,7 +3,7 @@
 //   - the company logos at /logos/*           (v2 Wave 11 F3 order-mask branding)
 //   - the official logistic PDFs at /docs/*    (v2 Wave 11 F8 info-docs tab)
 // Runs automatically before `dev` and `build`. The copies in public/ are gitignored.
-import { copyFileSync, existsSync, mkdirSync, readdirSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -42,3 +42,13 @@ function copyDir(srcDir, destSub, allowExt) {
 
 copyDir("company Logos", "logos", [".png", ".jpg", ".jpeg", ".svg", ".webp"]);
 copyDir("Official logistic documents", "docs", [".pdf"]);
+
+// Write a manifest of the served PDFs so the Info Docs tab can list them (v2 Wave 11 F8).
+// Just the filenames — the frontend derives titles/groups (pure, tested in infoDocs.ts).
+const docsDir = resolve(here, "../public/docs");
+const pdfs = existsSync(docsDir)
+  ? readdirSync(docsDir).filter((n) => extname(n).toLowerCase() === ".pdf").sort()
+  : [];
+mkdirSync(docsDir, { recursive: true });
+writeFileSync(join(docsDir, "manifest.json"), JSON.stringify(pdfs, null, 2));
+console.log(`sync-assets: wrote docs manifest (${pdfs.length} pdf(s)) -> public/docs/manifest.json`);

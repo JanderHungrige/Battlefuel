@@ -1389,3 +1389,69 @@ body {
   cursor: pointer;
 }
 
+/* Info Docs panel (v2 Wave 11 F8). */
+.supply-head-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.info-docs-panel {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 340px;
+  max-height: 80vh;
+  overflow-y: auto;
+  z-index: 22;
+  background: var(--panel, #11161d);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.info-docs-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.info-docs-head button.ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.info-docs-group h3 {
+  margin: 10px 0 4px;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.info-docs-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.info-docs-list a {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 13px;
+  word-break: break-word;
+}
+
+.info-docs-list a:hover {
+  text-decoration: underline;
+}
+
+.info-docs-empty {
+  opacity: 0.7;
+  font-size: 13px;
+}
+

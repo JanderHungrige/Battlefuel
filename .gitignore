@@ -42,3 +42,7 @@ CLAUDE.local.md
 .mdd/audits/
 # MDD active jobs (ephemeral — deleted on completion)
 .mdd/jobs/
+
+# macOS
+.DS_Store
+**/.DS_Store
