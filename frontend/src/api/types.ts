@@ -1,5 +1,7 @@
 // TypeScript mirrors of the backend API schemas (the contract between the two).
 
+import type { NatoStage } from '../lib/natoStage'
+
 export interface BBox {
   west: number
   south: number
@@ -284,6 +286,9 @@ export interface BuyOrder {
   inform_jlsg?: boolean
   inform_jtf?: boolean
   destination_name?: string | null
+  // NATO fulfilment stage tracking (v2 Wave 11 F4).
+  nato_stage?: NatoStage
+  stage_remaining_game_s?: number
 }
 
 export interface CreateBuyOrderRequest {
@@ -331,7 +336,7 @@ export interface CreateRefuelOrderRequest {
   requested_liters?: number
 }
 
-/** Live frame broadcast when a buy order is delivered (Wave 5 buy-orders). */
+/** Live frame broadcast when a buy order's NATO stage changes / it is delivered (Wave 5 + W11 F4). */
 export interface BuyOrderUpdate {
   type: 'buy_order_update'
   order_id: string
@@ -340,6 +345,8 @@ export interface BuyOrderUpdate {
   quantity_liters: number
   status: BuyOrderStatus
   remaining_game_s: number
+  nato_stage?: NatoStage
+  stage_remaining_game_s?: number
 }
 
 /** Live frame broadcast when a refuel transfer completes (Wave 5 refuel-orders). */

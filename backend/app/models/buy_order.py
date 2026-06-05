@@ -25,4 +25,7 @@ class BuyOrderRow(Base):
     inform_jlsg: Mapped[bool] = mapped_column(default=False)
     inform_jtf: Mapped[bool] = mapped_column(default=False)
     destination_name: Mapped[str | None] = mapped_column(default=None)
+    # NATO fulfilment stage tracking (v2 Wave 11 F4).
+    nato_stage: Mapped[str] = mapped_column(default="placed")
+    stage_remaining_game_s: Mapped[float] = mapped_column(default=30.0)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())

@@ -12,6 +12,7 @@ import { firstHaltedUnit } from './lib/halt'
 import { ObstacleKindPicker } from './components/ObstacleKindPicker'
 import type { ObstacleKind } from './components/obstacleKinds'
 import { RoleToggle } from './components/RoleToggle'
+import { OrderHistoryPanel } from './components/OrderHistoryPanel'
 import { SupplyPanel } from './components/SupplyPanel'
 import { UnitOverview } from './components/UnitOverview'
 import { OSM_ATTRIBUTION } from './config'
@@ -22,6 +23,7 @@ import { useAdviceMarker } from './hooks/useAdviceMarker'
 import { useAdvisor } from './hooks/useAdvisor'
 import { useMovePlanning } from './hooks/useMovePlanning'
 import { useFuelPlatforms } from './hooks/useFuelPlatforms'
+import { useOrderHistory } from './hooks/useOrderHistory'
 import { useSupply } from './hooks/useSupply'
 import { useSupplyOrders } from './hooks/useSupplyOrders'
 import { useTheaterData } from './hooks/useTheaterData'
@@ -111,6 +113,8 @@ export default function App() {
   const supply = useSupply(role === 'OF8', supplyTick)
   const supplyOrders = useSupplyOrders(units, unitTypes, pushChatter, supply.refetch)
   const fuelPlatforms = useFuelPlatforms(role === 'OF8')
+  const orderHistory = useOrderHistory(role === 'OF8', supplyTick)
+  const [orderHistoryOpen, setOrderHistoryOpen] = useState(false)
   const roster = useUnitOverview(setUnits)
   const advisor = useAdvisor(pushChatter, supply.refetch, {
     instanceId: selectedUnitId,
@@ -326,10 +330,17 @@ export default function App() {
                 selectedPlatformId={fuelPlatforms.selectedId}
                 onSelectPlatform={fuelPlatforms.setSelectedId}
                 onAddPlatform={(name) => void fuelPlatforms.addPlatform(name)}
+                onShowHistory={() => setOrderHistoryOpen(true)}
                 onBuy={supplyOrders.placeBuy}
                 onRefuel={supplyOrders.placeRefuel}
                 onConfirmRefuel={supplyOrders.confirmRefuel}
                 onCancelRefuel={supplyOrders.cancelRefuel}
+              />
+            )}
+            {canShow(role, 'supplyPanel') && orderHistoryOpen && (
+              <OrderHistoryPanel
+                orders={orderHistory.orders}
+                onClose={() => setOrderHistoryOpen(false)}
               />
             )}
             {obstacleActive && (

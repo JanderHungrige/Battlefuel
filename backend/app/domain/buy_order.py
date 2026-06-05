@@ -21,6 +21,45 @@ class BuyOrderStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
+class NatoStage(StrEnum):
+    """NATO fuel-order fulfilment stages (v2 Wave 11 F4), advanced on the sim clock.
+
+    The order moves through these in sequence; reaching ``REACHED_OPCON`` is delivery.
+    """
+
+    PLACED = "placed"  # order placed
+    CONFIRMED_JLSG = "confirmed_jlsg"  # confirmed by JLSG
+    CONFIRMED_JTF = "confirmed_jtf"  # confirmed by JTF
+    CONFIRMED_PROVIDER = "confirmed_provider"  # confirmed by fuel provider
+    ON_ROUTE = "on_route"  # fuel on route
+    REACHED_JLSG = "reached_jlsg"  # fuel reached JLSG
+    REACHED_OPCON = "reached_opcon"  # fuel reached OPCON (delivered)
+
+
+# Ordered progression and per-stage dwell time (game-seconds).
+NATO_STAGE_ORDER: tuple[NatoStage, ...] = (
+    NatoStage.PLACED,
+    NatoStage.CONFIRMED_JLSG,
+    NatoStage.CONFIRMED_JTF,
+    NatoStage.CONFIRMED_PROVIDER,
+    NatoStage.ON_ROUTE,
+    NatoStage.REACHED_JLSG,
+    NatoStage.REACHED_OPCON,
+)
+ORDER_STAGE_SECONDS: float = 30.0
+
+
+def is_terminal_stage(stage: NatoStage) -> bool:
+    return stage is NatoStage.REACHED_OPCON
+
+
+def next_nato_stage(stage: NatoStage) -> NatoStage | None:
+    """The stage after ``stage``, or ``None`` if already terminal."""
+    idx = NATO_STAGE_ORDER.index(stage)
+    nxt = idx + 1
+    return NATO_STAGE_ORDER[nxt] if nxt < len(NATO_STAGE_ORDER) else None
+
+
 class BuyOrder(BaseModel):
     """A committed fuel purchase into a depot, delivered after a lead time.
 
@@ -41,3 +80,5 @@ class BuyOrder(BaseModel):
     inform_jlsg: bool = False
     inform_jtf: bool = False
     destination_name: str | None = None
+    nato_stage: NatoStage = NatoStage.PLACED
+    stage_remaining_game_s: float = Field(default=ORDER_STAGE_SECONDS, ge=0)

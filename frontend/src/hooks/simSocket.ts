@@ -9,6 +9,7 @@ import type {
   TileUpdate,
   UnitUpdate,
 } from '../api/types'
+import { natoStageLabel } from '../lib/natoStage'
 import { formatMgrs, toMgrs } from '../map/mgrsGrid'
 
 function parse(raw: string): Record<string, unknown> | null {
@@ -110,9 +111,14 @@ export function parseStrategicMessage(raw: string): StrategicMessage | null {
   return null
 }
 
-/** A short human-readable summary of a buy-order delivery, for the chatter/strategic feed. */
+/** A short human-readable summary of a buy-order stage change / delivery, for the chatter feed. */
 export function describeBuyOrderUpdate(u: BuyOrderUpdate): string {
-  return `Buy order delivered: ${Math.round(u.quantity_liters)} L ${u.fuel_type} → ${u.depot_id}`
+  const dest = u.depot_id
+  const amount = `${Math.round(u.quantity_liters)} L ${u.fuel_type}`
+  if (u.status === 'delivered' || u.nato_stage === 'reached_opcon') {
+    return `Fuel order reached OPCON: ${amount} → ${dest}`
+  }
+  return `Fuel order ${natoStageLabel(u.nato_stage)}: ${amount} → ${dest}`
 }
 
 /** A short human-readable summary of a completed refuel, for the chatter/strategic feed. */

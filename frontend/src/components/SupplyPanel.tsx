@@ -21,6 +21,8 @@ export interface SupplyPanelProps {
   selectedPlatformId?: string
   onSelectPlatform?: (id: string) => void
   onAddPlatform?: (name: string) => void
+  /** Open the Order History panel (v2 Wave 11 F4). */
+  onShowHistory?: () => void
   onBuy: (depotId: string, fuelType: string, quantityLiters: number, meta?: OrderMeta) => void
   onRefuel: (unitId: string) => void
   onConfirmRefuel: () => void
@@ -40,6 +42,7 @@ export function SupplyPanel({
   selectedPlatformId = '',
   onSelectPlatform,
   onAddPlatform,
+  onShowHistory,
   onBuy,
   onRefuel,
   onConfirmRefuel,
@@ -78,7 +81,19 @@ export function SupplyPanel({
 
   return (
     <aside className="supply-panel" data-testid="supply-panel">
-      <h2>Joint-Force Supply</h2>
+      <div className="supply-head">
+        <h2>Joint-Force Supply</h2>
+        {onShowHistory && (
+          <button
+            type="button"
+            className="ghost"
+            data-testid="order-history-open"
+            onClick={onShowHistory}
+          >
+            Order history
+          </button>
+        )}
+      </div>
 
       <section className="supply-dist">
         {overview?.depots.map((d) => (

@@ -12,7 +12,14 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.buy_order import BuyOrder, BuyOrderStatus
+from app.domain.buy_order import (
+    ORDER_STAGE_SECONDS,
+    BuyOrder,
+    BuyOrderStatus,
+    NatoStage,
+    is_terminal_stage,
+    next_nato_stage,
+)
 from app.domain.unit import FuelType
 from app.providers.buy_orders import BuyOrderProvider
 from app.providers.supply import SupplyProvider
@@ -22,6 +29,35 @@ def advance_buy_order(remaining_game_s: float, dt_game_s: float) -> tuple[float,
     """Return ``(new_remaining, delivered)`` after one game-time step."""
     new_remaining = max(0.0, remaining_game_s - dt_game_s)
     return new_remaining, new_remaining <= 0.0
+
+
+def advance_order_stage(
+    stage: NatoStage,
+    stage_remaining_game_s: float,
+    dt_game_s: float,
+    stage_seconds: float = ORDER_STAGE_SECONDS,
+) -> tuple[NatoStage, float, bool]:
+    """Advance the NATO fulfilment stage by ``dt_game_s`` (pure, deterministic).
+
+    Returns ``(new_stage, new_stage_remaining, reached_terminal)``. A single large ``dt`` can
+    cross several stages. ``reached_terminal`` is True only on the step that first arrives at
+    ``REACHED_OPCON`` (so the caller delivers stock exactly once).
+    """
+    if is_terminal_stage(stage):
+        return stage, 0.0, False
+    remaining = stage_remaining_game_s - dt_game_s
+    reached_terminal = False
+    while remaining <= 0.0 and not is_terminal_stage(stage):
+        nxt = next_nato_stage(stage)
+        if nxt is None:
+            break
+        stage = nxt
+        if is_terminal_stage(stage):
+            remaining = 0.0
+            reached_terminal = True
+            break
+        remaining += stage_seconds
+    return stage, max(0.0, remaining), reached_terminal
 
 
 async def create_buy_order(
@@ -90,3 +126,38 @@ async def deliver_due_buy_orders(
         else:
             await orders.set_remaining(session, order.id, new_remaining)
     return delivered
+
+
+async def progress_buy_order_stages(
+    session: AsyncSession,
+    supply: SupplyProvider,
+    orders: BuyOrderProvider,
+    dt_game_s: float,
+) -> list[BuyOrder]:
+    """Advance the NATO fulfilment stage of every active order by ``dt_game_s``.
+
+    This is the live-sim order lifecycle (v2 Wave 11 F4): each stage dwells ``ORDER_STAGE_SECONDS``
+    game-seconds, and arriving at ``REACHED_OPCON`` delivers the fuel (increasing depot stock via
+    ``adjust_stock`` — never a raw UPDATE) and marks the order delivered. Returns every order whose
+    stage changed this step, so the caller can broadcast one frame per change.
+    """
+    changed: list[BuyOrder] = []
+    for order in await orders.list_active(session):
+        new_stage, new_remaining, reached_terminal = advance_order_stage(
+            order.nato_stage, order.stage_remaining_game_s, dt_game_s
+        )
+        if reached_terminal:
+            await supply.adjust_stock(
+                session, order.depot_id, order.fuel_type, order.quantity_liters
+            )
+            done = await orders.mark_delivered(session, order.id)
+            if done is not None:
+                changed.append(done)
+        elif new_stage is not order.nato_stage:
+            updated = await orders.set_stage(session, order.id, new_stage, new_remaining)
+            if updated is not None:
+                changed.append(updated)
+        else:
+            # Same stage, just less dwell time left — persist the countdown, no broadcast.
+            await orders.set_stage(session, order.id, new_stage, new_remaining)
+    return changed

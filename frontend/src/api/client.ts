@@ -110,6 +110,7 @@ export const api = {
   getSupplyOverview: (): Promise<SupplyOverview> => getJson<SupplyOverview>('/supply/overview'),
   createBuyOrder: (req: CreateBuyOrderRequest): Promise<BuyOrder> =>
     postJson<BuyOrder>('/buy-orders', req),
+  getBuyOrders: (): Promise<BuyOrder[]> => getJson<BuyOrder[]>('/buy-orders'),
 
   // Fuel-management platforms (v2 Wave 11 F2).
   getFuelPlatforms: (): Promise<FuelPlatform[]> => getJson<FuelPlatform[]>('/fuel-platforms'),
