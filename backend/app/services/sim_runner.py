@@ -40,7 +40,7 @@ from app.providers.supply import build_supply_provider
 from app.providers.tile_feed import TileFeedProvider, build_tile_feed_provider, due_events
 from app.providers.tiles import TileDataProvider, build_tile_provider
 from app.providers.unit_instances import build_unit_instance_provider
-from app.services.buy_service import deliver_due_buy_orders
+from app.services.buy_service import progress_buy_order_stages
 from app.services.cost_model import TileFactors, tile_factors
 from app.services.event_engine import EventEngine
 from app.services.refuel_service import try_complete_refuel
@@ -175,12 +175,13 @@ class SimEngine:
         return completed
 
     async def advance_buy_orders(self, session: AsyncSession, dt_game_s: float) -> int:
-        """Count down active buy orders; deliver + broadcast those that come due. Public for
-        testing. Returns the number delivered this step."""
+        """Advance active buy orders through their NATO fulfilment stages; broadcast every stage
+        change (delivery is the terminal stage). Public for testing. Returns the number of orders
+        whose stage changed this step (v2 Wave 11 F4)."""
         supply = build_supply_provider()
         orders = build_buy_order_provider()
-        delivered = await deliver_due_buy_orders(session, supply, orders, dt_game_s)
-        for order in delivered:
+        changed = await progress_buy_order_stages(session, supply, orders, dt_game_s)
+        for order in changed:
             await self._manager.broadcast(
                 {
                     "type": "buy_order_update",
@@ -190,9 +191,11 @@ class SimEngine:
                     "quantity_liters": round(order.quantity_liters, 1),
                     "status": order.status.value,
                     "remaining_game_s": round(order.remaining_game_s, 1),
+                    "nato_stage": order.nato_stage.value,
+                    "stage_remaining_game_s": round(order.stage_remaining_game_s, 1),
                 }
             )
-        return len(delivered)
+        return len(changed)
 
     async def tick(self, session: AsyncSession, dt_game_s: float) -> None:
         """Advance every active order by one game-time step. Public for testing."""

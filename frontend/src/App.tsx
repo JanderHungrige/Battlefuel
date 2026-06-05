@@ -12,15 +12,22 @@ import { firstHaltedUnit } from './lib/halt'
 import { ObstacleKindPicker } from './components/ObstacleKindPicker'
 import type { ObstacleKind } from './components/obstacleKinds'
 import { RoleToggle } from './components/RoleToggle'
+import { InfoDocsPanel } from './components/InfoDocsPanel'
+import { OrderHistoryPanel } from './components/OrderHistoryPanel'
 import { SupplyPanel } from './components/SupplyPanel'
 import { UnitOverview } from './components/UnitOverview'
 import { OSM_ATTRIBUTION } from './config'
+import { LOGISTIC_SITE_TYPES, logisticSiteLabel } from './lib/logisticSite'
+import { shouldRefuelOnClick } from './lib/refuelOnClick'
 import { canShow, type Role } from './roles'
 import { useObstacleOps } from './hooks/useObstacleOps'
 import { useSimSocket } from './hooks/useSimSocket'
 import { useAdviceMarker } from './hooks/useAdviceMarker'
 import { useAdvisor } from './hooks/useAdvisor'
 import { useMovePlanning } from './hooks/useMovePlanning'
+import { useFuelPlatforms } from './hooks/useFuelPlatforms'
+import { useInfoDocs } from './hooks/useInfoDocs'
+import { useOrderHistory } from './hooks/useOrderHistory'
 import { useSupply } from './hooks/useSupply'
 import { useSupplyOrders } from './hooks/useSupplyOrders'
 import { useTheaterData } from './hooks/useTheaterData'
@@ -54,6 +61,13 @@ export default function App() {
   const { obstacles, placeObstacle, removeObstacle, mutateTile } = useObstacleOps()
   const [obstacleMode, setObstacleMode] = useState(false)
   const [obstacleKind, setObstacleKind] = useState<ObstacleKind>('minefield')
+  const [depotMode, setDepotMode] = useState(false)
+  // Site type for the next placed depot ('' = plain depot/marker); v2 Wave 11 F5.
+  const [depotSiteType, setDepotSiteType] = useState('')
+  // Depot the operator asked to locate on the map (v2 Wave 11 F5).
+  const [locateDepotId, setLocateDepotId] = useState<string | null>(null)
+  // OF-8 on-map per-unit fuel bars (v2 Wave 11 F7); on by default.
+  const [infoBarsOn, setInfoBarsOn] = useState(true)
 
   // Tiles merged with their latest live tile_update (threat/road/situation/etc.).
   const displayedTiles = useMemo(() => {
@@ -108,6 +122,11 @@ export default function App() {
   // OF-8 supply + advisor + unit roster.
   const supply = useSupply(role === 'OF8', supplyTick)
   const supplyOrders = useSupplyOrders(units, unitTypes, pushChatter, supply.refetch)
+  const fuelPlatforms = useFuelPlatforms(role === 'OF8')
+  const orderHistory = useOrderHistory(role === 'OF8', supplyTick)
+  const [orderHistoryOpen, setOrderHistoryOpen] = useState(false)
+  const infoDocs = useInfoDocs(role === 'OF8')
+  const [infoDocsOpen, setInfoDocsOpen] = useState(false)
   const roster = useUnitOverview(setUnits)
   const advisor = useAdvisor(pushChatter, supply.refetch, {
     instanceId: selectedUnitId,
@@ -115,9 +134,9 @@ export default function App() {
   })
 
   const livePositions = useMemo(() => {
-    const out: Record<string, { lat: number; lon: number }> = {}
+    const out: Record<string, { lat: number; lon: number; fuel_l?: number }> = {}
     for (const u of Object.values(live)) {
-      if (u.status !== 'cancelled') out[u.instance_id] = { lat: u.lat, lon: u.lon }
+      if (u.status !== 'cancelled') out[u.instance_id] = { lat: u.lat, lon: u.lon, fuel_l: u.fuel_l }
     }
     return out
   }, [live])
@@ -174,11 +193,54 @@ export default function App() {
     setSelectedUnitId(halted.instanceId)
   }, [halted, planning])
 
-  // Esc exits any active mode (planning / obstacle placement / selection).
+  // Manually place a fuel depot — or a typed stocked logistic site (v2 Wave 10 F6 / W11 F5).
+  const placeDepot = useCallback(
+    (lat: number, lon: number) => {
+      const tag = Math.round(lat * 1000) % 1000
+      const name = depotSiteType
+        ? `${depotSiteType.toUpperCase()} ${tag}`
+        : `FWD depot ${tag}`
+      api
+        .createDepot({ name, lat, lon, site_type: depotSiteType || null })
+        .then((d) => {
+          pushChatter(`Logistic site placed: ${d.name}`, 'order')
+          supply.refetch()
+        })
+        .catch((e: unknown) => pushChatter(errorMessage(e), 'status'))
+    },
+    [pushChatter, supply, depotSiteType],
+  )
+
+  // Locate a supply point on the map (v2 Wave 11 F5). Pulse the id so MapView re-eases each click.
+  const locateDepot = useCallback(
+    (depotId: string) => {
+      setLocateDepotId(null)
+      setLocateDepotId(depotId)
+    },
+    [],
+  )
+
+  // Ask the Wave-6 redistribution advisor to propose a refuel for a low site (v2 Wave 11 F5).
+  const proposeSiteRefuel = useCallback(
+    (depotId: string) => {
+      const name = supply.depots.find((d) => d.id === depotId)?.name ?? depotId
+      api
+        .getSiteRefuel(depotId)
+        .then((res) => {
+          pushChatter(`Refuel proposal — ${name}: ${res.summary}`, 'order')
+          for (const r of res.recommendations) pushChatter(r.rationale, 'order')
+        })
+        .catch((e: unknown) => pushChatter(errorMessage(e), 'status'))
+    },
+    [pushChatter, supply.depots],
+  )
+
+  // Esc exits any active mode (planning / obstacle placement / depot placement / selection).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
       setObstacleMode(false)
+      setDepotMode(false)
       clear()
     }
     window.addEventListener('keydown', onKey)
@@ -222,6 +284,41 @@ export default function App() {
             {obstacleMode ? '🚧 Obstacle mode: ON' : 'Obstacle mode'}
           </button>
         )}
+        {theater && canShow(role, 'depotOverlay') && (
+          <button
+            className={`mode-toggle${depotMode ? ' active' : ''}`}
+            data-testid="depot-mode-toggle"
+            onClick={() => setDepotMode((m) => !m)}
+          >
+            {depotMode ? '⛽ Add depot: ON' : 'Add depot'}
+          </button>
+        )}
+        {theater && canShow(role, 'depotOverlay') && depotMode && (
+          <select
+            className="site-type-select"
+            data-testid="site-type-select"
+            value={depotSiteType}
+            onChange={(e) => setDepotSiteType(e.target.value)}
+            title="Logistic site type for the next placed site"
+          >
+            <option value="">Plain depot</option>
+            {LOGISTIC_SITE_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {logisticSiteLabel(t)}
+              </option>
+            ))}
+          </select>
+        )}
+        {theater && canShow(role, 'depotOverlay') && (
+          <label className="info-bars-toggle" data-testid="info-bars-toggle">
+            <input
+              type="checkbox"
+              checked={infoBarsOn}
+              onChange={(e) => setInfoBarsOn(e.target.checked)}
+            />
+            Fuel bars
+          </label>
+        )}
         <span className="spacer" />
         <span className="attribution">{OSM_ATTRIBUTION}</span>
       </header>
@@ -242,10 +339,14 @@ export default function App() {
               activeRoutes={planning.activeRouteGeometries}
               obstacles={obstacles}
               obstacleMode={obstacleActive}
+              depotMode={depotMode && canShow(role, 'depotOverlay')}
+              onPlaceDepot={placeDepot}
               combatEvents={Object.values(combatEvents)}
               highlightEventId={highlightEventId}
               enemyUnits={enemyUnits}
               depots={canShow(role, 'depotOverlay') ? (supply.overview?.depots ?? []) : []}
+              locateDepotId={locateDepotId}
+              showUnitFuelBars={canShow(role, 'depotOverlay') && infoBarsOn}
               rendezvous={canShow(role, 'supplyPanel') ? supplyOrders.rendezvous : null}
               adviceArrow={adviceMarker.arrow}
               adviceDest={adviceMarker.dest}
@@ -266,6 +367,17 @@ export default function App() {
                 setHighlightEventId(null)
                 planning.resetPlanning()
                 setSelectedUnitId(id)
+                // OF-8: clicking a refuelable unit starts its refuel flow (v2 Wave 11 F6) —
+                // an entry point in addition to the supply panel's "Request refuel".
+                if (
+                  shouldRefuelOnClick(
+                    role,
+                    supplyOrders.refuelTargets.map((u) => u.id),
+                    id,
+                  )
+                ) {
+                  supplyOrders.placeRefuel(id)
+                }
               }}
               onPickDestination={(lat, lon) =>
                 planning.waypointMode
@@ -293,11 +405,28 @@ export default function App() {
                 recommendation={supplyOrders.recommendation}
                 busy={supplyOrders.busy}
                 message={supplyOrders.message}
+                platforms={fuelPlatforms.platforms}
+                selectedPlatformId={fuelPlatforms.selectedId}
+                onSelectPlatform={fuelPlatforms.setSelectedId}
+                onAddPlatform={(name) => void fuelPlatforms.addPlatform(name)}
+                onShowHistory={() => setOrderHistoryOpen(true)}
+                onShowDocs={() => setInfoDocsOpen(true)}
+                onLocateDepot={locateDepot}
+                onProposeRefuel={proposeSiteRefuel}
                 onBuy={supplyOrders.placeBuy}
                 onRefuel={supplyOrders.placeRefuel}
                 onConfirmRefuel={supplyOrders.confirmRefuel}
                 onCancelRefuel={supplyOrders.cancelRefuel}
               />
+            )}
+            {canShow(role, 'supplyPanel') && orderHistoryOpen && (
+              <OrderHistoryPanel
+                orders={orderHistory.orders}
+                onClose={() => setOrderHistoryOpen(false)}
+              />
+            )}
+            {canShow(role, 'supplyPanel') && infoDocsOpen && (
+              <InfoDocsPanel groups={infoDocs.groups} onClose={() => setInfoDocsOpen(false)} />
             )}
             {obstacleActive && (
               <ObstacleKindPicker selected={obstacleKind} onSelect={setObstacleKind} />

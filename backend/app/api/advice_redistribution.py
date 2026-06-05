@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.advice import CAPABILITIES
@@ -84,4 +84,32 @@ async def redistribution(session: SessionDep, supply: SupplyDep) -> AdviceResult
         kind=RecommendationKind.REDISTRIBUTION,
         recommendations=recommendations,
         summary=f"{transfers} transfer(s), {buys} buy(s) to balance depots",
+    )
+
+
+@router.get("/site-refuel/{depot_id}")
+async def site_refuel(depot_id: str, session: SessionDep, supply: SupplyDep) -> AdviceResult:
+    """Propose a refuel/redistribution order for one low logistic site (v2 Wave 11 F5).
+
+    Reuses the Wave-6 redistribution optimizer and filters the plan to moves targeting this
+    site. An empty recommendation list means the site is already at/above target fill.
+    """
+    depot = await supply.get_depot(session, depot_id)
+    if depot is None:
+        raise HTTPException(status_code=404, detail=f"depot {depot_id!r} not found")
+    depots = await supply.list_depots(session)
+    stocks = await supply.list_stocks(session)
+    coords = {d.id: (d.lat, d.lon) for d in depots}
+    moves = [m for m in redistribution_plan(depots, stocks) if m.to_depot == depot_id]
+    recommendations = [_to_recommendation(m, coords) for m in moves]
+    name = depot.name
+    summary = (
+        f"{len(recommendations)} proposal(s) to refuel {name}"
+        if recommendations
+        else f"{name} is at or above target fill — no refuel needed"
+    )
+    return AdviceResult(
+        kind=RecommendationKind.REDISTRIBUTION,
+        recommendations=recommendations,
+        summary=summary,
     )

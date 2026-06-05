@@ -5,11 +5,14 @@ import type {
   AdviceResult,
   BuyOrder,
   CreateBuyOrderRequest,
+  CreateDepotRequest,
+  CreateFuelPlatformRequest,
   CreateMoveOrderRequest,
   CreateRefuelOrderRequest,
   CreateWaypointMoveOrderRequest,
   EnemyUnit,
   FuelDepot,
+  FuelPlatform,
   FuelStock,
   MoveOrder,
   Obstacle,
@@ -101,10 +104,18 @@ export const api = {
 
   // Fuel supply (Wave 5).
   getDepots: (): Promise<FuelDepot[]> => getJson<FuelDepot[]>('/depots'),
+  createDepot: (req: CreateDepotRequest): Promise<FuelDepot> =>
+    postJson<FuelDepot>('/depots', req),
   getFuelStocks: (): Promise<FuelStock[]> => getJson<FuelStock[]>('/fuel-stocks'),
   getSupplyOverview: (): Promise<SupplyOverview> => getJson<SupplyOverview>('/supply/overview'),
   createBuyOrder: (req: CreateBuyOrderRequest): Promise<BuyOrder> =>
     postJson<BuyOrder>('/buy-orders', req),
+  getBuyOrders: (): Promise<BuyOrder[]> => getJson<BuyOrder[]>('/buy-orders'),
+
+  // Fuel-management platforms (v2 Wave 11 F2).
+  getFuelPlatforms: (): Promise<FuelPlatform[]> => getJson<FuelPlatform[]>('/fuel-platforms'),
+  createFuelPlatform: (req: CreateFuelPlatformRequest): Promise<FuelPlatform> =>
+    postJson<FuelPlatform>('/fuel-platforms', req),
   confirmBuyOrder: (id: string): Promise<BuyOrder> => postJson<BuyOrder>(`/buy-orders/${id}/confirm`),
   cancelBuyOrder: (id: string): Promise<BuyOrder> => postJson<BuyOrder>(`/buy-orders/${id}/cancel`),
   createRefuelOrder: (req: CreateRefuelOrderRequest): Promise<RefuelOrder> =>
@@ -118,6 +129,9 @@ export const api = {
   getReposition: (): Promise<AdviceResult> => getJson<AdviceResult>('/advice/reposition'),
   getRefuelPlan: (): Promise<AdviceResult> => getJson<AdviceResult>('/advice/refuel-plan'),
   getRedistribution: (): Promise<AdviceResult> => getJson<AdviceResult>('/advice/redistribution'),
+  // Per-site low-fuel refuel proposal (v2 Wave 11 F5).
+  getSiteRefuel: (depotId: string): Promise<AdviceResult> =>
+    getJson<AdviceResult>(`/advice/site-refuel/${encodeURIComponent(depotId)}`),
   getRouteAdvice: (instanceId: string, destLat: number, destLon: number): Promise<AdviceResult> =>
     getJson<AdviceResult>(
       `/advice/route?instance_id=${encodeURIComponent(instanceId)}&dest_lat=${destLat}&dest_lon=${destLon}`,

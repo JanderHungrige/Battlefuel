@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings, get_settings
-from app.domain.buy_order import BuyOrder, BuyOrderStatus
+from app.domain.buy_order import BuyOrder, BuyOrderStatus, NatoStage
 from app.domain.unit import FuelType
 from app.models.buy_order import BuyOrderRow
 
@@ -23,6 +23,12 @@ def _to_order(row: BuyOrderRow) -> BuyOrder:
         status=BuyOrderStatus(row.status),
         lead_time_game_s=row.lead_time_game_s,
         remaining_game_s=row.remaining_game_s,
+        platform_id=row.platform_id,
+        inform_jlsg=row.inform_jlsg,
+        inform_jtf=row.inform_jtf,
+        destination_name=row.destination_name,
+        nato_stage=NatoStage(row.nato_stage),
+        stage_remaining_game_s=row.stage_remaining_game_s,
     )
 
 
@@ -50,6 +56,11 @@ class BuyOrderProvider(ABC):
     ) -> None: ...
 
     @abstractmethod
+    async def set_stage(
+        self, session: AsyncSession, order_id: str, stage: NatoStage, stage_remaining_game_s: float
+    ) -> BuyOrder | None: ...
+
+    @abstractmethod
     async def mark_delivered(self, session: AsyncSession, order_id: str) -> BuyOrder | None: ...
 
 
@@ -64,6 +75,12 @@ class DbBuyOrderProvider(BuyOrderProvider):
                 status=order.status.value,
                 lead_time_game_s=order.lead_time_game_s,
                 remaining_game_s=order.remaining_game_s,
+                platform_id=order.platform_id,
+                inform_jlsg=order.inform_jlsg,
+                inform_jtf=order.inform_jtf,
+                destination_name=order.destination_name,
+                nato_stage=order.nato_stage.value,
+                stage_remaining_game_s=order.stage_remaining_game_s,
             )
         )
         await session.commit()
@@ -101,12 +118,26 @@ class DbBuyOrderProvider(BuyOrderProvider):
         row.remaining_game_s = remaining_game_s
         await session.commit()
 
+    async def set_stage(
+        self, session: AsyncSession, order_id: str, stage: NatoStage, stage_remaining_game_s: float
+    ) -> BuyOrder | None:
+        row = await session.get(BuyOrderRow, order_id)
+        if row is None:
+            return None
+        row.nato_stage = stage.value
+        row.stage_remaining_game_s = stage_remaining_game_s
+        await session.commit()
+        return _to_order(row)
+
     async def mark_delivered(self, session: AsyncSession, order_id: str) -> BuyOrder | None:
         row = await session.get(BuyOrderRow, order_id)
         if row is None:
             return None
         row.status = BuyOrderStatus.DELIVERED.value
         row.remaining_game_s = 0.0
+        # Delivery is the terminal NATO stage (v2 Wave 11 F4).
+        row.nato_stage = NatoStage.REACHED_OPCON.value
+        row.stage_remaining_game_s = 0.0
         await session.commit()
         return _to_order(row)
 

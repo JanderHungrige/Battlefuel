@@ -1053,5 +1053,405 @@ body {
   padding: 2px 6px;
 }
 
+/* Fuel-platform selector + add control (v2 Wave 11 F2). */
+.platform-selector .platform-add {
+  display: flex;
+  flex-basis: 100%;
+  gap: 6px;
+}
 
+.platform-selector button.ghost,
+.platform-add button.ghost {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--border);
+}
+
+/* Branded order mask (v2 Wave 11 F3). */
+.order-mask-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(2, 6, 12, 0.6);
+}
+
+.order-mask {
+  width: 340px;
+  max-width: 92vw;
+  background: var(--panel, #11161d);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.order-mask-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+}
+
+.order-mask-logo {
+  max-height: 36px;
+  max-width: 160px;
+  object-fit: contain;
+  background: #fff;
+  border-radius: 4px;
+  padding: 3px 6px;
+}
+
+.order-mask-badge {
+  font-weight: 700;
+  background: var(--accent);
+  color: #05080c;
+  border-radius: 4px;
+  padding: 3px 8px;
+}
+
+.order-mask-platform {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.order-mask-fields {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.order-mask-fields div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.order-mask-fields dt {
+  opacity: 0.7;
+  font-size: 12px;
+}
+
+.order-mask-fields dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.order-mask-fields input {
+  width: 100px;
+  background: #1c222b;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 6px;
+}
+
+.order-mask-inform {
+  display: flex;
+  gap: 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin: 8px 0;
+}
+
+.order-mask-inform legend {
+  font-size: 11px;
+  opacity: 0.7;
+  padding: 0 4px;
+}
+
+.order-mask-inform label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+}
+
+.order-mask-summary {
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.order-mask-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.order-mask-actions button {
+  padding: 6px 14px;
+  background: var(--accent);
+  color: #05080c;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.order-mask-actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.order-mask-actions button.ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+/* Order history (v2 Wave 11 F4). */
+.supply-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.supply-head button.ghost {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.order-history-panel {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 320px;
+  max-height: 80vh;
+  overflow-y: auto;
+  z-index: 22;
+  background: var(--panel, #11161d);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.order-history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.order-history-head button.ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.order-history-empty {
+  opacity: 0.7;
+  font-size: 13px;
+}
+
+.order-history-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.order-history-row {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.order-history-row-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.order-history-amount {
+  font-weight: 600;
+}
+
+.order-history-dest {
+  opacity: 0.8;
+}
+
+.order-stages {
+  list-style: none;
+  display: flex;
+  gap: 4px;
+  margin: 8px 0;
+  padding: 0;
+}
+
+.order-stage {
+  flex: 1;
+}
+
+.order-stage-dot {
+  display: block;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.order-stage.done .order-stage-dot {
+  background: var(--accent);
+}
+
+.order-stage.current .order-stage-dot {
+  background: var(--accent);
+  box-shadow: 0 0 0 2px rgba(255, 217, 189, 0.35);
+}
+
+.order-stage.cancelled .order-stage-dot {
+  background: #7a2e2e;
+}
+
+.order-history-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.order-history-platform,
+.order-history-informed {
+  opacity: 0.7;
+}
+
+/* Typed logistic sites (v2 Wave 11 F5). */
+.site-type-select {
+  background: #1c222b;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.depot-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.depot-name.link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.depot-site-tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: var(--accent);
+  color: #05080c;
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.depot-propose {
+  margin-left: auto;
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+/* On-map info-bars toggle (v2 Wave 11 F7). */
+.info-bars-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* Info Docs panel (v2 Wave 11 F8). */
+.supply-head-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.info-docs-panel {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 340px;
+  max-height: 80vh;
+  overflow-y: auto;
+  z-index: 22;
+  background: var(--panel, #11161d);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.info-docs-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.info-docs-head button.ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.info-docs-group h3 {
+  margin: 10px 0 4px;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.info-docs-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.info-docs-list a {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 13px;
+  word-break: break-word;
+}
+
+.info-docs-list a:hover {
+  text-decoration: underline;
+}
+
+.info-docs-empty {
+  opacity: 0.7;
+  font-size: 13px;
+}
 
