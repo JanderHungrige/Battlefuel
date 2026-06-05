@@ -21,6 +21,7 @@ import { useSimSocket } from './hooks/useSimSocket'
 import { useAdviceMarker } from './hooks/useAdviceMarker'
 import { useAdvisor } from './hooks/useAdvisor'
 import { useMovePlanning } from './hooks/useMovePlanning'
+import { useFuelPlatforms } from './hooks/useFuelPlatforms'
 import { useSupply } from './hooks/useSupply'
 import { useSupplyOrders } from './hooks/useSupplyOrders'
 import { useTheaterData } from './hooks/useTheaterData'
@@ -109,6 +110,7 @@ export default function App() {
   // OF-8 supply + advisor + unit roster.
   const supply = useSupply(role === 'OF8', supplyTick)
   const supplyOrders = useSupplyOrders(units, unitTypes, pushChatter, supply.refetch)
+  const fuelPlatforms = useFuelPlatforms(role === 'OF8')
   const roster = useUnitOverview(setUnits)
   const advisor = useAdvisor(pushChatter, supply.refetch, {
     instanceId: selectedUnitId,
@@ -320,6 +322,10 @@ export default function App() {
                 recommendation={supplyOrders.recommendation}
                 busy={supplyOrders.busy}
                 message={supplyOrders.message}
+                platforms={fuelPlatforms.platforms}
+                selectedPlatformId={fuelPlatforms.selectedId}
+                onSelectPlatform={fuelPlatforms.setSelectedId}
+                onAddPlatform={(name) => void fuelPlatforms.addPlatform(name)}
                 onBuy={supplyOrders.placeBuy}
                 onRefuel={supplyOrders.placeRefuel}
                 onConfirmRefuel={supplyOrders.confirmRefuel}

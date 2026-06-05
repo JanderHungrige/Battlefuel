@@ -1,7 +1,7 @@
 // OF-8 supply panel (Wave 5 of8-supply-ui): fuel distribution + buy / refuel order placement.
 
 import { useMemo, useState } from 'react'
-import type { FuelDepot, RefuelOrder, SupplyOverview } from '../api/types'
+import type { FuelDepot, FuelPlatform, RefuelOrder, SupplyOverview } from '../api/types'
 
 export interface RecommendationView {
   order: RefuelOrder
@@ -15,6 +15,11 @@ export interface SupplyPanelProps {
   recommendation: RecommendationView | null
   busy?: boolean
   message?: string | null
+  /** Fuel-management platforms for the selector (v2 Wave 11 F2). */
+  platforms?: FuelPlatform[]
+  selectedPlatformId?: string
+  onSelectPlatform?: (id: string) => void
+  onAddPlatform?: (name: string) => void
   onBuy: (depotId: string, fuelType: string, quantityLiters: number) => void
   onRefuel: (unitId: string) => void
   onConfirmRefuel: () => void
@@ -30,6 +35,10 @@ export function SupplyPanel({
   recommendation,
   busy = false,
   message = null,
+  platforms = [],
+  selectedPlatformId = '',
+  onSelectPlatform,
+  onAddPlatform,
   onBuy,
   onRefuel,
   onConfirmRefuel,
@@ -38,6 +47,16 @@ export function SupplyPanel({
   const [buyDepot, setBuyDepot] = useState(depots[0]?.id ?? '')
   const [buyQty, setBuyQty] = useState(5000)
   const [refuelUnit, setRefuelUnit] = useState(refuelTargets[0]?.id ?? '')
+  const [addingPlatform, setAddingPlatform] = useState(false)
+  const [newPlatformName, setNewPlatformName] = useState('')
+
+  const submitNewPlatform = (): void => {
+    const name = newPlatformName.trim()
+    if (!name || !onAddPlatform) return
+    onAddPlatform(name)
+    setNewPlatformName('')
+    setAddingPlatform(false)
+  }
 
   // `depots` is empty on first render (still loading), so the stateful `buyDepot` seeds to
   // '' and never re-initialises. Fall back to the first real depot whenever the stored id
@@ -91,6 +110,59 @@ export function SupplyPanel({
           ))}
         </div>
       </section>
+
+      {platforms.length > 0 && (
+        <section className="supply-form platform-selector" data-testid="platform-selector">
+          <h3>Fuel-management platform</h3>
+          <select
+            data-testid="platform-select"
+            value={selectedPlatformId}
+            onChange={(e) => onSelectPlatform?.(e.target.value)}
+          >
+            {platforms.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          {addingPlatform ? (
+            <div className="platform-add">
+              <input
+                data-testid="platform-new-name"
+                type="text"
+                placeholder="New platform name"
+                value={newPlatformName}
+                onChange={(e) => setNewPlatformName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') submitNewPlatform()
+                }}
+              />
+              <button type="button" data-testid="platform-add-confirm" onClick={submitNewPlatform}>
+                Add
+              </button>
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => {
+                  setAddingPlatform(false)
+                  setNewPlatformName('')
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="ghost"
+              data-testid="platform-add-toggle"
+              onClick={() => setAddingPlatform(true)}
+            >
+              + Add platform
+            </button>
+          )}
+        </section>
+      )}
 
       <section className="supply-form">
         <h3>Order fuel → depot</h3>

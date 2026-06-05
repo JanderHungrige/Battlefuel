@@ -65,6 +65,9 @@ class Settings(BaseSettings):
     # Provider the factory builds for buy orders (Wave 5 ships "db").
     buy_order_provider: str = "db"
 
+    # Provider the factory builds for fuel-management platforms (v2 Wave 11 ships "db").
+    fuel_platform_provider: str = "db"
+
     # Default fuel-procurement lead time in game-seconds (overridable per buy order).
     buy_order_lead_time_game_s: float = 600.0
 

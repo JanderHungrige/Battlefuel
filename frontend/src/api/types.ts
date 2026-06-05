@@ -288,6 +288,19 @@ export interface CreateBuyOrderRequest {
   lead_time_game_s?: number
 }
 
+/** A selectable fuel-management / procurement platform (v2 Wave 11 F2). */
+export interface FuelPlatform {
+  id: string
+  name: string
+  logo_key: string | null
+  is_default: boolean
+}
+
+export interface CreateFuelPlatformRequest {
+  name: string
+  logo_key?: string | null
+}
+
 export type RefuelOrderStatus = 'pending' | 'active' | 'complete' | 'cancelled'
 
 export interface RefuelOrder {

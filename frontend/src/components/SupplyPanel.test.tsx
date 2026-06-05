@@ -81,6 +81,42 @@ describe('SupplyPanel', () => {
     expect(onBuy).toHaveBeenCalledWith('depot-main', 'diesel', 5000)
   })
 
+  it('hides the platform selector when no platforms are provided', () => {
+    render(<SupplyPanel {...baseProps} />)
+    expect(screen.queryByTestId('platform-selector')).not.toBeInTheDocument()
+  })
+
+  it('renders the platform selector and adds a new platform (W11 F2)', () => {
+    const onAddPlatform = vi.fn()
+    const onSelectPlatform = vi.fn()
+    render(
+      <SupplyPanel
+        {...baseProps}
+        platforms={[
+          { id: 'platform-world-fuel-dfms', name: 'World Fuel DFMS', logo_key: 'world-fuel', is_default: true },
+          { id: 'platform-shell-fm', name: 'Shell FM', logo_key: 'shell-fm', is_default: false },
+        ]}
+        selectedPlatformId="platform-world-fuel-dfms"
+        onSelectPlatform={onSelectPlatform}
+        onAddPlatform={onAddPlatform}
+      />,
+    )
+    expect(screen.getByTestId('platform-selector')).toBeInTheDocument()
+    expect(screen.getByTestId('platform-select')).toHaveValue('platform-world-fuel-dfms')
+
+    fireEvent.change(screen.getByTestId('platform-select'), {
+      target: { value: 'platform-shell-fm' },
+    })
+    expect(onSelectPlatform).toHaveBeenCalledWith('platform-shell-fm')
+
+    fireEvent.click(screen.getByTestId('platform-add-toggle'))
+    fireEvent.change(screen.getByTestId('platform-new-name'), {
+      target: { value: 'NATO Fuel Cell' },
+    })
+    fireEvent.click(screen.getByTestId('platform-add-confirm'))
+    expect(onAddPlatform).toHaveBeenCalledWith('NATO Fuel Cell')
+  })
+
   it('requests a refuel for the chosen unit', () => {
     const onRefuel = vi.fn()
     render(<SupplyPanel {...baseProps} onRefuel={onRefuel} />)

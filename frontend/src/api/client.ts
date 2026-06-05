@@ -6,11 +6,13 @@ import type {
   BuyOrder,
   CreateBuyOrderRequest,
   CreateDepotRequest,
+  CreateFuelPlatformRequest,
   CreateMoveOrderRequest,
   CreateRefuelOrderRequest,
   CreateWaypointMoveOrderRequest,
   EnemyUnit,
   FuelDepot,
+  FuelPlatform,
   FuelStock,
   MoveOrder,
   Obstacle,
@@ -108,6 +110,11 @@ export const api = {
   getSupplyOverview: (): Promise<SupplyOverview> => getJson<SupplyOverview>('/supply/overview'),
   createBuyOrder: (req: CreateBuyOrderRequest): Promise<BuyOrder> =>
     postJson<BuyOrder>('/buy-orders', req),
+
+  // Fuel-management platforms (v2 Wave 11 F2).
+  getFuelPlatforms: (): Promise<FuelPlatform[]> => getJson<FuelPlatform[]>('/fuel-platforms'),
+  createFuelPlatform: (req: CreateFuelPlatformRequest): Promise<FuelPlatform> =>
+    postJson<FuelPlatform>('/fuel-platforms', req),
   confirmBuyOrder: (id: string): Promise<BuyOrder> => postJson<BuyOrder>(`/buy-orders/${id}/confirm`),
   cancelBuyOrder: (id: string): Promise<BuyOrder> => postJson<BuyOrder>(`/buy-orders/${id}/cancel`),
   createRefuelOrder: (req: CreateRefuelOrderRequest): Promise<RefuelOrder> =>
