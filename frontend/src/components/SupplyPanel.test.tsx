@@ -50,11 +50,34 @@ describe('SupplyPanel', () => {
     expect(screen.getByTestId('supply-panel')).toBeInTheDocument()
   })
 
-  it('places a buy order with the chosen depot, fuel type, and quantity', () => {
+  it('places an order with the chosen depot, fuel type, and quantity', () => {
     const onBuy = vi.fn()
     render(<SupplyPanel {...baseProps} onBuy={onBuy} />)
     fireEvent.change(screen.getByTestId('buy-quantity'), { target: { value: '5000' } })
     fireEvent.click(screen.getByTestId('buy-submit'))
+    expect(onBuy).toHaveBeenCalledWith('depot-main', 'diesel', 5000)
+  })
+
+  it('renames the action to "Order fuel"', () => {
+    render(<SupplyPanel {...baseProps} />)
+    expect(screen.getByTestId('buy-submit')).toHaveTextContent('Order fuel')
+    expect(screen.queryByText('Buy fuel')).not.toBeInTheDocument()
+  })
+
+  // Regression (W11 F1): when depots arrive AFTER first render, the stateful buyDepot was
+  // never re-seeded, leaving the default Main Supply Point with an empty fuel dropdown and a
+  // disabled button. With the effectiveDepot fallback the default depot is order-ready
+  // immediately, with no prior selection.
+  it('enables ordering for the default depot when depots load after first render', () => {
+    const onBuy = vi.fn()
+    // First render with no depots (loading), then re-render once they arrive.
+    const { rerender } = render(
+      <SupplyPanel {...baseProps} depots={[]} overview={null} onBuy={onBuy} />,
+    )
+    rerender(<SupplyPanel {...baseProps} onBuy={onBuy} />)
+    const submit = screen.getByTestId('buy-submit')
+    expect(submit).not.toBeDisabled()
+    fireEvent.click(submit)
     expect(onBuy).toHaveBeenCalledWith('depot-main', 'diesel', 5000)
   })
 

@@ -59,13 +59,15 @@ export function useSupplyOrders(
         .createBuyOrder({ depot_id: depotId, fuel_type: fuelType, quantity_liters: quantityLiters })
         .then((o) => api.confirmBuyOrder(o.id))
         .then(() => {
-          const text = `Buy order: ${quantityLiters} L ${fuelType} → ${depotId} (inbound)`
+          const text = `Fuel order: ${quantityLiters} L ${fuelType} → ${depotId} (inbound)`
           setMessage(text)
           pushChatter(text, 'order')
           refetch()
         })
         .catch((e: unknown) =>
-          setMessage(e instanceof ApiError ? `Buy order failed (${e.status}).` : 'Buy order failed.'),
+          setMessage(
+            e instanceof ApiError ? `Fuel order failed (${e.status}).` : 'Fuel order failed.',
+          ),
         )
         .finally(() => setBusy(false))
     },

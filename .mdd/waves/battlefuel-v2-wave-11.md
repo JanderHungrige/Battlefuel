@@ -7,7 +7,7 @@ status: planned
 depends_on: battlefuel-v2-wave-10
 demo_state: "In the OF-8 Joint-Force Supply view the operator orders fuel end-to-end: pick a fuel-management platform (World Fuel DFMS default / Shell FM / add new), hit 'Order fuel' (renamed from Buy fuel) to open a branded order mask with fuel type / destination / amount prefilled, tick who to inform (JLSG, JTF HQ), and Place order — posting a confirmation + an entry in a new Order History panel that tracks each order through the NATO stages (placed -> JLSG -> JTF -> provider -> on route -> reached JLSG -> reached OPCON). The initial main-supply-point order dropdown is populated (bug fixed). Supply points are clickable to locate on the map; the operator can add typed logistic sites (BSA / CSSBN / DOB / FLS / TLB) that carry fuel stock and can be refueled — and when a site runs low it proposes a refuel/redistribution order. Refuel is started by clicking a unit. On the map in OF-8, each unit shows a colour-coded fuel bar (selected unit on top), toggleable via an on-map-info-bars selector. An Info Docs tab surfaces the official PDFs from the folder. Order status auto-advances on the sim clock (30 s per stage)."
 created: 2026-06-05
-hash:
+hash: 3b54081b
 ---
 
 # Wave 11: OF-8 Fuel Ordering, Logistic Sites & Supply Optics
@@ -29,7 +29,7 @@ Mark `complete` only after ALL three gates pass (never on a localhost demo):
 ## Features
 | # | Feature | Doc | Status | Depends on |
 |---|---------|-----|--------|------------|
-| 1 | order-fuel-rename-and-dropdown-bug | — | planned | — |
+| 1 | order-fuel-rename-and-dropdown-bug | docs/66-order-fuel-rename-and-dropdown-bug.md | complete | — |
 | 2 | fuel-platform-selector | — | planned | order-fuel-rename-and-dropdown-bug |
 | 3 | order-fuel-mask | — | planned | fuel-platform-selector |
 | 4 | order-history-panel | — | planned | order-fuel-mask |

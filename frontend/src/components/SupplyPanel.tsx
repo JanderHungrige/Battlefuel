@@ -39,11 +39,17 @@ export function SupplyPanel({
   const [buyQty, setBuyQty] = useState(5000)
   const [refuelUnit, setRefuelUnit] = useState(refuelTargets[0]?.id ?? '')
 
+  // `depots` is empty on first render (still loading), so the stateful `buyDepot` seeds to
+  // '' and never re-initialises. Fall back to the first real depot whenever the stored id
+  // is not a current depot — this keeps the default Main Supply Point selected (and the
+  // fuel dropdown populated + the order button enabled) without a sync effect.
+  const effectiveDepot = depots.some((d) => d.id === buyDepot) ? buyDepot : (depots[0]?.id ?? '')
+
   // Fuel types offered for the chosen depot = the fuel types it already stocks.
   const fuelOptions = useMemo(() => {
-    const d = overview?.depots.find((x) => x.depot.id === buyDepot)
+    const d = overview?.depots.find((x) => x.depot.id === effectiveDepot)
     return d ? d.stocks.map((s) => s.fuel_type) : []
-  }, [overview, buyDepot])
+  }, [overview, effectiveDepot])
   const [buyFuel, setBuyFuel] = useState(fuelOptions[0] ?? '')
   const effectiveFuel = fuelOptions.includes(buyFuel) ? buyFuel : (fuelOptions[0] ?? '')
 
@@ -87,10 +93,10 @@ export function SupplyPanel({
       </section>
 
       <section className="supply-form">
-        <h3>Buy fuel → depot</h3>
+        <h3>Order fuel → depot</h3>
         <select
           data-testid="buy-depot"
-          value={buyDepot}
+          value={effectiveDepot}
           onChange={(e) => setBuyDepot(e.target.value)}
         >
           {depots.map((d) => (
@@ -120,10 +126,10 @@ export function SupplyPanel({
         <button
           type="button"
           data-testid="buy-submit"
-          disabled={busy || !buyDepot || !effectiveFuel || buyQty <= 0}
-          onClick={() => onBuy(buyDepot, effectiveFuel, buyQty)}
+          disabled={busy || !effectiveDepot || !effectiveFuel || buyQty <= 0}
+          onClick={() => onBuy(effectiveDepot, effectiveFuel, buyQty)}
         >
-          Buy fuel
+          Order fuel
         </button>
       </section>
 
