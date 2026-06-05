@@ -279,6 +279,11 @@ export interface BuyOrder {
   status: BuyOrderStatus
   lead_time_game_s: number
   remaining_game_s: number
+  // Order-mask metadata (v2 Wave 11 F3).
+  platform_id?: string | null
+  inform_jlsg?: boolean
+  inform_jtf?: boolean
+  destination_name?: string | null
 }
 
 export interface CreateBuyOrderRequest {
@@ -286,6 +291,11 @@ export interface CreateBuyOrderRequest {
   fuel_type: string
   quantity_liters: number
   lead_time_game_s?: number
+  // Order-mask metadata (v2 Wave 11 F3).
+  platform_id?: string | null
+  inform_jlsg?: boolean
+  inform_jtf?: boolean
+  destination_name?: string | null
 }
 
 /** A selectable fuel-management / procurement platform (v2 Wave 11 F2). */

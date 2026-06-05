@@ -22,7 +22,11 @@ class BuyOrderStatus(StrEnum):
 
 
 class BuyOrder(BaseModel):
-    """A committed fuel purchase into a depot, delivered after a lead time."""
+    """A committed fuel purchase into a depot, delivered after a lead time.
+
+    Order-mask metadata (v2 Wave 11 F3): the fuel-management platform the order was placed
+    through and who to inform (JLSG / JTF HQ), plus a human destination label.
+    """
 
     model_config = ConfigDict(frozen=True)
 
@@ -33,3 +37,7 @@ class BuyOrder(BaseModel):
     status: BuyOrderStatus
     lead_time_game_s: float = Field(ge=0)
     remaining_game_s: float = Field(ge=0)
+    platform_id: str | None = None
+    inform_jlsg: bool = False
+    inform_jtf: bool = False
+    destination_name: str | None = None

@@ -27,8 +27,10 @@ __pycache__/
 /data/*.osm.pbf
 /data/*.geojson
 
-# Frontend: the basemap is copied here from data/ by sync:assets (don't double-commit)
+# Frontend: assets copied here by sync:assets from their committed source (don't double-commit)
 /frontend/public/hohenfels.pmtiles
+/frontend/public/logos/
+/frontend/public/docs/
 
 # Claude
 CLAUDE.local.md

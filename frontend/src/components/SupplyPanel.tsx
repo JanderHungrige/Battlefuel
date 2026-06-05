@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import type { FuelDepot, FuelPlatform, RefuelOrder, SupplyOverview } from '../api/types'
+import { type OrderMeta, OrderFuelMask } from './OrderFuelMask'
 
 export interface RecommendationView {
   order: RefuelOrder
@@ -20,7 +21,7 @@ export interface SupplyPanelProps {
   selectedPlatformId?: string
   onSelectPlatform?: (id: string) => void
   onAddPlatform?: (name: string) => void
-  onBuy: (depotId: string, fuelType: string, quantityLiters: number) => void
+  onBuy: (depotId: string, fuelType: string, quantityLiters: number, meta?: OrderMeta) => void
   onRefuel: (unitId: string) => void
   onConfirmRefuel: () => void
   onCancelRefuel: () => void
@@ -49,6 +50,9 @@ export function SupplyPanel({
   const [refuelUnit, setRefuelUnit] = useState(refuelTargets[0]?.id ?? '')
   const [addingPlatform, setAddingPlatform] = useState(false)
   const [newPlatformName, setNewPlatformName] = useState('')
+  const [maskOpen, setMaskOpen] = useState(false)
+
+  const selectedPlatform = platforms.find((p) => p.id === selectedPlatformId) ?? null
 
   const submitNewPlatform = (): void => {
     const name = newPlatformName.trim()
@@ -199,11 +203,26 @@ export function SupplyPanel({
           type="button"
           data-testid="buy-submit"
           disabled={busy || !effectiveDepot || !effectiveFuel || buyQty <= 0}
-          onClick={() => onBuy(effectiveDepot, effectiveFuel, buyQty)}
+          onClick={() => setMaskOpen(true)}
         >
           Order fuel
         </button>
       </section>
+
+      {maskOpen && (
+        <OrderFuelMask
+          platform={selectedPlatform}
+          fuelType={effectiveFuel}
+          destinationName={depots.find((d) => d.id === effectiveDepot)?.name ?? effectiveDepot}
+          amount={buyQty}
+          busy={busy}
+          onClose={() => setMaskOpen(false)}
+          onPlace={(amount, meta) => {
+            onBuy(effectiveDepot, effectiveFuel, amount, meta)
+            setMaskOpen(false)
+          }}
+        />
+      )}
 
       <section className="supply-form">
         <h3>Refuel a unit</h3>

@@ -20,4 +20,9 @@ class BuyOrderRow(Base):
     status: Mapped[str] = mapped_column(default="pending")
     lead_time_game_s: Mapped[float]
     remaining_game_s: Mapped[float]
+    # Order-mask metadata (v2 Wave 11 F3).
+    platform_id: Mapped[str | None] = mapped_column(default=None)
+    inform_jlsg: Mapped[bool] = mapped_column(default=False)
+    inform_jtf: Mapped[bool] = mapped_column(default=False)
+    destination_name: Mapped[str | None] = mapped_column(default=None)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())

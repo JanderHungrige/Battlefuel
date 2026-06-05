@@ -94,6 +94,49 @@ class TestBuyOrderApi:
             await client.aclose()
             await engine.dispose()
 
+    async def test_order_mask_metadata_persists(self) -> None:
+        # v2 Wave 11 F3: platform / inform flags / destination are persisted on the order.
+        try:
+            client, engine, _ = await _client()
+        except SQLAlchemyError as exc:
+            pytest.skip(f"database unavailable: {exc}")
+        try:
+            body = {
+                "depot_id": "depot-main",
+                "fuel_type": "diesel",
+                "quantity_liters": 5000,
+                "platform_id": "platform-world-fuel-dfms",
+                "inform_jlsg": True,
+                "inform_jtf": False,
+                "destination_name": "Main Supply Point",
+            }
+            order = (await client.post("/api/v1/buy-orders", json=body)).json()
+            assert order["platform_id"] == "platform-world-fuel-dfms"
+            assert order["inform_jlsg"] is True
+            assert order["inform_jtf"] is False
+            assert order["destination_name"] == "Main Supply Point"
+
+            # The metadata survives a re-fetch (persisted, not just echoed).
+            again = (await client.get(f"/api/v1/buy-orders/{order['id']}")).json()
+            assert again["platform_id"] == "platform-world-fuel-dfms"
+            assert again["inform_jlsg"] is True
+        finally:
+            await client.aclose()
+            await engine.dispose()
+
+    async def test_destination_name_defaults_to_depot_name(self) -> None:
+        try:
+            client, engine, _ = await _client()
+        except SQLAlchemyError as exc:
+            pytest.skip(f"database unavailable: {exc}")
+        try:
+            body = {"depot_id": "depot-main", "fuel_type": "diesel", "quantity_liters": 100}
+            order = (await client.post("/api/v1/buy-orders", json=body)).json()
+            assert order["destination_name"] == "Main Supply Point"
+        finally:
+            await client.aclose()
+            await engine.dispose()
+
     async def test_unknown_depot_404(self) -> None:
         try:
             client, engine, _ = await _client()

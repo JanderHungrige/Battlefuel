@@ -50,12 +50,22 @@ describe('SupplyPanel', () => {
     expect(screen.getByTestId('supply-panel')).toBeInTheDocument()
   })
 
-  it('places an order with the chosen depot, fuel type, and quantity', () => {
+  it('opens the order mask and places the order through it (W11 F3)', () => {
     const onBuy = vi.fn()
     render(<SupplyPanel {...baseProps} onBuy={onBuy} />)
     fireEvent.change(screen.getByTestId('buy-quantity'), { target: { value: '5000' } })
+    // "Order fuel" now opens the branded mask instead of placing directly.
     fireEvent.click(screen.getByTestId('buy-submit'))
-    expect(onBuy).toHaveBeenCalledWith('depot-main', 'diesel', 5000)
+    expect(screen.getByTestId('order-mask')).toBeInTheDocument()
+    expect(screen.getByTestId('order-mask-fuel')).toHaveTextContent('diesel')
+    expect(screen.getByTestId('order-mask-destination')).toHaveTextContent('Main Supply Point')
+    fireEvent.click(screen.getByTestId('order-mask-place'))
+    expect(onBuy).toHaveBeenCalledWith('depot-main', 'diesel', 5000, {
+      platformId: null,
+      informJlsg: false,
+      informJtf: false,
+      destinationName: 'Main Supply Point',
+    })
   })
 
   it('renames the action to "Order fuel"', () => {
@@ -78,7 +88,13 @@ describe('SupplyPanel', () => {
     const submit = screen.getByTestId('buy-submit')
     expect(submit).not.toBeDisabled()
     fireEvent.click(submit)
-    expect(onBuy).toHaveBeenCalledWith('depot-main', 'diesel', 5000)
+    fireEvent.click(screen.getByTestId('order-mask-place'))
+    expect(onBuy).toHaveBeenCalledWith('depot-main', 'diesel', 5000, {
+      platformId: null,
+      informJlsg: false,
+      informJtf: false,
+      destinationName: 'Main Supply Point',
+    })
   })
 
   it('hides the platform selector when no platforms are provided', () => {

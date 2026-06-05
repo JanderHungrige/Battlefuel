@@ -33,11 +33,17 @@ async def create_buy_order(
     fuel_type: FuelType,
     quantity_liters: float,
     lead_time_game_s: float,
+    platform_id: str | None = None,
+    inform_jlsg: bool = False,
+    inform_jtf: bool = False,
+    destination_name: str | None = None,
 ) -> BuyOrder | None:
     """Create a pending buy order.
 
     Raises ``LookupError`` if the depot is unknown (API → 404). Returns ``None`` if the depot has
     no stock row for ``fuel_type`` (API → 422), since delivery targets an existing stock row.
+    The order-mask metadata (platform / inform flags / destination label) is persisted for the
+    order-history panel (v2 Wave 11 F3).
     """
     depot = await supply.get_depot(session, depot_id)
     if depot is None:
@@ -52,6 +58,10 @@ async def create_buy_order(
         status=BuyOrderStatus.PENDING,
         lead_time_game_s=lead_time_game_s,
         remaining_game_s=lead_time_game_s,
+        platform_id=platform_id,
+        inform_jlsg=inform_jlsg,
+        inform_jtf=inform_jtf,
+        destination_name=destination_name or depot.name,
     )
     return await orders.create(session, order)
 

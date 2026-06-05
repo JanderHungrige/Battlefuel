@@ -5,6 +5,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { ApiError, api } from '../api/client'
 import type { ChatterMessage, UnitInstance, UnitType } from '../api/types'
+import type { OrderMeta } from '../components/OrderFuelMask'
 import type { RecommendationView } from '../components/SupplyPanel'
 
 type PushChatter = (text: string, kind?: ChatterMessage['kind'], h3Index?: string) => void
@@ -17,7 +18,7 @@ export interface SupplyOrdersState {
   truckHighlightH3: string | null
   busy: boolean
   message: string | null
-  placeBuy: (depotId: string, fuelType: string, quantityLiters: number) => void
+  placeBuy: (depotId: string, fuelType: string, quantityLiters: number, meta?: OrderMeta) => void
   placeRefuel: (unitId: string) => void
   confirmRefuel: () => void
   cancelRefuel: () => void
@@ -52,14 +53,28 @@ export function useSupplyOrders(
   }, [])
 
   const placeBuy = useCallback(
-    (depotId: string, fuelType: string, quantityLiters: number) => {
+    (depotId: string, fuelType: string, quantityLiters: number, meta?: OrderMeta) => {
       setBusy(true)
       setMessage(null)
+      const dest = meta?.destinationName ?? depotId
       api
-        .createBuyOrder({ depot_id: depotId, fuel_type: fuelType, quantity_liters: quantityLiters })
+        .createBuyOrder({
+          depot_id: depotId,
+          fuel_type: fuelType,
+          quantity_liters: quantityLiters,
+          platform_id: meta?.platformId ?? null,
+          inform_jlsg: meta?.informJlsg ?? false,
+          inform_jtf: meta?.informJtf ?? false,
+          destination_name: meta?.destinationName ?? null,
+        })
         .then((o) => api.confirmBuyOrder(o.id))
         .then(() => {
-          const text = `Fuel order: ${quantityLiters} L ${fuelType} → ${depotId} (inbound)`
+          const informed = [meta?.informJlsg ? 'JLSG' : null, meta?.informJtf ? 'JTF HQ' : null]
+            .filter(Boolean)
+            .join(', ')
+          const text =
+            `Fuel order: ${quantityLiters} L ${fuelType} → ${dest} (inbound)` +
+            (informed ? ` — informed ${informed}` : '')
           setMessage(text)
           pushChatter(text, 'order')
           refetch()

@@ -23,6 +23,10 @@ def _to_order(row: BuyOrderRow) -> BuyOrder:
         status=BuyOrderStatus(row.status),
         lead_time_game_s=row.lead_time_game_s,
         remaining_game_s=row.remaining_game_s,
+        platform_id=row.platform_id,
+        inform_jlsg=row.inform_jlsg,
+        inform_jtf=row.inform_jtf,
+        destination_name=row.destination_name,
     )
 
 
@@ -64,6 +68,10 @@ class DbBuyOrderProvider(BuyOrderProvider):
                 status=order.status.value,
                 lead_time_game_s=order.lead_time_game_s,
                 remaining_game_s=order.remaining_game_s,
+                platform_id=order.platform_id,
+                inform_jlsg=order.inform_jlsg,
+                inform_jtf=order.inform_jtf,
+                destination_name=order.destination_name,
             )
         )
         await session.commit()
