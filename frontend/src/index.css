@@ -192,6 +192,113 @@ body {
   color: #f0c878;
 }
 
+.fuel-run-start {
+  margin-top: 4px;
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+/* Fuel run panel (v2 Wave 12). */
+.fuel-run-panel {
+  position: absolute;
+  bottom: 12px;
+  left: 364px;
+  width: 280px;
+  z-index: 24;
+  background: var(--panel, #11161d);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.fuel-run-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.fuel-run-head h2 {
+  margin: 0;
+  font-size: 14px;
+  color: var(--accent);
+}
+
+.fuel-run-head .ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.fuel-run-route {
+  font-size: 13px;
+  margin: 6px 0;
+}
+
+.fuel-run-hint {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.fuel-run-options {
+  list-style: none;
+  margin: 6px 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.fuel-run-option {
+  width: 100%;
+  text-align: left;
+  background: #1c222b;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fuel-run-option.active {
+  border-color: var(--accent);
+}
+
+.fuel-run-option-label {
+  font-weight: 700;
+}
+
+.fuel-run-option-meta {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.fuel-run-confirm {
+  width: 100%;
+  padding: 6px 12px;
+  background: var(--accent);
+  color: #05080c;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fuel-run-confirm:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .supply-panel h3 {
   margin: 12px 0 6px;
   font-size: 12px;

@@ -32,6 +32,8 @@ export interface SupplyPanelProps {
   onShowDocs?: () => void
   /** Mark + locate a supply entity (depot / fuel truck / …) on the map (v2 Wave 11). */
   onLocate?: (lat: number, lon: number) => void
+  /** Start a routed fuel run from a truck (v2 Wave 12): pick a target unit next. */
+  onCreateFuelRun?: (truckId: string, truckName: string) => void
   /** Ask the advisor to propose a refuel for a low site (v2 Wave 11 F5). */
   onProposeRefuel?: (depotId: string) => void
   onBuy: (depotId: string, fuelType: string, quantityLiters: number, meta?: OrderMeta) => void
@@ -56,6 +58,7 @@ export function SupplyPanel({
   onShowHistory,
   onShowDocs,
   onLocate,
+  onCreateFuelRun,
   onProposeRefuel,
   onBuy,
   onRefuel,
@@ -265,6 +268,16 @@ export function SupplyPanel({
                   {t.assigned_unit_id ? `Tasked → ${unitName(t.assigned_unit_id)}` : 'On standby'}
                 </span>
               </div>
+              {onCreateFuelRun && (
+                <button
+                  type="button"
+                  className="ghost fuel-run-start"
+                  data-testid={`fuel-run-start-${t.instance_id}`}
+                  onClick={() => onCreateFuelRun(t.instance_id, t.name)}
+                >
+                  Create fuel run
+                </button>
+              )}
               <div className="stock-row">
                 <span className="stock-label">{t.fuel_type}</span>
                 {t.current_fuel_liters == null ? (
