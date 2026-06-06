@@ -7,9 +7,11 @@ import type {
   CreateBuyOrderRequest,
   CreateDepotRequest,
   CreateFuelPlatformRequest,
+  CreateFuelRunRequest,
   CreateMoveOrderRequest,
   CreateRefuelOrderRequest,
   CreateWaypointMoveOrderRequest,
+  FuelRunResponse,
   EnemyUnit,
   FuelDepot,
   FuelPlatform,
@@ -120,6 +122,8 @@ export const api = {
   cancelBuyOrder: (id: string): Promise<BuyOrder> => postJson<BuyOrder>(`/buy-orders/${id}/cancel`),
   createRefuelOrder: (req: CreateRefuelOrderRequest): Promise<RefuelOrder> =>
     postJson<RefuelOrder>('/refuel-orders', req),
+  createFuelRun: (req: CreateFuelRunRequest): Promise<FuelRunResponse> =>
+    postJson<FuelRunResponse>('/fuel-runs', req),
   confirmRefuelOrder: (id: string): Promise<RefuelOrder> =>
     postJson<RefuelOrder>(`/refuel-orders/${id}/confirm`),
   cancelRefuelOrder: (id: string): Promise<RefuelOrder> =>

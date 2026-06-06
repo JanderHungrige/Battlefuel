@@ -342,6 +342,22 @@ export interface CreateRefuelOrderRequest {
   requested_liters?: number
 }
 
+/** Start a routed fuel run: dispatch a mover to a target + wire the refuel (v2 Wave 12). */
+export interface CreateFuelRunRequest {
+  mover_id: string
+  unit_id: string
+  truck_id: string
+  dest_lat: number
+  dest_lon: number
+  metric: RouteMetric
+  mode?: RouteMode
+}
+
+export interface FuelRunResponse {
+  move_order: MoveOrder
+  refuel_order: RefuelOrder
+}
+
 /** Live frame broadcast when a buy order's NATO stage changes / it is delivered (Wave 5 + W11 F4). */
 export interface BuyOrderUpdate {
   type: 'buy_order_update'

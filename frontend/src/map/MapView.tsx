@@ -91,6 +91,9 @@ export interface MapViewProps {
   onRemoveObstacle: (id: string) => void
   depotMode: boolean
   onPlaceDepot: (lat: number, lon: number) => void
+  /** Fuel-run target-pick mode (v2 Wave 12): clicking a unit picks it as the refuel target. */
+  fuelRunPickMode?: boolean
+  onPickFuelTarget?: (unitId: string) => void
   onClearSelection: () => void
 }
 
@@ -692,7 +695,13 @@ function wireInteraction(map: maplibregl.Map, propsRef: { current: MapViewProps 
     }
     const hitUnits = map.queryRenderedFeatures(e.point, { layers: ['units'] })
     if (hitUnits.length > 0) {
-      p.onSelectUnit(String(hitUnits[0].properties?.id))
+      const unitId = String(hitUnits[0].properties?.id)
+      // Fuel-run target pick (v2 Wave 12): clicking a unit picks it as the refuel target.
+      if (p.fuelRunPickMode && p.onPickFuelTarget) {
+        p.onPickFuelTarget(unitId)
+        return
+      }
+      p.onSelectUnit(unitId)
       return
     }
     if (p.planning) {

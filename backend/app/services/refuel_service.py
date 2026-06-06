@@ -40,16 +40,20 @@ async def create_refuel_order(
     session: AsyncSession,
     instances: UnitInstanceProvider,
     units: UnitDataProvider,
-    recommender: RefuelRecommender,
+    recommender: RefuelRecommender | None,
     orders: RefuelOrderProvider,
     *,
     unit_id: str,
+    truck_id: str | None = None,
     requested_liters: float | None = None,
 ) -> RefuelOrder | None:
-    """Create a pending refuel order with a recommended truck + rendezvous.
+    """Create a pending refuel order with a truck + rendezvous.
 
-    Returns ``None`` when no compatible fuelled truck is available. Raises ``LookupError`` if the
-    unit or its unit type is unknown (the API maps these to 404 / 409).
+    Normally the truck is chosen by the pluggable recommender. When ``truck_id`` is given (a
+    routed fuel run, v2 Wave 12) that truck is used directly — validated as a fuelled
+    FUEL_SUPPLY truck whose fuel type matches the unit — with the rendezvous at the unit's
+    current position. Returns ``None`` when no compatible fuelled truck is available (or the
+    explicit truck is invalid). Raises ``LookupError`` if the unit or its unit type is unknown.
     """
     unit = await instances.get_instance(session, unit_id)
     if unit is None:
@@ -59,30 +63,50 @@ async def create_refuel_order(
         raise LookupError(f"unit type {unit.unit_type_id!r} missing")
     fuel_type = unit_type.fuel.fuel_type
 
-    candidates = []
-    for inst in await instances.list_instances(session):
-        if inst.id == unit.id:
-            continue
-        truck_type = units.get_unit(inst.unit_type_id)
-        if truck_type is None or truck_type.nato_unit_type is not NatoUnitType.FUEL_SUPPLY:
-            continue
-        if truck_type.fuel.fuel_type is not fuel_type:
-            continue
-        candidates.append(inst)
+    if truck_id is not None:
+        # Explicit truck (routed fuel run): validate it and rendezvous at the unit's position.
+        if truck_id == unit.id:
+            return None
+        truck = await instances.get_instance(session, truck_id)
+        truck_type = units.get_unit(truck.unit_type_id) if truck is not None else None
+        if (
+            truck is None
+            or truck_type is None
+            or truck_type.nato_unit_type is not NatoUnitType.FUEL_SUPPLY
+            or truck_type.fuel.fuel_type is not fuel_type
+        ):
+            return None
+        chosen_truck_id = truck.id
+        rdv_lat, rdv_lon, rdv_h3 = unit.lat, unit.lon, unit.h3_index
+    else:
+        candidates = []
+        for inst in await instances.list_instances(session):
+            if inst.id == unit.id:
+                continue
+            truck_type = units.get_unit(inst.unit_type_id)
+            if truck_type is None or truck_type.nato_unit_type is not NatoUnitType.FUEL_SUPPLY:
+                continue
+            if truck_type.fuel.fuel_type is not fuel_type:
+                continue
+            candidates.append(inst)
 
-    rec = recommender.recommend(unit, candidates)
-    if rec is None:
-        return None
+        if recommender is None:
+            return None
+        rec = recommender.recommend(unit, candidates)
+        if rec is None:
+            return None
+        chosen_truck_id = rec.truck_id
+        rdv_lat, rdv_lon, rdv_h3 = rec.rendezvous.lat, rec.rendezvous.lon, rec.rendezvous.h3_index
 
     order = RefuelOrder(
         id=uuid.uuid4().hex,
         unit_id=unit.id,
-        truck_id=rec.truck_id,
+        truck_id=chosen_truck_id,
         fuel_type=fuel_type,
         status=RefuelOrderStatus.PENDING,
-        rendezvous_lat=rec.rendezvous.lat,
-        rendezvous_lon=rec.rendezvous.lon,
-        rendezvous_h3=rec.rendezvous.h3_index,
+        rendezvous_lat=rdv_lat,
+        rendezvous_lon=rdv_lon,
+        rendezvous_h3=rdv_h3,
         requested_liters=requested_liters,
     )
     return await orders.create(session, order)

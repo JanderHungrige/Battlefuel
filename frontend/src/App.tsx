@@ -13,6 +13,7 @@ import { ObstacleKindPicker } from './components/ObstacleKindPicker'
 import type { ObstacleKind } from './components/obstacleKinds'
 import { RoleToggle } from './components/RoleToggle'
 import { InfoDocsPanel } from './components/InfoDocsPanel'
+import { FuelRunPanel } from './components/FuelRunPanel'
 import { OrderHistoryPanel } from './components/OrderHistoryPanel'
 import { SupplyPanel } from './components/SupplyPanel'
 import { UnitOverview } from './components/UnitOverview'
@@ -27,6 +28,7 @@ import { useAdvisor } from './hooks/useAdvisor'
 import { useMovePlanning } from './hooks/useMovePlanning'
 import { useFuelPlatforms } from './hooks/useFuelPlatforms'
 import { useInfoDocs } from './hooks/useInfoDocs'
+import { useFuelRun } from './hooks/useFuelRun'
 import { useOrderHistory } from './hooks/useOrderHistory'
 import { useSupply } from './hooks/useSupply'
 import { useSupplyOrders } from './hooks/useSupplyOrders'
@@ -141,6 +143,7 @@ export default function App() {
     return out
   }, [live])
   const selectedLive = selectedUnitId ? live[selectedUnitId] : undefined
+  const fuelRun = useFuelRun(units, unitTypes, supply.overview, livePositions, pushChatter, supply.refetch)
 
   // A clicked advisor recommendation marked on the map: highlight + a movement arrow.
   const [selectedAdvice, setSelectedAdvice] = useState<Recommendation | null>(null)
@@ -367,8 +370,9 @@ export default function App() {
                 setHighlightEventId(null)
                 planning.resetPlanning()
                 setSelectedUnitId(id)
-                // OF-8: clicking a refuelable unit starts its refuel flow (v2 Wave 11 F6) —
-                // an entry point in addition to the supply panel's "Request refuel".
+                // OF-8: clicking a refuelable unit starts a routed fuel run — find the nearest
+                // fuelled truck, plan Safe/Fast routes (v2 Wave 12 F1, supersedes the W11 F6
+                // one-click recommendation).
                 if (
                   shouldRefuelOnClick(
                     role,
@@ -376,9 +380,11 @@ export default function App() {
                     id,
                   )
                 ) {
-                  supplyOrders.placeRefuel(id)
+                  fuelRun.startUnitFirst(id)
                 }
               }}
+              fuelRunPickMode={fuelRun.phase === 'pick-target'}
+              onPickFuelTarget={fuelRun.pickTarget}
               onPickDestination={(lat, lon) =>
                 planning.waypointMode
                   ? planning.addWaypoint(lat, lon)
@@ -412,6 +418,7 @@ export default function App() {
                 onShowDocs={() => setInfoDocsOpen(true)}
                 onLocate={locate}
                 onProposeRefuel={proposeSiteRefuel}
+                onCreateFuelRun={(truckId, truckName) => fuelRun.startTruckFirst(truckId, truckName)}
                 onBuy={supplyOrders.placeBuy}
                 onRefuel={supplyOrders.placeRefuel}
                 onConfirmRefuel={supplyOrders.confirmRefuel}
@@ -426,6 +433,20 @@ export default function App() {
             )}
             {canShow(role, 'supplyPanel') && infoDocsOpen && (
               <InfoDocsPanel groups={infoDocs.groups} onClose={() => setInfoDocsOpen(false)} />
+            )}
+            {canShow(role, 'supplyPanel') && (
+              <FuelRunPanel
+                phase={fuelRun.phase}
+                moverName={fuelRun.moverName}
+                targetName={fuelRun.targetName}
+                options={fuelRun.options}
+                metric={fuelRun.metric}
+                busy={fuelRun.busy}
+                message={fuelRun.message}
+                onSelectMetric={fuelRun.selectMetric}
+                onConfirm={fuelRun.confirm}
+                onCancel={fuelRun.cancel}
+              />
             )}
             {obstacleActive && (
               <ObstacleKindPicker selected={obstacleKind} onSelect={setObstacleKind} />
