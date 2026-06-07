@@ -349,6 +349,8 @@ export default function App() {
               enemyUnits={enemyUnits}
               depots={canShow(role, 'depotOverlay') ? (supply.overview?.depots ?? []) : []}
               locatePoint={locatePoint}
+              fuelRunOptions={fuelRun.options}
+              fuelRunMetric={fuelRun.metric}
               showUnitFuelBars={canShow(role, 'depotOverlay') && infoBarsOn}
               rendezvous={canShow(role, 'supplyPanel') ? supplyOrders.rendezvous : null}
               adviceArrow={adviceMarker.arrow}
