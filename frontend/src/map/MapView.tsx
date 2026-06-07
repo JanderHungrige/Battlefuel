@@ -75,6 +75,9 @@ export interface MapViewProps {
   depots: DepotFuel[]
   /** When set, mark + ease the map to this point (locate a depot / truck / etc.). v2 Wave 11. */
   locatePoint?: { lat: number; lon: number } | null
+  /** Proposed fuel-run routes to preview (v2 Wave 12): selected drawn bold, others lighter. */
+  fuelRunOptions?: { metric: string; geometry: number[][] }[]
+  fuelRunMetric?: string | null
   rendezvous: { lat: number; lon: number } | null
   adviceArrow: { from: { lat: number; lon: number }; to: { lat: number; lon: number } } | null
   adviceDest: { lat: number; lon: number } | null
@@ -438,6 +441,35 @@ function initLayers(map: maplibregl.Map): void {
       'circle-stroke-color': '#3fd0ff',
     },
   })
+
+  // Proposed fuel-run routes preview (v2 Wave 12): selected bold, alternatives lighter.
+  map.addSource('fuel-run-routes', { type: 'geojson', data: EMPTY })
+  map.addLayer({
+    id: 'fuel-run-routes',
+    type: 'line',
+    source: 'fuel-run-routes',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: {
+      'line-color': '#3fd0ff',
+      'line-width': ['case', ['get', 'selected'], 5, 2],
+      'line-opacity': ['case', ['get', 'selected'], 0.95, 0.4],
+    },
+  })
+}
+
+function syncFuelRunRoutes(
+  map: maplibregl.Map,
+  options: { metric: string; geometry: number[][] }[] | undefined,
+  metric: string | null | undefined,
+): void {
+  const features: GeoJSON.Feature[] = (options ?? [])
+    .filter((o) => o.geometry && o.geometry.length > 1)
+    .map((o) => ({
+      type: 'Feature',
+      geometry: { type: 'LineString', coordinates: o.geometry },
+      properties: { selected: o.metric === metric },
+    }))
+  setData(map, 'fuel-run-routes', { type: 'FeatureCollection', features })
 }
 
 function syncUnits(
@@ -812,6 +844,7 @@ export function MapView(props: MapViewProps) {
       setData(map, 'advice-arrow', adviceArrowToGeoJSON(p.adviceArrow?.from, p.adviceArrow?.to))
       setData(map, 'advice-dest', destinationToGeoJSON(p.adviceDest))
       setData(map, 'locate-marker', destinationToGeoJSON(p.locatePoint ?? null))
+      syncFuelRunRoutes(map, p.fuelRunOptions, p.fuelRunMetric)
       wireInteraction(map, propsRef)
       wireHover(map)
       wireCombatHover(map)
@@ -866,6 +899,10 @@ export function MapView(props: MapViewProps) {
   useEffect(() => {
     if (readyRef.current && mapRef.current) syncEnemyUnits(mapRef.current, props.enemyUnits)
   }, [props.enemyUnits])
+  useEffect(() => {
+    if (readyRef.current && mapRef.current)
+      syncFuelRunRoutes(mapRef.current, props.fuelRunOptions, props.fuelRunMetric)
+  }, [props.fuelRunOptions, props.fuelRunMetric])
   useEffect(() => {
     if (readyRef.current && mapRef.current)
       setData(mapRef.current, 'combat-events', combatEventsToGeoJSON(props.combatEvents))
