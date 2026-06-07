@@ -29,7 +29,9 @@ class RefuelOrder(BaseModel):
 
     id: str
     unit_id: str
-    truck_id: str
+    # Source is EITHER a mobile truck OR a fixed depot (v2 Wave 12 F2): exactly one is set.
+    truck_id: str | None = None
+    depot_id: str | None = None
     fuel_type: FuelType
     status: RefuelOrderStatus
     rendezvous_lat: float

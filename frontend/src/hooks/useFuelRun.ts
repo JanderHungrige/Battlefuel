@@ -13,7 +13,7 @@ import type {
   UnitInstance,
   UnitType,
 } from '../api/types'
-import { nearestFuelTruck } from '../lib/fuelRun'
+import { nearestFuelSource } from '../lib/fuelRun'
 
 type Phase = 'idle' | 'pick-target' | 'review'
 type PushChatter = (text: string, kind?: ChatterMessage['kind']) => void
@@ -49,6 +49,8 @@ export function useFuelRun(
   const [moverId, setMoverId] = useState('')
   const [moverName, setMoverName] = useState('')
   const [truckId, setTruckId] = useState('')
+  const [depotId, setDepotId] = useState('')
+  const [unitId, setUnitId] = useState('')
   const [target, setTarget] = useState<{ id: string; name: string; lat: number; lon: number } | null>(null)
   const [options, setOptions] = useState<RouteOption[]>([])
   const [metric, setMetric] = useState<RouteMetric | null>(null)
@@ -70,6 +72,8 @@ export function useFuelRun(
     setMoverId('')
     setMoverName('')
     setTruckId('')
+    setDepotId('')
+    setUnitId('')
     setTarget(null)
     setOptions([])
     setMetric(null)
@@ -110,6 +114,7 @@ export function useFuelRun(
       const unit = units.find((u) => u.id === unitId)
       if (!unit) return
       const p = unitPos(unit)
+      setUnitId(unit.id)
       setTarget({ id: unit.id, name: unit.name, lat: p.lat, lon: p.lon })
       planTo(moverId, p.lat, p.lon)
     },
@@ -123,30 +128,51 @@ export function useFuelRun(
       if (!unit) return
       const fuelType = unitFuelType(unit)
       const p = unitPos(unit)
-      const truck = fuelType ? nearestFuelTruck(p.lat, p.lon, overview?.trucks ?? [], fuelType) : null
-      if (!truck) {
+      setUnitId(unit.id)
+      const depots = (overview?.depots ?? []).map((d) => ({
+        id: d.depot.id,
+        name: d.depot.name,
+        lat: d.depot.lat,
+        lon: d.depot.lon,
+        stocks: d.stocks,
+      }))
+      const source = fuelType
+        ? nearestFuelSource(p.lat, p.lon, overview?.trucks ?? [], depots, fuelType)
+        : null
+      if (!source) {
         setPhase('review')
         setTarget({ id: unit.id, name: unit.name, lat: p.lat, lon: p.lon })
-        setMessage('No compatible fuelled truck available.')
+        setMessage('No compatible fuel source available.')
         return
       }
-      setMoverId(truck.instance_id)
-      setMoverName(truck.name)
-      setTruckId(truck.instance_id)
-      setTarget({ id: unit.id, name: unit.name, lat: p.lat, lon: p.lon })
-      planTo(truck.instance_id, p.lat, p.lon)
+      if (source.kind === 'truck') {
+        // Truck comes to the unit.
+        setMoverId(source.id)
+        setMoverName(source.name)
+        setTruckId(source.id)
+        setTarget({ id: unit.id, name: unit.name, lat: p.lat, lon: p.lon })
+        planTo(source.id, p.lat, p.lon)
+      } else {
+        // Fixed depot can't move — the unit drives to the depot (v2 W12 F2).
+        setMoverId(unit.id)
+        setMoverName(unit.name)
+        setDepotId(source.id)
+        setTarget({ id: source.id, name: source.name, lat: source.lat, lon: source.lon })
+        planTo(unit.id, source.lat, source.lon)
+      }
     },
     [reset, units, unitFuelType, unitPos, overview, planTo],
   )
 
   const confirm = useCallback(() => {
-    if (!target || !moverId || !truckId || !metric) return
+    if (!target || !moverId || !unitId || !metric || (!truckId && !depotId)) return
     setBusy(true)
     api
       .createFuelRun({
         mover_id: moverId,
-        unit_id: target.id,
-        truck_id: truckId,
+        unit_id: unitId,
+        truck_id: truckId || null,
+        depot_id: depotId || null,
         dest_lat: target.lat,
         dest_lon: target.lon,
         metric,
@@ -161,7 +187,7 @@ export function useFuelRun(
         setMessage(e instanceof ApiError ? `Fuel run failed (${e.status}).` : 'Fuel run failed.'),
       )
       .finally(() => setBusy(false))
-  }, [target, moverId, truckId, metric, moverName, pushChatter, refetch, reset])
+  }, [target, moverId, unitId, truckId, depotId, metric, moverName, pushChatter, refetch, reset])
 
   const routeGeometry = useMemo(
     () => options.find((o) => o.metric === metric)?.geometry ?? null,

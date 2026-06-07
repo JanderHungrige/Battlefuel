@@ -30,9 +30,11 @@ SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
 class CreateFuelRunRequest(BaseModel):
-    mover_id: str  # the instance that moves (the fuel truck in F1)
+    mover_id: str  # the instance that moves (truck → unit, or the unit → depot)
     unit_id: str  # the unit being refuelled
-    truck_id: str  # the fuel truck supplying the fuel
+    # Source: exactly one of truck_id (mobile truck) or depot_id (fixed depot, v2 W12 F2).
+    truck_id: str | None = None
+    depot_id: str | None = None
     dest_lat: float
     dest_lon: float
     metric: RouteMetric = RouteMetric.SAFE
@@ -86,6 +88,7 @@ async def create_fuel_run(
             mover_id=req.mover_id,
             unit_id=req.unit_id,
             truck_id=req.truck_id,
+            depot_id=req.depot_id,
             dest_lat=req.dest_lat,
             dest_lon=req.dest_lon,
             metric=req.metric,

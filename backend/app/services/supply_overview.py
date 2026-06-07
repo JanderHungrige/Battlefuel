@@ -42,7 +42,7 @@ async def build_supply_overview(
     tasked: dict[str, str] = {}
     if refuel_orders is not None:
         for order in await refuel_orders.list_all(session):
-            if order.status in _OPEN_REFUEL:
+            if order.status in _OPEN_REFUEL and order.truck_id is not None:
                 tasked[order.truck_id] = order.unit_id
 
     stocks_by_depot = defaultdict(list)

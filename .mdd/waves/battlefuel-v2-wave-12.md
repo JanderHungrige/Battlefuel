@@ -30,7 +30,7 @@ Mark `complete` only after ALL three gates pass (never on a localhost demo):
 | # | Feature | Doc | Status | Depends on |
 |---|---------|-----|--------|------------|
 | 1 | routed-fuel-run | docs/74-routed-fuel-run.md | complete | — |
-| 2 | depot-source-fuel-run | — | planned | routed-fuel-run |
+| 2 | depot-source-fuel-run | docs/75-depot-source-fuel-run.md | complete | routed-fuel-run |
 
 Build order: 1 → 2.
 

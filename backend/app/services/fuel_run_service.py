@@ -8,6 +8,8 @@ to a thirsty unit; the truck is used explicitly (no recommender). Reuses ``creat
 
 from __future__ import annotations
 
+import uuid
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.move_order import MoveOrder, MoveOrderStatus
@@ -40,7 +42,8 @@ async def start_fuel_run(
     *,
     mover_id: str,
     unit_id: str,
-    truck_id: str,
+    truck_id: str | None = None,
+    depot_id: str | None = None,
     dest_lat: float,
     dest_lon: float,
     metric: RouteMetric,
@@ -64,15 +67,36 @@ async def start_fuel_run(
     )
     if move is None:
         return None
-    refuel = await create_refuel_order(
-        session,
-        instances,
-        units,
-        recommender=None,  # explicit truck → recommender unused
-        orders=refuel_orders,
-        unit_id=unit_id,
-        truck_id=truck_id,
-    )
+
+    if depot_id is not None:
+        # Depot-sourced: the unit drives to the depot and fills from depot stock (v2 W12 F2).
+        unit = await instances.get_instance(session, unit_id)
+        unit_type = units.get_unit(unit.unit_type_id) if unit is not None else None
+        if unit is None or unit_type is None:
+            await move_orders.set_status(session, move.id, MoveOrderStatus.CANCELLED)
+            raise LookupError(f"unit {unit_id!r} not found")
+        depot_order = RefuelOrder(
+            id=uuid.uuid4().hex,
+            unit_id=unit_id,
+            truck_id=None,
+            depot_id=depot_id,
+            fuel_type=unit_type.fuel.fuel_type,
+            status=RefuelOrderStatus.PENDING,
+            rendezvous_lat=dest_lat,
+            rendezvous_lon=dest_lon,
+            rendezvous_h3=unit.h3_index,
+        )
+        refuel: RefuelOrder | None = await refuel_orders.create(session, depot_order)
+    else:
+        refuel = await create_refuel_order(
+            session,
+            instances,
+            units,
+            recommender=None,  # explicit truck → recommender unused
+            orders=refuel_orders,
+            unit_id=unit_id,
+            truck_id=truck_id,
+        )
     if refuel is None:
         # Roll the move order back so we don't dispatch a truck with nothing to deliver.
         await move_orders.set_status(session, move.id, MoveOrderStatus.CANCELLED)

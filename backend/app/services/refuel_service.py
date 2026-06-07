@@ -15,6 +15,7 @@ from app.domain.refuel import RefuelOrder, RefuelOrderStatus
 from app.domain.unit import NatoUnitType
 from app.providers.base import UnitDataProvider
 from app.providers.refuel_orders import RefuelOrderProvider
+from app.providers.supply import SupplyProvider
 from app.providers.unit_instances import UnitInstanceProvider
 from app.services.refuel_recommender import RefuelRecommender
 
@@ -124,7 +125,7 @@ async def try_complete_refuel(
     Returns the completed order, or ``None`` if not yet co-located (or an endpoint is missing).
     """
     unit = await instances.get_instance(session, order.unit_id)
-    truck = await instances.get_instance(session, order.truck_id)
+    truck = await instances.get_instance(session, order.truck_id) if order.truck_id else None
     if unit is None or truck is None:
         return None
     if not co_located(unit.h3_index, truck.h3_index):
@@ -139,4 +140,37 @@ async def try_complete_refuel(
     if amount > 0:
         await instances.set_fuel(session, unit.id, unit_fuel + amount)
         await instances.set_fuel(session, truck.id, truck_fuel - amount)
+    return await orders.complete(session, order.id, amount)
+
+
+async def try_complete_depot_refuel(
+    session: AsyncSession,
+    instances: UnitInstanceProvider,
+    units: UnitDataProvider,
+    supply: SupplyProvider,
+    orders: RefuelOrderProvider,
+    order: RefuelOrder,
+) -> RefuelOrder | None:
+    """Depot-sourced refuel (v2 Wave 12 F2): when the unit reaches the depot, fill it from the
+    depot's stock and drain that stock. Returns the completed order, or ``None`` if not yet
+    co-located / the depot or its stock is missing."""
+    if order.depot_id is None:
+        return None
+    unit = await instances.get_instance(session, order.unit_id)
+    depot = await supply.get_depot(session, order.depot_id)
+    if unit is None or depot is None:
+        return None
+    if not co_located(unit.h3_index, depot.h3_index):
+        return None
+
+    stock = await supply.get_stock(session, order.depot_id, order.fuel_type)
+    available = stock.quantity_liters if stock is not None else 0.0
+    unit_type = units.get_unit(unit.unit_type_id)
+    capacity = unit_type.fuel.capacity_liters if unit_type is not None else 0.0
+    unit_fuel = unit.current_fuel_liters if unit.current_fuel_liters is not None else 0.0
+
+    amount = compute_transfer(unit_fuel, capacity, available, order.requested_liters)
+    if amount > 0:
+        await instances.set_fuel(session, unit.id, unit_fuel + amount)
+        await supply.adjust_stock(session, order.depot_id, order.fuel_type, -amount)
     return await orders.complete(session, order.id, amount)

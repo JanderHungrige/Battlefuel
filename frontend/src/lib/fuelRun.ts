@@ -30,3 +30,51 @@ export function nearestFuelTruck(
   }
   return best
 }
+
+export interface DepotLike {
+  id: string
+  name: string
+  lat: number
+  lon: number
+  stocks: { fuel_type: string; quantity_liters: number }[]
+}
+
+export interface FuelSource {
+  kind: 'truck' | 'depot'
+  id: string
+  name: string
+  lat: number
+  lon: number
+}
+
+/** Closest fuel source (mobile truck OR stocked depot) of the matching fuel type, or null. */
+export function nearestFuelSource(
+  lat: number,
+  lon: number,
+  trucks: readonly TruckLike[],
+  depots: readonly DepotLike[],
+  fuelType: string,
+): FuelSource | null {
+  const candidates: FuelSource[] = []
+  for (const t of trucks) {
+    if (t.fuel_type === fuelType && (t.current_fuel_liters ?? 0) > 0) {
+      candidates.push({ kind: 'truck', id: t.instance_id, name: t.name, lat: t.lat, lon: t.lon })
+    }
+  }
+  for (const d of depots) {
+    const stock = d.stocks.find((s) => s.fuel_type === fuelType)
+    if (stock && stock.quantity_liters > 0) {
+      candidates.push({ kind: 'depot', id: d.id, name: d.name, lat: d.lat, lon: d.lon })
+    }
+  }
+  let best: FuelSource | null = null
+  let bestD = Infinity
+  for (const c of candidates) {
+    const dist = (c.lat - lat) ** 2 + (c.lon - lon) ** 2
+    if (dist < bestD) {
+      bestD = dist
+      best = c
+    }
+  }
+  return best
+}
