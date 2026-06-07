@@ -72,6 +72,38 @@ class TestFuelRunApi:
             await client.aclose()
             await engine.dispose()
 
+    async def test_depot_sourced_unit_routes_to_depot(self) -> None:
+        # v2 W12 F2: the unit is the mover, routing to the depot; refuel order is depot-sourced.
+        try:
+            client, engine, maker = await _client()
+        except SQLAlchemyError as exc:
+            pytest.skip(f"database unavailable: {exc}")
+        try:
+            from app.services.supply_seed import seed_fuel_supply
+
+            async with maker() as s:
+                await seed_fuel_supply(s)
+            body = {
+                "mover_id": "inst-armor-1",  # the thirsty unit moves
+                "unit_id": "inst-armor-1",
+                "depot_id": "depot-main",
+                "dest_lat": 49.205,
+                "dest_lon": 11.835,
+                "metric": "fast",
+            }
+            resp = await client.post("/api/v1/fuel-runs", json=body)
+            if resp.status_code == 422:
+                pytest.skip("router unavailable — fuel run unroutable")
+            assert resp.status_code == 201
+            data = resp.json()
+            assert data["move_order"]["instance_id"] == "inst-armor-1"
+            assert data["refuel_order"]["depot_id"] == "depot-main"
+            assert data["refuel_order"]["truck_id"] is None
+            assert data["refuel_order"]["status"] == "active"
+        finally:
+            await client.aclose()
+            await engine.dispose()
+
     async def test_unknown_mover_404(self) -> None:
         try:
             client, engine, _ = await _client()

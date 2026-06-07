@@ -43,7 +43,7 @@ from app.providers.unit_instances import build_unit_instance_provider
 from app.services.buy_service import progress_buy_order_stages
 from app.services.cost_model import TileFactors, tile_factors
 from app.services.event_engine import EventEngine
-from app.services.refuel_service import try_complete_refuel
+from app.services.refuel_service import try_complete_depot_refuel, try_complete_refuel
 from app.services.sim import SimStep, advance, advance_with_terrain, substep_dt
 from app.services.tile_grid import DEFAULT_RESOLUTION
 from app.services.tile_mutation import apply_tile_mutation, tile_update_frame
@@ -156,9 +156,15 @@ class SimEngine:
         orders = build_refuel_order_provider()
         instances = build_unit_instance_provider()
         units = build_unit_provider()
+        supply = build_supply_provider()
         completed = 0
         for order in await orders.list_active(session):
-            done = await try_complete_refuel(session, instances, units, orders, order)
+            if order.depot_id is not None:
+                done = await try_complete_depot_refuel(
+                    session, instances, units, supply, orders, order
+                )
+            else:
+                done = await try_complete_refuel(session, instances, units, orders, order)
             if done is not None:
                 await self._manager.broadcast(
                     {
@@ -166,6 +172,7 @@ class SimEngine:
                         "order_id": done.id,
                         "unit_id": done.unit_id,
                         "truck_id": done.truck_id,
+                        "depot_id": done.depot_id,
                         "status": done.status.value,
                         "fuel_type": done.fuel_type.value,
                         "transferred_liters": round(done.transferred_liters, 1),

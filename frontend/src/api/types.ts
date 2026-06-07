@@ -346,7 +346,8 @@ export interface CreateRefuelOrderRequest {
 export interface CreateFuelRunRequest {
   mover_id: string
   unit_id: string
-  truck_id: string
+  truck_id?: string | null
+  depot_id?: string | null
   dest_lat: number
   dest_lon: number
   metric: RouteMetric
