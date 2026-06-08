@@ -67,7 +67,7 @@ export function FuelRunPanel({
             disabled={busy}
             onClick={() => onSelectSource('truck')}
           >
-            🚚 {truckSourceName} → unit
+            {truckSourceName} → unit
           </button>
           <button
             type="button"
@@ -76,7 +76,7 @@ export function FuelRunPanel({
             disabled={busy}
             onClick={() => onSelectSource('depot')}
           >
-            unit → 🏭 {depotSourceName}
+            unit → {depotSourceName}
           </button>
         </div>
       )}
