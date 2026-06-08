@@ -138,11 +138,14 @@
 
 /* ---- faux clearance check ---- */
 .landing-clearance {
-  display: inline-flex;
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
   align-items: center;
   gap: 10px;
   padding: 10px 16px;
-  margin-bottom: 26px;
+  /* Block-level + auto margins: always its own line (so Enter sits below from the start), centered. */
+  margin: 0 auto 26px;
   border-radius: 999px;
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   font-size: 12.5px;
@@ -262,6 +265,11 @@
   height: 26px;
   width: auto;
   display: block;
+}
+
+/* Eraneos mark reads larger than the World Fuel logo at the same height — 30% smaller. */
+.landing-powered-logos img[alt="Eraneos"] {
+  height: 18px;
 }
 
 @media (prefers-reduced-motion: reduce) {
