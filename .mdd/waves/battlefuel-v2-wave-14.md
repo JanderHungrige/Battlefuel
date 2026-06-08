@@ -7,7 +7,7 @@ status: planned
 depends_on: none
 demo_state: "The default Hohenfels theater reads as a coherent East/West battle. NATO forces sit mostly in the WEST and OPFOR in the EAST, separated by an irregular North–South frontline (not a straight line — it has gaps and bulges). NATO combat units are positioned forward toward the frontline while depots and HQ sit in the rear (further west); there are a few more frontline combat units than before. Threats cluster around the frontline with a few sightings reaching deeper in, and the East sector is mostly threat-filled. New threats appear more slowly than today, and light threats (e.g. drone-activity sightings) fade away over time rather than persisting. Built on the existing seed + event-engine — no new map data."
 created: 2026-06-08
-hash: be8bdb7c
+hash: d32caa3d
 ---
 
 # Wave 14: Theater scenario — East/West frontline
@@ -36,12 +36,16 @@ Mark `complete` only after ALL three gates pass (never on a localhost demo):
 | 1 | frontline-theater-layout | docs/76-frontline-theater-layout.md | complete | — |
 | 2 | frontline-weighted-threats | docs/77-frontline-weighted-threats.md | complete | frontline-theater-layout |
 | 3 | light-threat-decay | docs/78-light-threat-decay.md | complete | — |
+| 4 | frontline-initial-threats | docs/79-frontline-initial-threats.md | complete | frontline-theater-layout, light-threat-decay |
 
-**Build status (2026-06-08):** all 3 features built + green (backend 322 tests, mypy strict, ruff;
-backend-only, no migration, no frontend change). Wave stays **open** — Done-When gates below not
-yet met (awaiting local `make dev` demo → `:3001` → prod). ⚠ Seeing F1 requires **reseeding** the
-unit/supply tables (`scripts/seed_unit_instances.py` + `scripts/seed_supply.py`) so existing rows
-move to the new positions.
+**Build status (2026-06-08):** all 4 features built + green (backend 328 tests, mypy strict, ruff;
+backend-only, no migration, no frontend change). F4 was added after the requester noticed threat
+was still spread across the map — there was no initial threat seed, only the live emitter. Wave
+stays **open** — Done-When gates below not yet met (awaiting local `make dev` demo → `:3001` →
+prod). ⚠ Seeing the new layout requires **reseeding**: `make seed` (now also runs
+`scripts/seed_threats.py`), or individually `scripts/seed_threats.py` +
+`scripts/seed_unit_instances.py` + `scripts/seed_supply.py`; then re-annotate the routing graph
+(`scripts/annotate_routing.py`) so safe-cost reflects the new threat.
 
 Build order: 1 → 2, with 3 independent (can land any time).
 

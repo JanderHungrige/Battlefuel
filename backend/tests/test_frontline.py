@@ -9,6 +9,7 @@ OPFOR in the east — all inside the Hohenfels bbox.
 from __future__ import annotations
 
 from itertools import pairwise
+from random import Random
 
 import pytest
 
@@ -16,6 +17,7 @@ from app.domain.frontline import (
     FRONTLINE_CONTROL,
     REAR_LON_MAX,
     frontline_lon,
+    initial_threat_level,
     is_east,
     is_west,
     threat_weight,
@@ -116,6 +118,41 @@ class TestThreatWeight:
         lat = 49.22
         front = frontline_lon(lat)
         assert threat_weight(lat, front - 0.008) > threat_weight(lat, front - 0.04)
+
+
+class TestInitialThreat:
+    def test_always_in_range(self) -> None:
+        rng = Random(0)
+        for lat in (49.19, 49.22, 49.26):
+            for lon in (11.78, 11.82, 11.85, 11.88, 11.92):
+                assert 0 <= initial_threat_level(lat, lon, rng) <= 5
+
+    def test_deep_rear_is_mostly_benign(self) -> None:
+        rng = Random(0)
+        lat = 49.22
+        lon = frontline_lon(lat) - 0.05
+        vals = [initial_threat_level(lat, lon, rng) for _ in range(200)]
+        assert sum(v == 0 for v in vals) / len(vals) > 0.85
+        assert max(vals) <= 1
+
+    def test_east_shoulder_of_the_front_is_hot(self) -> None:
+        rng = Random(0)
+        lat = 49.22
+        lon = frontline_lon(lat) + 0.006
+        vals = [initial_threat_level(lat, lon, rng) for _ in range(200)]
+        assert min(vals) >= 3 and max(vals) == 5
+
+    def test_deep_east_is_broadly_threatened_but_not_max(self) -> None:
+        rng = Random(0)
+        lat = 49.22
+        lon = frontline_lon(lat) + 0.05
+        vals = [initial_threat_level(lat, lon, rng) for _ in range(200)]
+        assert all(v >= 1 for v in vals) and max(vals) <= 3
+
+    def test_deterministic_for_a_given_seed(self) -> None:
+        a = [initial_threat_level(49.22, 11.86, Random(7)) for _ in range(3)]
+        b = [initial_threat_level(49.22, 11.86, Random(7)) for _ in range(3)]
+        assert a == b
 
 
 class TestDepotLayout:

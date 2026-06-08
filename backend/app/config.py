@@ -76,9 +76,12 @@ class Settings(BaseSettings):
     game_mode: bool = True
     event_mean_interval_game_s: float = 240.0
 
-    # Light-threat decay (v2 Wave 14): tiles at threat level 1..light_threat_max drift down by one
-    # every decay interval (game-seconds), so transient light threats (e.g. drone sightings) fade.
+    # Light-threat decay (v2 Wave 14): each decay interval (game-seconds), every tile at threat
+    # 1..light_threat_max has threat_decay_chance of dropping one level — a gradual, probabilistic
+    # fade (not a synchronized purge), so transient light threats (e.g. drone sightings) clear over
+    # time while the contested east stays populated.
     threat_decay_interval_game_s: float = 600.0
+    threat_decay_chance: float = 0.2
     light_threat_max: int = 2
 
     # Simulation game-time scale (1 real second = sim_time_scale game seconds).

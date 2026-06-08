@@ -116,6 +116,7 @@ class EventEngine:
         mean_interval_game_s: float,
         enabled: bool,
         decay_interval_game_s: float = 600.0,
+        decay_chance: float = 0.2,
         light_threat_max: int = 2,
     ) -> None:
         self._rng = rng
@@ -123,6 +124,7 @@ class EventEngine:
         self._enabled = enabled
         self._pending: list[_Revert] = []
         self._decay_interval = decay_interval_game_s
+        self._decay_chance = decay_chance
         self._light_threat_max = light_threat_max
         self._next_decay_s = decay_interval_game_s  # first decay pass one interval in
 
@@ -133,11 +135,12 @@ class EventEngine:
         return due
 
     def decay_due(self, tiles: Sequence[Tile], now_s: float) -> list[tuple[str, TileMutation]]:
-        """When a decay interval has elapsed, step every light-threat tile (1..max) down by one.
+        """When a decay interval elapses, step *some* light-threat tiles (1..max) down by one.
 
-        Heavier threats (combat zones at 3+) are left to persist; only light, transient threats
-        fade. New spawns (``maybe_fire``) outpace this in the contested east, so the front stays
-        active while stale sightings clear (v2 Wave 14).
+        Decay is **probabilistic per tile** (``decay_chance``), not a synchronized purge: light
+        threats fade gradually and at any moment most persist, so the contested east stays visibly
+        threatened (replenished by ``maybe_fire``) while stale sightings clear over time. Heavier
+        threats (combat zones at 3+) never decay (v2 Wave 14).
         """
         if not self._enabled or now_s < self._next_decay_s:
             return []
@@ -146,6 +149,7 @@ class EventEngine:
             (t.h3_index, TileMutation(threat_level=t.threat_level - 1))
             for t in tiles
             if 0 < t.threat_level <= self._light_threat_max
+            and self._rng.random() < self._decay_chance
         ]
 
     def maybe_fire(

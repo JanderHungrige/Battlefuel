@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import math
 from itertools import pairwise
+from random import Random
 
 # (lat, lon) control points, latitude ASCENDING. The longitudes weave east/west of the theater
 # centre (11.85) to give the front its bulges and gaps across the ~10 km north-south span.
@@ -70,3 +71,27 @@ def threat_weight(lat: float, lon: float) -> float:
     if d >= 0:
         return _EAST_BASE + front
     return front * 0.5 + _WEST_BASE * math.exp(d / _WEST_DECAY_DEG)
+
+
+# Initial-threat seed bands (longitude degrees relative to the front).
+_FRONT_BAND_DEG = 0.012  # width of the hot combat band on the east shoulder of the front
+_REAR_DEPTH_DEG = 0.015  # west of this (behind the line) the rear is benign
+
+
+def initial_threat_level(lat: float, lon: float, rng: Random) -> int:
+    """A plausible STARTING threat level (0-5) for a tile, concentrated on the front + east.
+
+    Deep NATO rear is benign (rare sighting); the front's west shoulder skirmishes; the front's
+    east shoulder is the hottest (combat); the OPFOR-held deep east is broadly threatened. Driven
+    by an injected RNG so the seeded map is deterministic (v2 Wave 14).
+    """
+    d = lon - frontline_lon(lat)
+    if d < -_REAR_DEPTH_DEG:  # deep NATO rear
+        return 1 if rng.random() < 0.05 else 0
+    if d < 0.0:  # west shoulder of the front
+        return rng.choice((1, 2, 2, 3))
+    if d < _FRONT_BAND_DEG:  # east shoulder of the front — hottest
+        return rng.choice((3, 4, 4, 5))
+    # Deep east (OPFOR-held): a durable ~50% floor at 3+ (never decays) keeps the east visibly
+    # threatened, with the rest light sightings that fade and are replenished.
+    return rng.choice((1, 2, 3, 3))
