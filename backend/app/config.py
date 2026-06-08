@@ -72,8 +72,9 @@ class Settings(BaseSettings):
     buy_order_lead_time_game_s: float = 600.0
 
     # Random event engine (Wave 4): master toggle + mean interval between events in game-seconds.
+    # Tempo slowed in v2 Wave 14 (was 120) so new threats appear more gradually.
     game_mode: bool = True
-    event_mean_interval_game_s: float = 120.0
+    event_mean_interval_game_s: float = 240.0
 
     # Simulation game-time scale (1 real second = sim_time_scale game seconds).
     sim_time_scale: float = 60.0

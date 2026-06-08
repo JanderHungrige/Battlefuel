@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from random import Random
 
+from app.domain.frontline import frontline_lon, is_east
 from app.domain.tile import (
     Cover,
     IntelLevel,
@@ -13,6 +14,22 @@ from app.domain.tile import (
     Weather,
 )
 from app.services.event_engine import EVENT_CATALOG, EventEngine
+
+
+def _tile_at(idx: int, lat: float, lon: float) -> Tile:
+    return Tile(
+        h3_index=f"88{idx:04x}",
+        resolution=8,
+        center_lat=lat,
+        center_lon=lon,
+        terrain=TerrainType.OPEN,
+        threat_level=2,
+        intel_level=IntelLevel.LOW,
+        weather=Weather.CLEAR,
+        road_condition=RoadCondition.CLEAR,
+        cover=Cover.NONE,
+        boundary=[],
+    )
 
 
 def _tile(threat: int = 2, road: RoadCondition = RoadCondition.CLEAR) -> Tile:
@@ -115,3 +132,31 @@ class TestMaybeFire:
         later = eng.collect_due_reverts(1e9)  # 0 (permanent) or 1 (temporary) — both valid
         assert all(h == "8811aa" for h, _ in later)
         assert eng.collect_due_reverts(1e9) == []  # drained
+
+
+class TestFrontlineWeightedSpawn:
+    """Spawns are weighted toward the front + the OPFOR east, not uniform (v2 Wave 14)."""
+
+    def _run(self, n: int) -> list[Tile]:
+        # A west→east strip of tiles across the theater at one latitude.
+        tiles = [_tile_at(i, 49.22, 11.79 + 0.005 * i) for i in range(28)]
+        by_h3 = {t.h3_index: t for t in tiles}
+        eng = EventEngine(Random(7), mean_interval_game_s=1.0, enabled=True)
+        out = []
+        for _ in range(n):
+            fired = eng.maybe_fire(tiles, now_s=0.0, dt_game_s=1000.0)  # prob = 1.0 → always fires
+            assert fired is not None
+            out.append(by_h3[fired[0]])
+        return out
+
+    def test_majority_of_spawns_land_in_or_east_of_the_front(self) -> None:
+        fired = self._run(500)
+        east = sum(1 for t in fired if is_east(t.center_lat, t.center_lon))
+        assert east / len(fired) > 0.6
+
+    def test_deep_nato_rear_is_rarely_hit(self) -> None:
+        fired = self._run(500)
+        deep_rear = sum(
+            1 for t in fired if t.center_lon < frontline_lon(t.center_lat) - 0.02
+        )
+        assert deep_rear / len(fired) < 0.10

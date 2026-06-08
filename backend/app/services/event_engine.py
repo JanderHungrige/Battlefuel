@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from random import Random
 
 from app.api.ws import ConnectionManager
+from app.domain.frontline import threat_weight
 from app.domain.tile import IntelLevel, RoadCondition, Tile, TileMutation, Weather
 from app.providers.tiles import TileDataProvider
 from app.services.tile_mutation import apply_tile_mutation, tile_update_frame
@@ -128,7 +129,11 @@ class EventEngine:
             return None
         if self._rng.random() >= min(1.0, dt_game_s / self._mean_interval):
             return None
-        tile = self._rng.choice(list(tiles))
+        # Weight the spawn toward the frontline + the OPFOR east (v2 Wave 14): the event lands where
+        # the fighting is, not on a uniform-random tile across the whole theater.
+        pool = list(tiles)
+        weights = [threat_weight(t.center_lat, t.center_lon) for t in pool]
+        tile = self._rng.choices(pool, weights=weights, k=1)[0]
         spec = self._rng.choice(list(EVENT_CATALOG))
         if spec.duration_game_s > 0:
             self._pending.append(

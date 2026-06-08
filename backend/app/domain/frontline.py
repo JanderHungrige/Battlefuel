@@ -10,6 +10,7 @@ around it (``event_engine``). Pure and deterministic so seeds, the emitter, and 
 
 from __future__ import annotations
 
+import math
 from itertools import pairwise
 
 # (lat, lon) control points, latitude ASCENDING. The longitudes weave east/west of the theater
@@ -48,3 +49,24 @@ def is_west(lat: float, lon: float) -> bool:
 def is_east(lat: float, lon: float) -> bool:
     """True if (lat, lon) lies on the OPFOR (east) side of the frontline."""
     return lon > frontline_lon(lat)
+
+
+# Threat-density model (event-spawn weighting, v2 Wave 14): most activity hugs the front, the
+# OPFOR east stays broadly threatened, and the NATO west sees only occasional deep-in sightings.
+_FRONT_SIGMA_DEG = 0.012  # ~1 km: half-width of the hot band straddling the front
+_EAST_BASE = 0.6  # the east is mostly threat-filled even away from the front
+_WEST_BASE = 0.10  # sparse baseline for deep-in western sightings
+_WEST_DECAY_DEG = 0.02  # how fast western activity falls off behind the line
+
+
+def threat_weight(lat: float, lon: float) -> float:
+    """Relative likelihood a threat event spawns at (lat, lon). Always > 0.
+
+    A Gaussian hot band straddles the front; the east carries a broad base on top of it, while the
+    west only gets a small near-front spill plus a baseline that decays with depth behind the line.
+    """
+    d = lon - frontline_lon(lat)  # > 0 east (OPFOR), < 0 west (NATO rear)
+    front = math.exp(-((d / _FRONT_SIGMA_DEG) ** 2))
+    if d >= 0:
+        return _EAST_BASE + front
+    return front * 0.5 + _WEST_BASE * math.exp(d / _WEST_DECAY_DEG)

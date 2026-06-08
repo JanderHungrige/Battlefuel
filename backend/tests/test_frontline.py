@@ -18,6 +18,7 @@ from app.domain.frontline import (
     frontline_lon,
     is_east,
     is_west,
+    threat_weight,
 )
 from app.domain.theater import HOHENFELS
 from app.providers.enemy_units import SeededEnemyUnitProvider
@@ -91,6 +92,30 @@ class TestOpforLayout:
         b = HOHENFELS.bbox
         for u in SeededEnemyUnitProvider().units():
             assert b.west < u.lon < b.east and b.south < u.lat < b.north, f"{u.id} outside bbox"
+
+
+class TestThreatWeight:
+    def test_always_positive(self) -> None:
+        for lat in (49.18, 49.22, 49.27):
+            for lon in (11.78, 11.82, 11.85, 11.88, 11.92):
+                assert threat_weight(lat, lon) > 0.0
+
+    def test_peaks_on_the_front(self) -> None:
+        lat = 49.22
+        front = frontline_lon(lat)
+        on_front = threat_weight(lat, front)
+        assert on_front > threat_weight(lat, front - 0.05)  # > deep west
+        assert on_front > threat_weight(lat, front + 0.05)  # > deep east
+
+    def test_east_baseline_exceeds_deep_west(self) -> None:
+        lat = 49.22
+        front = frontline_lon(lat)
+        assert threat_weight(lat, front + 0.05) > threat_weight(lat, front - 0.05)
+
+    def test_falls_off_behind_the_line(self) -> None:
+        lat = 49.22
+        front = frontline_lon(lat)
+        assert threat_weight(lat, front - 0.008) > threat_weight(lat, front - 0.04)
 
 
 class TestDepotLayout:
