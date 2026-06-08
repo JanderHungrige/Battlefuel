@@ -37,3 +37,5 @@ Hetzner Cloud host, TLS/domain, persistent Postgres+PostGIS volume with backups,
   layer was still H3 and the inspect window showed hex attributes.
 
 - [ ] **Sim base-speed by travel mode (v2 W10 F2 follow-up).** The sim traverses every move order at `speed_road_kph × tile_factor` regardless of mode. Persist `mode` on the move order (alembic column) and have `sim.advance` use `speed_offroad_kph` for offroad/direct so the off-road speed penalty is real in live movement, not just in the plan. See `.mdd/docs/61-hybrid-direct-routing-modes.md`.
+
+- [ ] **Hand-drawn passage (descoped from v2 Wave 10 F6, 2026-06-04).** Let the operator draw a line that becomes routable edges in the pgRouting `ways` graph (insert edges + snap vertices to the existing graph + survive cost re-annotation) + a draw-mode UI. Needs the live routing graph to build/verify. Candidate for a future routing-data wave. See `.mdd/docs/65-hand-drawn-passage-obstacle-depot-editing.md`.

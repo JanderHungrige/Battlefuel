@@ -20,8 +20,8 @@ setup: ## First-time setup: Python venv + deps, frontend deps
 migrate: ## Apply database migrations
 	cd backend && .venv/bin/alembic upgrade head
 
-seed: ## Generate tiles + place demo units + fuel depots (idempotent)
-	cd backend && .venv/bin/python scripts/generate_tiles.py && .venv/bin/python scripts/seed_unit_instances.py && .venv/bin/python scripts/seed_supply.py
+seed: ## Generate tiles + frontline threats + place demo units + fuel depots (idempotent)
+	cd backend && .venv/bin/python scripts/generate_tiles.py && .venv/bin/python scripts/seed_threats.py && .venv/bin/python scripts/seed_unit_instances.py && .venv/bin/python scripts/seed_supply.py
 
 test: test-backend test-frontend ## Run all tests
 
@@ -48,6 +48,9 @@ deploy: ## Deploy the stack to the provisioned host (explicit; never auto-runs)
 
 prod-bootstrap: ## One-time data bootstrap on the prod stack (migrate + seed + routing graph)
 	@bash scripts/prod-bootstrap.sh
+
+reseed-stack: ## Reseed a DEPLOYED stack's DB to the canonical scenario (host): make reseed-stack ENV=deploy/.env.dev
+	@bash deploy/reseed-stack.sh "$(ENV)"
 
 backup: ## Run an on-demand production DB backup (pg_dump + retention)
 	@bash scripts/backup.sh

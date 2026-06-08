@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from random import Random
 
+from app.domain.frontline import frontline_lon, is_east
 from app.domain.tile import (
     Cover,
     IntelLevel,
@@ -13,6 +14,22 @@ from app.domain.tile import (
     Weather,
 )
 from app.services.event_engine import EVENT_CATALOG, EventEngine
+
+
+def _tile_at(idx: int, lat: float, lon: float) -> Tile:
+    return Tile(
+        h3_index=f"88{idx:04x}",
+        resolution=8,
+        center_lat=lat,
+        center_lon=lon,
+        terrain=TerrainType.OPEN,
+        threat_level=2,
+        intel_level=IntelLevel.LOW,
+        weather=Weather.CLEAR,
+        road_condition=RoadCondition.CLEAR,
+        cover=Cover.NONE,
+        boundary=[],
+    )
 
 
 def _tile(threat: int = 2, road: RoadCondition = RoadCondition.CLEAR) -> Tile:
@@ -115,3 +132,91 @@ class TestMaybeFire:
         later = eng.collect_due_reverts(1e9)  # 0 (permanent) or 1 (temporary) — both valid
         assert all(h == "8811aa" for h, _ in later)
         assert eng.collect_due_reverts(1e9) == []  # drained
+
+
+class TestLightThreatDecay:
+    """Light threats (1..max) fade probabilistically each interval; heavier ones persist (W14)."""
+
+    def _engine(self, chance: float = 0.5) -> EventEngine:
+        # Spawning off (mean_interval huge) so we isolate decay behaviour.
+        return EventEngine(
+            Random(0),
+            mean_interval_game_s=1e12,
+            enabled=True,
+            decay_interval_game_s=600.0,
+            decay_chance=chance,
+            light_threat_max=2,
+        )
+
+    def _light_tiles(self, n: int, level: int = 2) -> list[Tile]:
+        return [
+            _tile_at(i, 49.2, 11.86).model_copy(update={"threat_level": level}) for i in range(n)
+        ]
+
+    def test_no_decay_before_the_interval(self) -> None:
+        eng = self._engine()
+        assert eng.decay_due(self._light_tiles(50), now_s=599.0) == []
+
+    def test_some_but_not_all_light_threats_step_down(self) -> None:
+        eng = self._engine(chance=0.5)
+        due = eng.decay_due(self._light_tiles(200), now_s=600.0)
+        assert 0 < len(due) < 200  # probabilistic — a gradual fade, not a purge
+        for _h3, mutation in due:
+            assert mutation.threat_level == 1  # each decayed tile stepped 2 -> 1
+
+    def test_chance_one_decays_every_light_tile(self) -> None:
+        eng = self._engine(chance=1.0)
+        assert len(eng.decay_due(self._light_tiles(30), now_s=600.0)) == 30
+
+    def test_heavy_threats_never_decay(self) -> None:
+        eng = self._engine(chance=1.0)
+        heavy = [
+            _tile_at(i, 49.2, 11.86).model_copy(update={"threat_level": 4}) for i in range(50)
+        ]
+        assert eng.decay_due(heavy, now_s=600.0) == []
+
+    def test_benign_tiles_never_decay(self) -> None:
+        eng = self._engine(chance=1.0)
+        benign = [
+            _tile_at(i, 49.2, 11.86).model_copy(update={"threat_level": 0}) for i in range(50)
+        ]
+        assert eng.decay_due(benign, now_s=600.0) == []
+
+    def test_decay_is_rate_limited_to_one_pass_per_interval(self) -> None:
+        eng = self._engine(chance=1.0)
+        tiles = self._light_tiles(10)
+        assert eng.decay_due(tiles, now_s=600.0)  # first pass fires
+        assert eng.decay_due(tiles, now_s=900.0) == []  # within the next interval → nothing
+        assert eng.decay_due(tiles, now_s=1200.0)  # next interval → fires again
+
+    def test_disabled_engine_never_decays(self) -> None:
+        eng = EventEngine(Random(0), mean_interval_game_s=1e12, enabled=False)
+        assert eng.decay_due(self._light_tiles(10), now_s=1e9) == []
+
+
+class TestFrontlineWeightedSpawn:
+    """Spawns are weighted toward the front + the OPFOR east, not uniform (v2 Wave 14)."""
+
+    def _run(self, n: int) -> list[Tile]:
+        # A west→east strip of tiles across the theater at one latitude.
+        tiles = [_tile_at(i, 49.22, 11.79 + 0.005 * i) for i in range(28)]
+        by_h3 = {t.h3_index: t for t in tiles}
+        eng = EventEngine(Random(7), mean_interval_game_s=1.0, enabled=True)
+        out = []
+        for _ in range(n):
+            fired = eng.maybe_fire(tiles, now_s=0.0, dt_game_s=1000.0)  # prob = 1.0 → always fires
+            assert fired is not None
+            out.append(by_h3[fired[0]])
+        return out
+
+    def test_majority_of_spawns_land_in_or_east_of_the_front(self) -> None:
+        fired = self._run(500)
+        east = sum(1 for t in fired if is_east(t.center_lat, t.center_lon))
+        assert east / len(fired) > 0.6
+
+    def test_deep_nato_rear_is_rarely_hit(self) -> None:
+        fired = self._run(500)
+        deep_rear = sum(
+            1 for t in fired if t.center_lon < frontline_lon(t.center_lat) - 0.02
+        )
+        assert deep_rear / len(fired) < 0.10

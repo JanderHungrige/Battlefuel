@@ -56,9 +56,14 @@ DIRECT   → straight H3-line terrain provider     @ speed_offroad_kph  (new)
 HYBRID   → per metric, the cheaper of {road option, off-road option} (new)
 ```
 
-- **DIRECT**: `terrain_router.direct_path()` walks the H3 grid line (`h3.grid_path_cells`) from
-  start to destination and accumulates terrain time/fuel cost — a near-straight path that still
-  follows the landscape, ignoring roads and threat avoidance. Wrapped by `DirectRoutingProvider`.
+- **DIRECT**: `terrain_router.direct_path()` draws a **straight line between the exact start (unit
+  centre) and exact destination (clicked point)** — the geometry is the two real endpoints, not
+  snapped hex centres — with time/fuel/threat cost taken from the terrain of the cells the line
+  crosses. Wrapped by `DirectRoutingProvider`. (Endpoint-exactness fix, 2026-06-04.)
+- **Exact endpoints (both cross-country modes):** `terrain_path` (off-road) anchors its
+  geometry's first/last points to the exact unit position and clicked point too — the
+  intermediate path still follows terrain cell-by-cell, but the route no longer visibly snaps to
+  the coarse H3 grid at its ends.
 - **HYBRID**: `plan_routes` computes the road option (road provider @ road speed) and the
   off-road option (terrain provider @ off-road speed) for each metric and returns the better one
   (FAST → lower duration; SAFE → lower threat, then lower duration). This makes a SAFE-hybrid

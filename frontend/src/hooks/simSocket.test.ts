@@ -160,6 +160,19 @@ describe('parseBuyOrderUpdate / parseRefuelOrderUpdate', () => {
         remaining_game_s: 0,
       }),
     ).toContain('depot-main')
+    // A mid-flight stage frame describes the NATO stage (v2 Wave 11 F4).
+    expect(
+      describeBuyOrderUpdate({
+        type: 'buy_order_update',
+        order_id: 'b2',
+        depot_id: 'depot-main',
+        fuel_type: 'diesel',
+        quantity_liters: 5000,
+        status: 'active',
+        remaining_game_s: 100,
+        nato_stage: 'on_route',
+      }),
+    ).toContain('Fuel on route')
     expect(
       describeRefuelOrderUpdate({
         type: 'refuel_order_update',

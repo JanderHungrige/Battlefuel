@@ -26,7 +26,7 @@ export function buildBasemapStyle(pmtilesArchiveUrl: string): StyleSpecification
       {
         id: 'background',
         type: 'background',
-        paint: { 'background-color': '#f4f1e8' },
+        paint: { 'background-color': '#eadbc8' },
       },
       {
         id: 'areas',

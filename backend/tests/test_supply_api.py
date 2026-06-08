@@ -6,6 +6,7 @@ from collections.abc import AsyncIterator
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -34,6 +35,47 @@ async def _client() -> tuple[AsyncClient, object]:
 
 @pytest.mark.db
 class TestSupplyApi:
+    async def test_create_typed_site_and_site_refuel_proposal(self) -> None:
+        # v2 Wave 11 F5: a typed site is created stocked; a low site proposes a refuel via the
+        # reused Wave-6 redistribution advisor; unknown depot → 404; invalid type → 422.
+        try:
+            client, engine = await _client()
+        except SQLAlchemyError as exc:
+            pytest.skip(f"database unavailable: {exc}")
+        site_id = ""
+        try:
+            created = await client.post(
+                "/api/v1/depots",
+                json={"name": "Bravo BSA", "lat": 49.21, "lon": 11.84, "site_type": "bsa"},
+            )
+            assert created.status_code == 201
+            site = created.json()
+            site_id = site["id"]
+            assert site["site_type"] == "bsa"
+
+            # The site was seeded below target fill → the advisor proposes a refuel for it.
+            proposal = await client.get(f"/api/v1/advice/site-refuel/{site_id}")
+            assert proposal.status_code == 200
+            body = proposal.json()
+            assert len(body["recommendations"]) >= 1
+            assert all(r["target"] == site_id for r in body["recommendations"])
+
+            assert (await client.get("/api/v1/advice/site-refuel/nope")).status_code == 404
+            bad = await client.post(
+                "/api/v1/depots", json={"name": "X", "lat": 49.2, "lon": 11.8, "site_type": "zzz"}
+            )
+            assert bad.status_code == 422
+        finally:
+            if site_id:
+                async with async_sessionmaker(engine, expire_on_commit=False)() as s:  # type: ignore[arg-type]
+                    await s.execute(
+                        text("DELETE FROM fuel_stocks WHERE depot_id = :i"), {"i": site_id}
+                    )
+                    await s.execute(text("DELETE FROM fuel_depots WHERE id = :i"), {"i": site_id})
+                    await s.commit()
+            await client.aclose()
+            await engine.dispose()
+
     async def test_list_depots(self) -> None:
         try:
             client, engine = await _client()
@@ -46,6 +88,32 @@ class TestSupplyApi:
             assert len(depots) >= 2
             assert {"id", "name", "h3_index", "lat", "lon"} <= set(depots[0])
         finally:
+            await client.aclose()
+            await engine.dispose()
+
+    async def test_create_depot_then_listed(self) -> None:
+        """F6 (Wave 10): manually place a depot; it persists and appears in the list."""
+        try:
+            client, engine = await _client()
+        except SQLAlchemyError as exc:
+            pytest.skip(f"database unavailable: {exc}")
+        try:
+            created = await client.post(
+                "/api/v1/depots", json={"name": "FWD Cache", "lat": 49.21, "lon": 11.84}
+            )
+            assert created.status_code == 201
+            depot = created.json()
+            assert depot["name"] == "FWD Cache"
+            assert depot["h3_index"] and depot["lat"] == 49.21
+
+            listed = await client.get("/api/v1/depots")
+            assert any(d["id"] == depot["id"] for d in listed.json())
+        finally:
+            # Self-clean: never leave the placed depot in the shared dev DB (it has no stock and
+            # would skew sibling tests).
+            async with async_sessionmaker(engine)() as s:  # type: ignore[arg-type]
+                await s.execute(text("DELETE FROM fuel_depots WHERE name = 'FWD Cache'"))
+                await s.commit()
             await client.aclose()
             await engine.dispose()
 

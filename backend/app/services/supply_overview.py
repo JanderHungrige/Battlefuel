@@ -11,11 +11,16 @@ from collections import defaultdict
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domain.refuel import RefuelOrderStatus
 from app.domain.supply import DepotFuel, SupplyOverview, TruckFuel
 from app.domain.unit import NatoUnitType
 from app.providers.base import UnitDataProvider
+from app.providers.refuel_orders import RefuelOrderProvider
 from app.providers.supply import SupplyProvider
 from app.providers.unit_instances import UnitInstanceProvider
+
+# A truck with a refuel order in one of these states is tasked (not on standby).
+_OPEN_REFUEL = (RefuelOrderStatus.PENDING, RefuelOrderStatus.ACTIVE)
 
 
 async def build_supply_overview(
@@ -23,10 +28,22 @@ async def build_supply_overview(
     supply: SupplyProvider,
     instances: UnitInstanceProvider,
     units: UnitDataProvider,
+    refuel_orders: RefuelOrderProvider | None = None,
 ) -> SupplyOverview:
-    """Assemble depot stock + mobile-truck fuel into a single distribution view."""
+    """Assemble depot stock + mobile-truck fuel into a single distribution view.
+
+    When ``refuel_orders`` is supplied, each truck is tagged with the unit it is tasked to
+    refuel via an open (pending/active) order — else it is on standby (v2 Wave 11 supply fleet).
+    """
     depots = await supply.list_depots(session)
     all_stocks = await supply.list_stocks(session)
+
+    # Map truck_id → unit_id for trucks tasked by an open refuel order.
+    tasked: dict[str, str] = {}
+    if refuel_orders is not None:
+        for order in await refuel_orders.list_all(session):
+            if order.status in _OPEN_REFUEL and order.truck_id is not None:
+                tasked[order.truck_id] = order.unit_id
 
     stocks_by_depot = defaultdict(list)
     for stock in all_stocks:
@@ -54,6 +71,7 @@ async def build_supply_overview(
                 lat=inst.lat,
                 lon=inst.lon,
                 h3_index=inst.h3_index,
+                assigned_unit_id=tasked.get(inst.id),
             )
         )
         if inst.current_fuel_liters is not None:

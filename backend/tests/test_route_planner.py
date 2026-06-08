@@ -109,3 +109,67 @@ class TestHybridSelection:
         assert pick_route_option(RouteMetric.FAST, only, None) is only
         assert pick_route_option(RouteMetric.FAST, None, only) is only
         assert pick_route_option(RouteMetric.FAST, None, None) is None
+
+
+def _leg(
+    geom: list[list[float]],
+    *,
+    distance: float,
+    effective: float,
+    fuel: float,
+    threat_max: int = 0,
+    threat_avg: float = 0.0,
+    degraded: bool = False,
+) -> RoutePath:
+    return RoutePath(
+        metric=RouteMetric.FAST,
+        geometry=geom,
+        distance_m=distance,
+        effective_distance_m=effective,
+        fuel_distance_m=fuel,
+        threat_max=threat_max,
+        threat_avg=threat_avg,
+        degraded=degraded,
+    )
+
+
+class TestStitchPaths:
+    """F5 (Wave 10, doc 64): stitch ordered route legs into one multi-leg path."""
+
+    def test_none_when_no_legs(self) -> None:
+        from app.services.route_planner import stitch_paths
+
+        assert stitch_paths([]) is None
+
+    def test_concatenates_and_drops_shared_joint(self) -> None:
+        from app.services.route_planner import stitch_paths
+
+        a = _leg([[0, 0], [1, 1]], distance=100, effective=100, fuel=100)
+        b = _leg([[1, 1], [2, 2]], distance=50, effective=60, fuel=70)
+        s = stitch_paths([a, b])
+        assert s is not None
+        assert s.geometry == [[0, 0], [1, 1], [2, 2]]  # the shared waypoint is not duplicated
+        assert s.distance_m == 150
+        assert s.effective_distance_m == 160
+        assert s.fuel_distance_m == 170
+
+    def test_aggregates_threat_max_avg_and_degraded(self) -> None:
+        from app.services.route_planner import stitch_paths
+
+        a = _leg(
+            [[0, 0], [1, 1]], distance=100, effective=100, fuel=100, threat_max=2, threat_avg=1.0
+        )
+        b = _leg(
+            [[1, 1], [2, 2]],
+            distance=100,
+            effective=100,
+            fuel=100,
+            threat_max=5,
+            threat_avg=3.0,
+            degraded=True,
+        )
+        s = stitch_paths([a, b])
+        assert s is not None
+        assert s.threat_max == 5
+        assert s.threat_avg == pytest.approx(2.0)  # distance-weighted: (1*100 + 3*100) / 200
+        assert s.degraded is True

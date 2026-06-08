@@ -1,5 +1,7 @@
 // TypeScript mirrors of the backend API schemas (the contract between the two).
 
+import type { NatoStage } from '../lib/natoStage'
+
 export interface BBox {
   west: number
   south: number
@@ -172,6 +174,25 @@ export interface CreateMoveOrderRequest {
   mode?: RouteMode // default 'road' on the backend (v2 Wave 10)
 }
 
+/** An operator-placed waypoint (v2 Wave 10 F5). */
+export interface WaypointInput {
+  lat: number
+  lon: number
+}
+
+export interface PlanWaypointsRequest {
+  instance_id: string
+  waypoints: WaypointInput[]
+  mode?: RouteMode
+}
+
+export interface CreateWaypointMoveOrderRequest {
+  instance_id: string
+  waypoints: WaypointInput[]
+  metric: RouteMetric
+  mode?: RouteMode
+}
+
 /** A live per-unit frame broadcast by the sim engine over the WebSocket (server→client). */
 export interface UnitUpdate {
   type: 'unit_update'
@@ -184,6 +205,15 @@ export interface UnitUpdate {
   progress_m: number
   distance_m: number
   reason?: 'blocked' | 'threat' // why the unit halted, set when status === 'halted' (Wave 10 F1)
+}
+
+/** Operator-placed fuel depot request (v2 Wave 10 F6). */
+export interface CreateDepotRequest {
+  name: string
+  lat: number
+  lon: number
+  // NATO JLSG site type (v2 Wave 11 F5); omit for a plain depot/marker.
+  site_type?: string | null
 }
 
 /** An operator-placed obstacle the router avoids (blocks an H3 cell). */
@@ -210,6 +240,8 @@ export interface FuelDepot {
   h3_index: string
   lat: number
   lon: number
+  // NATO JLSG site type (v2 Wave 11 F5); null/absent for a plain depot.
+  site_type?: string | null
 }
 
 export interface FuelStock {
@@ -234,6 +266,8 @@ export interface TruckFuel {
   lat: number
   lon: number
   h3_index: string
+  // Unit this truck is tasked to refuel (open order), else null = on standby (v2 Wave 11).
+  assigned_unit_id?: string | null
 }
 
 export interface SupplyOverview {
@@ -253,6 +287,14 @@ export interface BuyOrder {
   status: BuyOrderStatus
   lead_time_game_s: number
   remaining_game_s: number
+  // Order-mask metadata (v2 Wave 11 F3).
+  platform_id?: string | null
+  inform_jlsg?: boolean
+  inform_jtf?: boolean
+  destination_name?: string | null
+  // NATO fulfilment stage tracking (v2 Wave 11 F4).
+  nato_stage?: NatoStage
+  stage_remaining_game_s?: number
 }
 
 export interface CreateBuyOrderRequest {
@@ -260,6 +302,24 @@ export interface CreateBuyOrderRequest {
   fuel_type: string
   quantity_liters: number
   lead_time_game_s?: number
+  // Order-mask metadata (v2 Wave 11 F3).
+  platform_id?: string | null
+  inform_jlsg?: boolean
+  inform_jtf?: boolean
+  destination_name?: string | null
+}
+
+/** A selectable fuel-management / procurement platform (v2 Wave 11 F2). */
+export interface FuelPlatform {
+  id: string
+  name: string
+  logo_key: string | null
+  is_default: boolean
+}
+
+export interface CreateFuelPlatformRequest {
+  name: string
+  logo_key?: string | null
 }
 
 export type RefuelOrderStatus = 'pending' | 'active' | 'complete' | 'cancelled'
@@ -282,7 +342,24 @@ export interface CreateRefuelOrderRequest {
   requested_liters?: number
 }
 
-/** Live frame broadcast when a buy order is delivered (Wave 5 buy-orders). */
+/** Start a routed fuel run: dispatch a mover to a target + wire the refuel (v2 Wave 12). */
+export interface CreateFuelRunRequest {
+  mover_id: string
+  unit_id: string
+  truck_id?: string | null
+  depot_id?: string | null
+  dest_lat: number
+  dest_lon: number
+  metric: RouteMetric
+  mode?: RouteMode
+}
+
+export interface FuelRunResponse {
+  move_order: MoveOrder
+  refuel_order: RefuelOrder
+}
+
+/** Live frame broadcast when a buy order's NATO stage changes / it is delivered (Wave 5 + W11 F4). */
 export interface BuyOrderUpdate {
   type: 'buy_order_update'
   order_id: string
@@ -291,6 +368,8 @@ export interface BuyOrderUpdate {
   quantity_liters: number
   status: BuyOrderStatus
   remaining_game_s: number
+  nato_stage?: NatoStage
+  stage_remaining_game_s?: number
 }
 
 /** Live frame broadcast when a refuel transfer completes (Wave 5 refuel-orders). */

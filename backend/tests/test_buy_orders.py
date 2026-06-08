@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.config import Settings
 from app.db import get_session
-from app.domain.buy_order import BuyOrderStatus
+from app.domain.buy_order import BuyOrderStatus, NatoStage
 from app.domain.unit import FuelType
 from app.main import create_app
 from app.providers.buy_orders import (
@@ -21,7 +21,12 @@ from app.providers.buy_orders import (
     build_buy_order_provider,
 )
 from app.providers.supply import build_supply_provider
-from app.services.buy_service import advance_buy_order, deliver_due_buy_orders
+from app.services.buy_service import (
+    advance_buy_order,
+    advance_order_stage,
+    deliver_due_buy_orders,
+    progress_buy_order_stages,
+)
 from app.services.supply_seed import seed_fuel_supply
 
 
@@ -40,6 +45,38 @@ class TestCountdown:
         remaining, delivered = advance_buy_order(remaining_game_s=30.0, dt_game_s=30.0)
         assert remaining == 0.0
         assert delivered is True
+
+
+class TestStageAdvance:
+    # v2 Wave 11 F4: NATO fulfilment stages advance at 30 game-seconds per stage (deterministic).
+    def test_decrements_within_a_stage(self) -> None:
+        stage, remaining, terminal = advance_order_stage(NatoStage.PLACED, 30.0, 10.0)
+        assert stage is NatoStage.PLACED
+        assert remaining == 20.0
+        assert terminal is False
+
+    def test_crosses_one_boundary(self) -> None:
+        stage, remaining, terminal = advance_order_stage(NatoStage.PLACED, 30.0, 30.0)
+        assert stage is NatoStage.CONFIRMED_JLSG
+        assert remaining == 30.0
+        assert terminal is False
+
+    def test_large_step_reaches_terminal_once(self) -> None:
+        stage, remaining, terminal = advance_order_stage(NatoStage.PLACED, 30.0, 10_000.0)
+        assert stage is NatoStage.REACHED_OPCON
+        assert remaining == 0.0
+        assert terminal is True
+
+    def test_exactly_six_stages_to_opcon(self) -> None:
+        # PLACED + 6 dwells of 30s each → REACHED_OPCON.
+        stage, _, terminal = advance_order_stage(NatoStage.PLACED, 30.0, 6 * 30.0)
+        assert stage is NatoStage.REACHED_OPCON
+        assert terminal is True
+
+    def test_terminal_is_stable(self) -> None:
+        stage, _remaining, terminal = advance_order_stage(NatoStage.REACHED_OPCON, 0.0, 30.0)
+        assert stage is NatoStage.REACHED_OPCON
+        assert terminal is False  # already delivered — no second delivery
 
 
 class TestFactory:
@@ -94,6 +131,49 @@ class TestBuyOrderApi:
             await client.aclose()
             await engine.dispose()
 
+    async def test_order_mask_metadata_persists(self) -> None:
+        # v2 Wave 11 F3: platform / inform flags / destination are persisted on the order.
+        try:
+            client, engine, _ = await _client()
+        except SQLAlchemyError as exc:
+            pytest.skip(f"database unavailable: {exc}")
+        try:
+            body = {
+                "depot_id": "depot-main",
+                "fuel_type": "diesel",
+                "quantity_liters": 5000,
+                "platform_id": "platform-world-fuel-dfms",
+                "inform_jlsg": True,
+                "inform_jtf": False,
+                "destination_name": "Main Supply Point",
+            }
+            order = (await client.post("/api/v1/buy-orders", json=body)).json()
+            assert order["platform_id"] == "platform-world-fuel-dfms"
+            assert order["inform_jlsg"] is True
+            assert order["inform_jtf"] is False
+            assert order["destination_name"] == "Main Supply Point"
+
+            # The metadata survives a re-fetch (persisted, not just echoed).
+            again = (await client.get(f"/api/v1/buy-orders/{order['id']}")).json()
+            assert again["platform_id"] == "platform-world-fuel-dfms"
+            assert again["inform_jlsg"] is True
+        finally:
+            await client.aclose()
+            await engine.dispose()
+
+    async def test_destination_name_defaults_to_depot_name(self) -> None:
+        try:
+            client, engine, _ = await _client()
+        except SQLAlchemyError as exc:
+            pytest.skip(f"database unavailable: {exc}")
+        try:
+            body = {"depot_id": "depot-main", "fuel_type": "diesel", "quantity_liters": 100}
+            order = (await client.post("/api/v1/buy-orders", json=body)).json()
+            assert order["destination_name"] == "Main Supply Point"
+        finally:
+            await client.aclose()
+            await engine.dispose()
+
     async def test_unknown_depot_404(self) -> None:
         try:
             client, engine, _ = await _client()
@@ -115,6 +195,45 @@ class TestBuyOrderApi:
             # depot-north stocks only diesel, not jp8.
             body = {"depot_id": "depot-north", "fuel_type": "jp8", "quantity_liters": 100}
             assert (await client.post("/api/v1/buy-orders", json=body)).status_code == 422
+        finally:
+            await client.aclose()
+            await engine.dispose()
+
+    async def test_stage_progression_delivers_at_opcon(self) -> None:
+        # v2 Wave 11 F4: the live-sim lifecycle advances stages and delivers at REACHED_OPCON.
+        try:
+            client, engine, maker = await _client()
+        except SQLAlchemyError as exc:
+            pytest.skip(f"database unavailable: {exc}")
+        try:
+            supply = build_supply_provider()
+            async with maker() as s:
+                before = (await supply.get_stock(s, "depot-main", FuelType.DIESEL)).quantity_liters
+
+            body = {"depot_id": "depot-main", "fuel_type": "diesel", "quantity_liters": 5000}
+            oid = (await client.post("/api/v1/buy-orders", json=body)).json()["id"]
+            await client.post(f"/api/v1/buy-orders/{oid}/confirm")
+
+            orders = build_buy_order_provider()
+            # One 30s step advances exactly one stage (placed → confirmed_jlsg), not yet delivered.
+            async with maker() as s:
+                changed = await progress_buy_order_stages(s, supply, orders, dt_game_s=30.0)
+            assert len(changed) == 1
+            assert changed[0].nato_stage is NatoStage.CONFIRMED_JLSG
+
+            async with maker() as s:
+                mid = await orders.get(s, oid)
+            assert mid.status is BuyOrderStatus.ACTIVE  # mid-flight, not delivered yet
+
+            # A large step runs it to OPCON → delivery.
+            async with maker() as s:
+                await progress_buy_order_stages(s, supply, orders, dt_game_s=10_000.0)
+            async with maker() as s:
+                after = (await supply.get_stock(s, "depot-main", FuelType.DIESEL)).quantity_liters
+                done = await orders.get(s, oid)
+            assert done.nato_stage is NatoStage.REACHED_OPCON
+            assert done.status is BuyOrderStatus.DELIVERED
+            assert after == before + 5000
         finally:
             await client.aclose()
             await engine.dispose()

@@ -12,7 +12,12 @@ from app.domain.unit import UnitType
 from app.domain.unit_instance import UnitInstance
 from app.providers.move_orders import MoveOrderProvider
 from app.providers.routing import RoutingProvider, build_routing_provider_for_mode
-from app.services.route_planner import build_option
+from app.services.route_planner import (
+    build_option,
+    plan_legs,
+    stitch_paths,
+    waypoint_provider_and_speed,
+)
 
 
 async def create_move_order(
@@ -46,6 +51,54 @@ async def create_move_order(
     path = await provider.shortest_path(
         session, instance.lat, instance.lon, dest_lat, dest_lon, metric
     )
+    if path is None:
+        return None
+    option = build_option(
+        path,
+        label=metric.value,
+        speed_road_kph=speed_kph,
+        consumption_normal_lph=unit_type.fuel.consumption_normal_lph,
+        start_fuel_l=start_fuel,
+    )
+    order = MoveOrder(
+        id=uuid.uuid4().hex,
+        instance_id=instance.id,
+        status=MoveOrderStatus.PENDING,
+        metric=metric,
+        distance_m=option.distance_m,
+        duration_s=option.duration_s,
+        fuel_consumed_l=option.fuel_consumed_l,
+        progress_m=0.0,
+        geometry=path.geometry,
+    )
+    return await orders.create(session, order)
+
+
+async def create_move_order_waypoints(
+    session: AsyncSession,
+    routing: RoutingProvider,
+    orders: MoveOrderProvider,
+    instance: UnitInstance,
+    unit_type: UnitType,
+    waypoints: list[tuple[float, float]],
+    metric: RouteMetric,
+    *,
+    mode: RouteMode = RouteMode.ROAD,
+) -> MoveOrder | None:
+    """Plan the legs through ``waypoints``, stitch them, and persist a pending move order whose
+    geometry is the full multi-leg path (v2 Wave 10, waypoint-routing). None if unroutable."""
+    if not waypoints:
+        return None
+    provider, speed_kph = waypoint_provider_and_speed(routing, unit_type, mode)
+    start_fuel = (
+        instance.current_fuel_liters
+        if instance.current_fuel_liters is not None
+        else unit_type.fuel.capacity_liters
+    )
+    legs = await plan_legs(session, provider, instance.lat, instance.lon, waypoints, metric)
+    if legs is None:
+        return None
+    path = stitch_paths(legs)
     if path is None:
         return None
     option = build_option(

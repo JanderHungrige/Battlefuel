@@ -17,10 +17,13 @@ from app.domain.unit import FuelType
 from app.models.supply import FuelDepotRow, FuelStockRow
 from app.services.tile_grid import DEFAULT_RESOLUTION
 
+# Depots sit in the deep rear (west of the frontline, at/inside REAR_LON_MAX) — see
+# ``app.domain.frontline`` (v2 Wave 14). FARP North was previously east of the new front; pulled
+# back into the western rear with the rest of the NATO logistics.
 # (id, name, lat, lon)
 SEED_DEPOTS: tuple[tuple[str, str, float, float], ...] = (
-    ("depot-main", "Main Supply Point", 49.205, 11.835),
-    ("depot-north", "FARP North", 49.245, 11.872),
+    ("depot-main", "Main Supply Point", 49.212, 11.800),
+    ("depot-north", "FARP North", 49.248, 11.808),
 )
 
 # (depot_id, fuel_type, quantity_liters, capacity_liters)

@@ -5,14 +5,21 @@ import type {
   AdviceResult,
   BuyOrder,
   CreateBuyOrderRequest,
+  CreateDepotRequest,
+  CreateFuelPlatformRequest,
+  CreateFuelRunRequest,
   CreateMoveOrderRequest,
   CreateRefuelOrderRequest,
+  CreateWaypointMoveOrderRequest,
+  FuelRunResponse,
   EnemyUnit,
   FuelDepot,
+  FuelPlatform,
   FuelStock,
   MoveOrder,
   Obstacle,
   PlanRouteRequest,
+  PlanWaypointsRequest,
   RefuelOrder,
   RouteOption,
   SupplyOverview,
@@ -72,8 +79,13 @@ export const api = {
   // Routing & movement (Wave 3).
   planRoute: (req: PlanRouteRequest): Promise<RouteOption[]> =>
     postJson<RouteOption[]>('/routes/plan', req),
+  // Plan fastest+safest through an ordered list of waypoints (v2 Wave 10 F5).
+  planWaypoints: (req: PlanWaypointsRequest): Promise<RouteOption[]> =>
+    postJson<RouteOption[]>('/routes/plan-waypoints', req),
   createMoveOrder: (req: CreateMoveOrderRequest): Promise<MoveOrder> =>
     postJson<MoveOrder>('/move-orders', req),
+  createWaypointMoveOrder: (req: CreateWaypointMoveOrderRequest): Promise<MoveOrder> =>
+    postJson<MoveOrder>('/move-orders/waypoints', req),
   confirmMoveOrder: (id: string): Promise<MoveOrder> =>
     postJson<MoveOrder>(`/move-orders/${id}/confirm`),
   cancelMoveOrder: (id: string): Promise<MoveOrder> =>
@@ -94,14 +106,24 @@ export const api = {
 
   // Fuel supply (Wave 5).
   getDepots: (): Promise<FuelDepot[]> => getJson<FuelDepot[]>('/depots'),
+  createDepot: (req: CreateDepotRequest): Promise<FuelDepot> =>
+    postJson<FuelDepot>('/depots', req),
   getFuelStocks: (): Promise<FuelStock[]> => getJson<FuelStock[]>('/fuel-stocks'),
   getSupplyOverview: (): Promise<SupplyOverview> => getJson<SupplyOverview>('/supply/overview'),
   createBuyOrder: (req: CreateBuyOrderRequest): Promise<BuyOrder> =>
     postJson<BuyOrder>('/buy-orders', req),
+  getBuyOrders: (): Promise<BuyOrder[]> => getJson<BuyOrder[]>('/buy-orders'),
+
+  // Fuel-management platforms (v2 Wave 11 F2).
+  getFuelPlatforms: (): Promise<FuelPlatform[]> => getJson<FuelPlatform[]>('/fuel-platforms'),
+  createFuelPlatform: (req: CreateFuelPlatformRequest): Promise<FuelPlatform> =>
+    postJson<FuelPlatform>('/fuel-platforms', req),
   confirmBuyOrder: (id: string): Promise<BuyOrder> => postJson<BuyOrder>(`/buy-orders/${id}/confirm`),
   cancelBuyOrder: (id: string): Promise<BuyOrder> => postJson<BuyOrder>(`/buy-orders/${id}/cancel`),
   createRefuelOrder: (req: CreateRefuelOrderRequest): Promise<RefuelOrder> =>
     postJson<RefuelOrder>('/refuel-orders', req),
+  createFuelRun: (req: CreateFuelRunRequest): Promise<FuelRunResponse> =>
+    postJson<FuelRunResponse>('/fuel-runs', req),
   confirmRefuelOrder: (id: string): Promise<RefuelOrder> =>
     postJson<RefuelOrder>(`/refuel-orders/${id}/confirm`),
   cancelRefuelOrder: (id: string): Promise<RefuelOrder> =>
@@ -111,6 +133,9 @@ export const api = {
   getReposition: (): Promise<AdviceResult> => getJson<AdviceResult>('/advice/reposition'),
   getRefuelPlan: (): Promise<AdviceResult> => getJson<AdviceResult>('/advice/refuel-plan'),
   getRedistribution: (): Promise<AdviceResult> => getJson<AdviceResult>('/advice/redistribution'),
+  // Per-site low-fuel refuel proposal (v2 Wave 11 F5).
+  getSiteRefuel: (depotId: string): Promise<AdviceResult> =>
+    getJson<AdviceResult>(`/advice/site-refuel/${encodeURIComponent(depotId)}`),
   getRouteAdvice: (instanceId: string, destLat: number, destLon: number): Promise<AdviceResult> =>
     getJson<AdviceResult>(
       `/advice/route?instance_id=${encodeURIComponent(instanceId)}&dest_lat=${destLat}&dest_lon=${destLon}`,

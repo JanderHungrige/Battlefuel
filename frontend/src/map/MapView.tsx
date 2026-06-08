@@ -18,6 +18,7 @@ import {
   ZONE_THREAT_LINE,
 } from './colors'
 import { DEPOT_SIDC, GAUGE_SEGMENTS, depotGauges, depotIconKey } from './depotSymbol'
+import { fuelBarColor, fuelBarKey, fuelFraction } from './unitFuelBar'
 import { ALL_EVENT_ICONS } from './eventIcons'
 import { formatMgrs, gridLabels, gridLines, squareCornersFromCenter, toMgrs } from './mgrsGrid'
 import 'maplibre-gl/dist/maplibre-gl.css'
@@ -64,7 +65,7 @@ export interface MapViewProps {
   routeGeometry: number[][] | null
   destination: { lat: number; lon: number } | null
   planning: boolean
-  livePositions: Record<string, { lat: number; lon: number }>
+  livePositions: Record<string, { lat: number; lon: number; fuel_l?: number }>
   activeRoutes: number[][][]
   obstacles: Obstacle[]
   obstacleMode: boolean
@@ -72,11 +73,18 @@ export interface MapViewProps {
   highlightEventId: string | null
   enemyUnits: EnemyUnit[]
   depots: DepotFuel[]
+  /** When set, mark + ease the map to this point (locate a depot / truck / etc.). v2 Wave 11. */
+  locatePoint?: { lat: number; lon: number } | null
+  /** Proposed fuel-run routes to preview (v2 Wave 12): selected drawn bold, others lighter. */
+  fuelRunOptions?: { metric: string; geometry: number[][] }[]
+  fuelRunMetric?: string | null
   rendezvous: { lat: number; lon: number } | null
   adviceArrow: { from: { lat: number; lon: number }; to: { lat: number; lon: number } } | null
   adviceDest: { lat: number; lon: number } | null
   highlightH3: string | null
   selectedUnitId: string | null
+  /** OF-8 per-unit fuel bars on the map (v2 Wave 11 F7); off → no bars rendered. */
+  showUnitFuelBars?: boolean
   selectedCell: { lat: number; lon: number } | null
   gridPrecisionM: number
   onSelectCell: (lat: number, lon: number) => void
@@ -84,6 +92,11 @@ export interface MapViewProps {
   onPickDestination: (lat: number, lon: number) => void
   onPlaceObstacle: (lat: number, lon: number) => void
   onRemoveObstacle: (id: string) => void
+  depotMode: boolean
+  onPlaceDepot: (lat: number, lon: number) => void
+  /** Fuel-run target-pick mode (v2 Wave 12): clicking a unit picks it as the refuel target. */
+  fuelRunPickMode?: boolean
+  onPickFuelTarget?: (unitId: string) => void
   onClearSelection: () => void
 }
 
@@ -306,6 +319,31 @@ function initLayers(map: maplibregl.Map): void {
     layout: { 'icon-image': ['get', 'sidc'], 'icon-size': 1, 'icon-allow-overlap': true },
   })
 
+  // Per-unit fuel bars (v2 Wave 11 F7): a small colour-coded bar below each unit symbol. Two
+  // layers off one source so the selected unit's bar draws on top of overlapping ones.
+  map.addSource('unit-fuel-bars', { type: 'geojson', data: EMPTY })
+  const fuelBarLayout: maplibregl.SymbolLayerSpecification['layout'] = {
+    'icon-image': ['get', 'key'],
+    'icon-size': 1,
+    'icon-allow-overlap': true,
+    'icon-anchor': 'top',
+    'icon-offset': [0, 16],
+  }
+  map.addLayer({
+    id: 'unit-fuel-bars',
+    type: 'symbol',
+    source: 'unit-fuel-bars',
+    filter: ['!=', ['get', 'id'], ''],
+    layout: fuelBarLayout,
+  })
+  map.addLayer({
+    id: 'unit-fuel-bars-selected',
+    type: 'symbol',
+    source: 'unit-fuel-bars',
+    filter: ['==', ['get', 'id'], ''],
+    layout: fuelBarLayout,
+  })
+
   // Enemy units (v2 Wave 3): red APP-6 hostile symbols, rendered through the same SIDC pipeline
   // but on a separate, non-orderable layer.
   map.addSource('enemy-units', { type: 'geojson', data: EMPTY })
@@ -389,6 +427,49 @@ function initLayers(map: maplibregl.Map): void {
       'circle-stroke-color': '#0e1116',
     },
   })
+
+  // "Locate" marker (v2 Wave 11): a bright ring dropped on a clicked depot / truck / etc.
+  map.addSource('locate-marker', { type: 'geojson', data: EMPTY })
+  map.addLayer({
+    id: 'locate-marker',
+    type: 'circle',
+    source: 'locate-marker',
+    paint: {
+      'circle-radius': 14,
+      'circle-color': 'rgba(63,208,255,0.18)',
+      'circle-stroke-width': 3,
+      'circle-stroke-color': '#3fd0ff',
+    },
+  })
+
+  // Proposed fuel-run routes preview (v2 Wave 12): selected bold, alternatives lighter.
+  map.addSource('fuel-run-routes', { type: 'geojson', data: EMPTY })
+  map.addLayer({
+    id: 'fuel-run-routes',
+    type: 'line',
+    source: 'fuel-run-routes',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: {
+      'line-color': '#3fd0ff',
+      'line-width': ['case', ['get', 'selected'], 5, 2],
+      'line-opacity': ['case', ['get', 'selected'], 0.95, 0.4],
+    },
+  })
+}
+
+function syncFuelRunRoutes(
+  map: maplibregl.Map,
+  options: { metric: string; geometry: number[][] }[] | undefined,
+  metric: string | null | undefined,
+): void {
+  const features: GeoJSON.Feature[] = (options ?? [])
+    .filter((o) => o.geometry && o.geometry.length > 1)
+    .map((o) => ({
+      type: 'Feature',
+      geometry: { type: 'LineString', coordinates: o.geometry },
+      properties: { selected: o.metric === metric },
+    }))
+  setData(map, 'fuel-run-routes', { type: 'FeatureCollection', features })
 }
 
 function syncUnits(
@@ -406,6 +487,78 @@ function syncUnits(
     }
   }
   setData(map, 'units', unitsToGeoJSON(units, sidcByType, live))
+}
+
+// --- Per-unit fuel bars (v2 Wave 11 F7) ---------------------------------------------------
+
+const FUEL_BAR_W = 30
+const FUEL_BAR_H = 7
+
+/** A small colour-coded fuel bar (track + proportional fill) as offline ImageData. */
+function fuelBarImage(fraction: number): ImageData {
+  const canvas = document.createElement('canvas')
+  canvas.width = FUEL_BAR_W
+  canvas.height = FUEL_BAR_H
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return new ImageData(FUEL_BAR_W, FUEL_BAR_H)
+  ctx.fillStyle = 'rgba(14,17,22,0.75)'
+  ctx.fillRect(0, 0, FUEL_BAR_W, FUEL_BAR_H)
+  const inset = 1
+  const fillW = Math.round((FUEL_BAR_W - inset * 2) * fraction)
+  ctx.fillStyle = fuelBarColor(fraction)
+  ctx.fillRect(inset, inset, fillW, FUEL_BAR_H - inset * 2)
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)'
+  ctx.lineWidth = 1
+  ctx.strokeRect(0.5, 0.5, FUEL_BAR_W - 1, FUEL_BAR_H - 1)
+  return ctx.getImageData(0, 0, FUEL_BAR_W, FUEL_BAR_H)
+}
+
+/** Build fuel-bar point features for every unit that has fuel telemetry. */
+function unitFuelBarsToGeoJSON(
+  units: UnitInstance[],
+  unitTypes: UnitType[],
+  live: Record<string, { lat: number; lon: number; fuel_l?: number }>,
+): GeoJSON.FeatureCollection {
+  const capByType: Record<string, number> = {}
+  for (const ut of unitTypes) capByType[ut.id] = ut.fuel.capacity_liters
+  const features: GeoJSON.Feature[] = []
+  for (const u of units) {
+    const liveU = live[u.id]
+    const current = liveU?.fuel_l ?? u.current_fuel_liters
+    const fraction = fuelFraction(current, capByType[u.unit_type_id] ?? 0)
+    if (fraction === null) continue
+    const lon = liveU?.lon ?? u.lon
+    const lat = liveU?.lat ?? u.lat
+    features.push({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [lon, lat] },
+      properties: { id: u.id, key: fuelBarKey(fraction) },
+    })
+  }
+  return { type: 'FeatureCollection', features }
+}
+
+function syncUnitFuelBars(
+  map: maplibregl.Map,
+  units: UnitInstance[],
+  unitTypes: UnitType[],
+  live: Record<string, { lat: number; lon: number; fuel_l?: number }>,
+  enabled: boolean,
+): void {
+  if (!enabled) {
+    setData(map, 'unit-fuel-bars', EMPTY)
+    return
+  }
+  const data = unitFuelBarsToGeoJSON(units, unitTypes, live)
+  // Register one image per distinct fill bucket present (bounded set).
+  for (const f of data.features) {
+    const key = String(f.properties?.key ?? '')
+    if (key && !map.hasImage(key)) {
+      const bucket = Number(key.split(':')[1])
+      map.addImage(key, fuelBarImage(bucket / 10))
+    }
+  }
+  setData(map, 'unit-fuel-bars', data)
 }
 
 /** Register each hostile SIDC image (red milsymbol) and push the enemy-unit points. */
@@ -559,6 +712,10 @@ function wireReadout(map: maplibregl.Map, el: HTMLElement): void {
 function wireInteraction(map: maplibregl.Map, propsRef: { current: MapViewProps }): void {
   map.on('click', (e) => {
     const p = propsRef.current
+    if (p.depotMode) {
+      p.onPlaceDepot(e.lngLat.lat, e.lngLat.lng)
+      return
+    }
     if (p.obstacleMode) {
       const hitObs = map.queryRenderedFeatures(e.point, { layers: ['obstacles'] })
       if (hitObs.length > 0) {
@@ -570,7 +727,13 @@ function wireInteraction(map: maplibregl.Map, propsRef: { current: MapViewProps 
     }
     const hitUnits = map.queryRenderedFeatures(e.point, { layers: ['units'] })
     if (hitUnits.length > 0) {
-      p.onSelectUnit(String(hitUnits[0].properties?.id))
+      const unitId = String(hitUnits[0].properties?.id)
+      // Fuel-run target pick (v2 Wave 12): clicking a unit picks it as the refuel target.
+      if (p.fuelRunPickMode && p.onPickFuelTarget) {
+        p.onPickFuelTarget(unitId)
+        return
+      }
+      p.onSelectUnit(unitId)
       return
     }
     if (p.planning) {
@@ -667,6 +830,9 @@ export function MapView(props: MapViewProps) {
       setData(map, 'tiles', tilesToGeoJSON(p.tiles))
       setData(map, 'cell-threat', cellThreatToGeoJSON(p.tiles, p.gridPrecisionM))
       syncUnits(map, p.units, p.unitTypes, p.livePositions)
+      syncUnitFuelBars(map, p.units, p.unitTypes, p.livePositions, p.showUnitFuelBars ?? false)
+      map.setFilter('unit-fuel-bars', ['!=', ['get', 'id'], p.selectedUnitId ?? ' '])
+      map.setFilter('unit-fuel-bars-selected', ['==', ['get', 'id'], p.selectedUnitId ?? ''])
       syncEnemyUnits(map, p.enemyUnits)
       setData(map, 'active-routes', activeRoutesToGeoJSON(p.activeRoutes))
       setData(map, 'route', routeToGeoJSON(p.routeGeometry))
@@ -677,6 +843,8 @@ export function MapView(props: MapViewProps) {
       setData(map, 'rendezvous', destinationToGeoJSON(p.rendezvous))
       setData(map, 'advice-arrow', adviceArrowToGeoJSON(p.adviceArrow?.from, p.adviceArrow?.to))
       setData(map, 'advice-dest', destinationToGeoJSON(p.adviceDest))
+      setData(map, 'locate-marker', destinationToGeoJSON(p.locatePoint ?? null))
+      syncFuelRunRoutes(map, p.fuelRunOptions, p.fuelRunMetric)
       wireInteraction(map, propsRef)
       wireHover(map)
       wireCombatHover(map)
@@ -701,9 +869,17 @@ export function MapView(props: MapViewProps) {
       setData(mapRef.current, 'cell-threat', cellThreatToGeoJSON(props.tiles, props.gridPrecisionM))
   }, [props.tiles, props.gridPrecisionM])
   useEffect(() => {
-    if (readyRef.current && mapRef.current)
+    if (readyRef.current && mapRef.current) {
       syncUnits(mapRef.current, props.units, props.unitTypes, props.livePositions)
-  }, [props.units, props.unitTypes, props.livePositions])
+      syncUnitFuelBars(
+        mapRef.current,
+        props.units,
+        props.unitTypes,
+        props.livePositions,
+        props.showUnitFuelBars ?? false,
+      )
+    }
+  }, [props.units, props.unitTypes, props.livePositions, props.showUnitFuelBars])
   useEffect(() => {
     if (readyRef.current && mapRef.current)
       setData(mapRef.current, 'active-routes', activeRoutesToGeoJSON(props.activeRoutes))
@@ -725,6 +901,10 @@ export function MapView(props: MapViewProps) {
   }, [props.enemyUnits])
   useEffect(() => {
     if (readyRef.current && mapRef.current)
+      syncFuelRunRoutes(mapRef.current, props.fuelRunOptions, props.fuelRunMetric)
+  }, [props.fuelRunOptions, props.fuelRunMetric])
+  useEffect(() => {
+    if (readyRef.current && mapRef.current)
       setData(mapRef.current, 'combat-events', combatEventsToGeoJSON(props.combatEvents))
   }, [props.combatEvents])
   // Highlight + recentre only when the *selected event* changes — NOT on every combat_event frame
@@ -741,6 +921,13 @@ export function MapView(props: MapViewProps) {
   useEffect(() => {
     if (readyRef.current && mapRef.current) syncDepots(mapRef.current, props.depots)
   }, [props.depots])
+  useEffect(() => {
+    // Mark + ease to a located point — a clicked depot, fuel truck, etc. (v2 Wave 11).
+    if (!readyRef.current || !mapRef.current) return
+    const p = props.locatePoint
+    setData(mapRef.current, 'locate-marker', destinationToGeoJSON(p ?? null))
+    if (p) mapRef.current.easeTo({ center: [p.lon, p.lat], duration: 600, zoom: 12 })
+  }, [props.locatePoint])
   useEffect(() => {
     if (readyRef.current && mapRef.current)
       setData(mapRef.current, 'rendezvous', destinationToGeoJSON(props.rendezvous))
@@ -781,8 +968,12 @@ export function MapView(props: MapViewProps) {
     }
   }, [props.highlightH3, props.gridPrecisionM])
   useEffect(() => {
-    if (readyRef.current && mapRef.current)
-      mapRef.current.setFilter('units-selected', ['==', ['get', 'id'], props.selectedUnitId ?? ''])
+    if (!readyRef.current || !mapRef.current) return
+    const sel = props.selectedUnitId ?? ''
+    mapRef.current.setFilter('units-selected', ['==', ['get', 'id'], sel])
+    // Selected unit's fuel bar renders via the dedicated top layer (v2 Wave 11 F7).
+    mapRef.current.setFilter('unit-fuel-bars', ['!=', ['get', 'id'], sel || ' '])
+    mapRef.current.setFilter('unit-fuel-bars-selected', ['==', ['get', 'id'], sel])
   }, [props.selectedUnitId])
   useEffect(() => {
     if (!readyRef.current || !mapRef.current) return

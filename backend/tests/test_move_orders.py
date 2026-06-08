@@ -166,3 +166,51 @@ class TestProceedSlowly:
         finally:
             await client.aclose()
             await engine.dispose()
+
+
+@pytest.mark.db
+class TestWaypointMoveOrders:
+    """F5 (Wave 10, doc 64): create a move order from an ordered waypoint route, then confirm it."""
+
+    async def test_create_waypoint_order_and_confirm(self) -> None:
+        try:
+            client, engine, maker = await _client_and_engine()
+        except SQLAlchemyError as exc:
+            pytest.skip(f"database unavailable: {exc}")
+        try:
+            if not await _graph_ready(maker):
+                pytest.skip("routing graph empty — run build_routing_graph.sh")
+            created = await client.post(
+                "/api/v1/move-orders/waypoints",
+                json={
+                    "instance_id": "inst-armor-1",
+                    "waypoints": [{"lat": 49.22, "lon": 11.86}, {"lat": 49.20, "lon": 11.83}],
+                    "metric": "fast",
+                },
+            )
+            assert created.status_code == 201
+            order = created.json()
+            assert order["status"] == "pending"
+            assert order["distance_m"] > 0
+            assert len(order["geometry"]) >= 2  # stitched multi-leg path
+
+            confirmed = await client.post(f"/api/v1/move-orders/{order['id']}/confirm")
+            assert confirmed.status_code == 200 and confirmed.json()["status"] == "active"
+        finally:
+            await client.aclose()
+            await engine.dispose()
+
+    async def test_create_waypoint_order_empty_422(self) -> None:
+        try:
+            client, engine, _ = await _client_and_engine()
+        except SQLAlchemyError as exc:
+            pytest.skip(f"database unavailable: {exc}")
+        try:
+            resp = await client.post(
+                "/api/v1/move-orders/waypoints",
+                json={"instance_id": "inst-armor-1", "waypoints": []},
+            )
+            assert resp.status_code == 422
+        finally:
+            await client.aclose()
+            await engine.dispose()

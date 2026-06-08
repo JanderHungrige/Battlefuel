@@ -13,7 +13,7 @@ from app.domain.route import RouteMode, RouteOption
 from app.providers.factory import build_unit_provider
 from app.providers.routing import RoutingProvider, build_routing_provider
 from app.providers.unit_instances import UnitInstanceProvider, build_unit_instance_provider
-from app.services.route_planner import plan_routes
+from app.services.route_planner import plan_routes, plan_waypoint_routes
 
 router = APIRouter(tags=["routes"])
 
@@ -62,4 +62,46 @@ async def plan_route(
     )
     if not options:
         raise HTTPException(status_code=422, detail="no route to destination")
+    return options
+
+
+class Waypoint(BaseModel):
+    lat: float
+    lon: float
+
+
+class PlanWaypointsRequest(BaseModel):
+    instance_id: str
+    waypoints: list[Waypoint]
+    mode: RouteMode = RouteMode.ROAD
+
+
+@router.post("/routes/plan-waypoints")
+async def plan_waypoints_route(
+    req: PlanWaypointsRequest,
+    session: SessionDep,
+    routing: RoutingDep,
+    instances: InstanceDep,
+) -> list[RouteOption]:
+    """Plan fastest + safest routes through an ordered list of operator waypoints (v2 Wave 10)."""
+    if not req.waypoints:
+        raise HTTPException(status_code=422, detail="at least one waypoint is required")
+    instance = await instances.get_instance(session, req.instance_id)
+    if instance is None:
+        raise HTTPException(status_code=404, detail=f"unit instance {req.instance_id!r} not found")
+    unit_type = build_unit_provider().get_unit(instance.unit_type_id)
+    if unit_type is None:
+        raise HTTPException(
+            status_code=409, detail=f"unit type {instance.unit_type_id!r} not in catalog"
+        )
+    options = await plan_waypoint_routes(
+        session,
+        routing,
+        instance,
+        unit_type,
+        [(w.lat, w.lon) for w in req.waypoints],
+        mode=req.mode,
+    )
+    if not options:
+        raise HTTPException(status_code=422, detail="no route through the given waypoints")
     return options

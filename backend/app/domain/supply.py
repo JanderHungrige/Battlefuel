@@ -9,9 +9,24 @@ fuel type that depot currently holds (and its capacity for that type). Mobile fu
 
 from __future__ import annotations
 
+from enum import StrEnum
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain.unit import FuelType
+
+
+class LogisticSiteType(StrEnum):
+    """NATO JLSG logistic site types (AJP-4.6, v2 Wave 11 F5).
+
+    A plain depot has no site type (``site_type=None``); a typed site carries one of these.
+    """
+
+    BSA = "bsa"  # Brigade Support Area
+    CSSBN = "cssbn"  # LCC Combat Service Support Battalion
+    DOB = "dob"  # Deployable Operating Base (ACC)
+    FLS = "fls"  # Forward Logistic Site (MCC)
+    TLB = "tlb"  # Theatre Logistic Base
 
 
 class FuelDepot(BaseModel):
@@ -24,6 +39,8 @@ class FuelDepot(BaseModel):
     h3_index: str
     lat: float
     lon: float
+    # NATO JLSG site type (v2 Wave 11 F5); None for a plain depot/marker.
+    site_type: LogisticSiteType | None = None
 
 
 class FuelStock(BaseModel):
@@ -61,6 +78,9 @@ class TruckFuel(BaseModel):
     lat: float
     lon: float
     h3_index: str
+    # Unit this truck is tasked to refuel via an open (pending/active) refuel order, else None
+    # (= on standby / available). v2 Wave 11 supply-fleet tab.
+    assigned_unit_id: str | None = None
 
 
 class SupplyOverview(BaseModel):

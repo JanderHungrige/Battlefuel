@@ -137,11 +137,12 @@ class TestRefuelOrderApi:
         except SQLAlchemyError as exc:
             pytest.skip(f"database unavailable: {exc}")
         try:
-            # inst-armor-1 is diesel; inst-fuel-1 (TANKER) is the diesel fuel truck.
+            # inst-armor-1 is diesel; the nearest-recommender picks one of the seeded diesel fuel
+            # trucks (v2 Wave 11 added BOWSER/CISTERN alongside TANKER, so don't hardcode one).
             resp = await client.post("/api/v1/refuel-orders", json={"unit_id": "inst-armor-1"})
             assert resp.status_code == 201
             order = resp.json()
-            assert order["truck_id"] == "inst-fuel-1"
+            assert order["truck_id"] in {"inst-fuel-1", "inst-fuel-2", "inst-fuel-3"}
             assert order["unit_id"] == "inst-armor-1"
             assert order["status"] == "pending"
             assert order["fuel_type"] == "diesel"

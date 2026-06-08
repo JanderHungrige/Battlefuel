@@ -65,12 +65,24 @@ class Settings(BaseSettings):
     # Provider the factory builds for buy orders (Wave 5 ships "db").
     buy_order_provider: str = "db"
 
+    # Provider the factory builds for fuel-management platforms (v2 Wave 11 ships "db").
+    fuel_platform_provider: str = "db"
+
     # Default fuel-procurement lead time in game-seconds (overridable per buy order).
     buy_order_lead_time_game_s: float = 600.0
 
     # Random event engine (Wave 4): master toggle + mean interval between events in game-seconds.
+    # Tempo slowed in v2 Wave 14 (was 120) so new threats appear more gradually.
     game_mode: bool = True
-    event_mean_interval_game_s: float = 120.0
+    event_mean_interval_game_s: float = 240.0
+
+    # Light-threat decay (v2 Wave 14): each decay interval (game-seconds), every tile at threat
+    # 1..light_threat_max has threat_decay_chance of dropping one level — a gradual, probabilistic
+    # fade (not a synchronized purge), so transient light threats (e.g. drone sightings) clear over
+    # time while the contested east stays populated.
+    threat_decay_interval_game_s: float = 600.0
+    threat_decay_chance: float = 0.2
+    light_threat_max: int = 2
 
     # Simulation game-time scale (1 real second = sim_time_scale game seconds).
     sim_time_scale: float = 60.0

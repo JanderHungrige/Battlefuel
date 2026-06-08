@@ -41,6 +41,11 @@ class CreateBuyOrderRequest(BaseModel):
     fuel_type: FuelType
     quantity_liters: float = Field(gt=0)
     lead_time_game_s: float | None = Field(default=None, ge=0)
+    # Order-mask metadata (v2 Wave 11 F3).
+    platform_id: str | None = Field(default=None, max_length=80)
+    inform_jlsg: bool = False
+    inform_jtf: bool = False
+    destination_name: str | None = Field(default=None, max_length=120)
 
 
 @router.post("/buy-orders", status_code=201)
@@ -65,6 +70,10 @@ async def create_order(
             fuel_type=req.fuel_type,
             quantity_liters=req.quantity_liters,
             lead_time_game_s=lead_time,
+            platform_id=req.platform_id,
+            inform_jlsg=req.inform_jlsg,
+            inform_jtf=req.inform_jtf,
+            destination_name=req.destination_name,
         )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

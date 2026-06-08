@@ -19,7 +19,9 @@ class RefuelOrderRow(Base):
 
     id: Mapped[str] = mapped_column(primary_key=True)
     unit_id: Mapped[str]
-    truck_id: Mapped[str]
+    # Source is EITHER a mobile truck OR a fixed depot (v2 Wave 12 F2): exactly one is set.
+    truck_id: Mapped[str | None] = mapped_column(default=None)
+    depot_id: Mapped[str | None] = mapped_column(default=None)
     fuel_type: Mapped[str]
     status: Mapped[str] = mapped_column(default="pending")
     rendezvous_lat: Mapped[float]

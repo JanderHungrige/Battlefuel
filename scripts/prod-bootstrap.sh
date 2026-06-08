@@ -34,8 +34,10 @@ info "Importing OSM geometry into PostGIS (osm_points/lines/multipolygons)…"
 # from these tables, so this must precede generate_tiles.py.
 "${COMPOSE[@]}" run --rm osm-import
 
-info "Seeding tiles, units, and supply (idempotent)…"
+info "Seeding tiles, frontline threats, units, and supply (idempotent)…"
 "${COMPOSE[@]}" exec -T backend python scripts/generate_tiles.py
+# Frontline threat pattern must precede annotate_routing.py (safe-cost reads tile threat).
+"${COMPOSE[@]}" exec -T backend python scripts/seed_threats.py
 "${COMPOSE[@]}" exec -T backend python scripts/seed_unit_instances.py
 "${COMPOSE[@]}" exec -T backend python scripts/seed_supply.py
 

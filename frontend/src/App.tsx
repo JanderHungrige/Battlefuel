@@ -12,15 +12,25 @@ import { firstHaltedUnit } from './lib/halt'
 import { ObstacleKindPicker } from './components/ObstacleKindPicker'
 import type { ObstacleKind } from './components/obstacleKinds'
 import { RoleToggle } from './components/RoleToggle'
+import { InfoDocsPanel } from './components/InfoDocsPanel'
+import { FuelRunPanel } from './components/FuelRunPanel'
+import { LandingPage } from './components/LandingPage'
+import { OrderHistoryPanel } from './components/OrderHistoryPanel'
 import { SupplyPanel } from './components/SupplyPanel'
 import { UnitOverview } from './components/UnitOverview'
 import { OSM_ATTRIBUTION } from './config'
+import { LOGISTIC_SITE_TYPES, logisticSiteLabel } from './lib/logisticSite'
+import { shouldRefuelOnClick } from './lib/refuelOnClick'
 import { canShow, type Role } from './roles'
 import { useObstacleOps } from './hooks/useObstacleOps'
 import { useSimSocket } from './hooks/useSimSocket'
 import { useAdviceMarker } from './hooks/useAdviceMarker'
 import { useAdvisor } from './hooks/useAdvisor'
 import { useMovePlanning } from './hooks/useMovePlanning'
+import { useFuelPlatforms } from './hooks/useFuelPlatforms'
+import { useInfoDocs } from './hooks/useInfoDocs'
+import { useFuelRun } from './hooks/useFuelRun'
+import { useOrderHistory } from './hooks/useOrderHistory'
 import { useSupply } from './hooks/useSupply'
 import { useSupplyOrders } from './hooks/useSupplyOrders'
 import { useTheaterData } from './hooks/useTheaterData'
@@ -30,6 +40,9 @@ import { MapView } from './map/MapView'
 import { cellIdFor, cellMgrsLabel, DEFAULT_PRECISION_M, GRID_PRECISIONS } from './map/mgrsGrid'
 
 export default function App() {
+  // Branded landing gate (v2 Wave 15): in-memory only (not persisted), so the landing + faux
+  // security check show on every page load / refresh.
+  const [entered, setEntered] = useState(false)
   const [role, setRole] = useState<Role>('OF4')
   const { theater, tiles, units, setUnits, unitTypes, enemyUnits, error } = useTheaterData()
 
@@ -54,6 +67,13 @@ export default function App() {
   const { obstacles, placeObstacle, removeObstacle, mutateTile } = useObstacleOps()
   const [obstacleMode, setObstacleMode] = useState(false)
   const [obstacleKind, setObstacleKind] = useState<ObstacleKind>('minefield')
+  const [depotMode, setDepotMode] = useState(false)
+  // Site type for the next placed depot ('' = plain depot/marker); v2 Wave 11 F5.
+  const [depotSiteType, setDepotSiteType] = useState('')
+  // Depot the operator asked to locate on the map (v2 Wave 11 F5).
+  const [locatePoint, setLocatePoint] = useState<{ lat: number; lon: number } | null>(null)
+  // OF-8 on-map per-unit fuel bars (v2 Wave 11 F7); on by default.
+  const [infoBarsOn, setInfoBarsOn] = useState(true)
 
   // Tiles merged with their latest live tile_update (threat/road/situation/etc.).
   const displayedTiles = useMemo(() => {
@@ -108,6 +128,11 @@ export default function App() {
   // OF-8 supply + advisor + unit roster.
   const supply = useSupply(role === 'OF8', supplyTick)
   const supplyOrders = useSupplyOrders(units, unitTypes, pushChatter, supply.refetch)
+  const fuelPlatforms = useFuelPlatforms(role === 'OF8')
+  const orderHistory = useOrderHistory(role === 'OF8', supplyTick)
+  const [orderHistoryOpen, setOrderHistoryOpen] = useState(false)
+  const infoDocs = useInfoDocs(role === 'OF8')
+  const [infoDocsOpen, setInfoDocsOpen] = useState(false)
   const roster = useUnitOverview(setUnits)
   const advisor = useAdvisor(pushChatter, supply.refetch, {
     instanceId: selectedUnitId,
@@ -115,13 +140,14 @@ export default function App() {
   })
 
   const livePositions = useMemo(() => {
-    const out: Record<string, { lat: number; lon: number }> = {}
+    const out: Record<string, { lat: number; lon: number; fuel_l?: number }> = {}
     for (const u of Object.values(live)) {
-      if (u.status !== 'cancelled') out[u.instance_id] = { lat: u.lat, lon: u.lon }
+      if (u.status !== 'cancelled') out[u.instance_id] = { lat: u.lat, lon: u.lon, fuel_l: u.fuel_l }
     }
     return out
   }, [live])
   const selectedLive = selectedUnitId ? live[selectedUnitId] : undefined
+  const fuelRun = useFuelRun(units, unitTypes, supply.overview, livePositions, pushChatter, supply.refetch)
 
   // A clicked advisor recommendation marked on the map: highlight + a movement arrow.
   const [selectedAdvice, setSelectedAdvice] = useState<Recommendation | null>(null)
@@ -132,6 +158,7 @@ export default function App() {
     setSelectedUnitId(null)
     setHighlightH3(null)
     setHighlightEventId(null)
+    setLocatePoint(null)
     planning.resetPlanning()
   }, [planning])
 
@@ -174,11 +201,52 @@ export default function App() {
     setSelectedUnitId(halted.instanceId)
   }, [halted, planning])
 
-  // Esc exits any active mode (planning / obstacle placement / selection).
+  // Manually place a fuel depot — or a typed stocked logistic site (v2 Wave 10 F6 / W11 F5).
+  const placeDepot = useCallback(
+    (lat: number, lon: number) => {
+      const tag = Math.round(lat * 1000) % 1000
+      const name = depotSiteType
+        ? `${depotSiteType.toUpperCase()} ${tag}`
+        : `FWD depot ${tag}`
+      api
+        .createDepot({ name, lat, lon, site_type: depotSiteType || null })
+        .then((d) => {
+          pushChatter(`Logistic site placed: ${d.name}`, 'order')
+          supply.refetch()
+        })
+        .catch((e: unknown) => pushChatter(errorMessage(e), 'status'))
+    },
+    [pushChatter, supply, depotSiteType],
+  )
+
+  // Locate a supply point on the map (v2 Wave 11 F5). Pulse the id so MapView re-eases each click.
+  // Mark + locate any supply entity (depot, fuel truck, …) on the map. A fresh object each call
+  // so re-clicking the same point still re-eases (v2 Wave 11).
+  const locate = useCallback((lat: number, lon: number) => {
+    setLocatePoint({ lat, lon })
+  }, [])
+
+  // Ask the Wave-6 redistribution advisor to propose a refuel for a low site (v2 Wave 11 F5).
+  const proposeSiteRefuel = useCallback(
+    (depotId: string) => {
+      const name = supply.depots.find((d) => d.id === depotId)?.name ?? depotId
+      api
+        .getSiteRefuel(depotId)
+        .then((res) => {
+          pushChatter(`Refuel proposal — ${name}: ${res.summary}`, 'order')
+          for (const r of res.recommendations) pushChatter(r.rationale, 'order')
+        })
+        .catch((e: unknown) => pushChatter(errorMessage(e), 'status'))
+    },
+    [pushChatter, supply.depots],
+  )
+
+  // Esc exits any active mode (planning / obstacle placement / depot placement / selection).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
       setObstacleMode(false)
+      setDepotMode(false)
       clear()
     }
     window.addEventListener('keydown', onKey)
@@ -189,12 +257,17 @@ export default function App() {
   // Obstacle placement is an OF-4 tactical tool; never active in the OF-8 supply view.
   const obstacleActive = canShow(role, 'obstacleMode') && obstacleMode
 
+  if (!entered) {
+    return <LandingPage onEnter={() => setEntered(true)} />
+  }
+
   return (
     <div className="app">
       <header className="topbar">
         <span className="brand">BattleFuel</span>
         {theater && <span className="theater">{theater.name}</span>}
         {theater && <RoleToggle role={role} onChange={setRole} />}
+        {theater && <GridLayoutControl precisionM={gridPrecisionM} onPrecision={setGridPrecisionM} />}
         {theater && canShow(role, 'unitOverview') && (
           <button
             className={`mode-toggle${roster.open ? ' active' : ''}`}
@@ -222,6 +295,41 @@ export default function App() {
             {obstacleMode ? '🚧 Obstacle mode: ON' : 'Obstacle mode'}
           </button>
         )}
+        {theater && canShow(role, 'depotOverlay') && (
+          <button
+            className={`mode-toggle${depotMode ? ' active' : ''}`}
+            data-testid="depot-mode-toggle"
+            onClick={() => setDepotMode((m) => !m)}
+          >
+            {depotMode ? '⛽ Add depot: ON' : 'Add depot'}
+          </button>
+        )}
+        {theater && canShow(role, 'depotOverlay') && depotMode && (
+          <select
+            className="site-type-select"
+            data-testid="site-type-select"
+            value={depotSiteType}
+            onChange={(e) => setDepotSiteType(e.target.value)}
+            title="Logistic site type for the next placed site"
+          >
+            <option value="">Plain depot</option>
+            {LOGISTIC_SITE_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {logisticSiteLabel(t)}
+              </option>
+            ))}
+          </select>
+        )}
+        {theater && canShow(role, 'depotOverlay') && (
+          <label className="info-bars-toggle" data-testid="info-bars-toggle">
+            <input
+              type="checkbox"
+              checked={infoBarsOn}
+              onChange={(e) => setInfoBarsOn(e.target.checked)}
+            />
+            Fuel bars
+          </label>
+        )}
         <span className="spacer" />
         <span className="attribution">{OSM_ATTRIBUTION}</span>
       </header>
@@ -242,10 +350,16 @@ export default function App() {
               activeRoutes={planning.activeRouteGeometries}
               obstacles={obstacles}
               obstacleMode={obstacleActive}
+              depotMode={depotMode && canShow(role, 'depotOverlay')}
+              onPlaceDepot={placeDepot}
               combatEvents={Object.values(combatEvents)}
               highlightEventId={highlightEventId}
               enemyUnits={enemyUnits}
               depots={canShow(role, 'depotOverlay') ? (supply.overview?.depots ?? []) : []}
+              locatePoint={locatePoint}
+              fuelRunOptions={fuelRun.options}
+              fuelRunMetric={fuelRun.metric}
+              showUnitFuelBars={canShow(role, 'depotOverlay') && infoBarsOn}
               rendezvous={canShow(role, 'supplyPanel') ? supplyOrders.rendezvous : null}
               adviceArrow={adviceMarker.arrow}
               adviceDest={adviceMarker.dest}
@@ -266,11 +380,28 @@ export default function App() {
                 setHighlightEventId(null)
                 planning.resetPlanning()
                 setSelectedUnitId(id)
+                // OF-8: clicking a refuelable unit starts a routed fuel run — find the nearest
+                // fuelled truck, plan Safe/Fast routes (v2 Wave 12 F1, supersedes the W11 F6
+                // one-click recommendation).
+                if (
+                  shouldRefuelOnClick(
+                    role,
+                    supplyOrders.refuelTargets.map((u) => u.id),
+                    id,
+                  )
+                ) {
+                  fuelRun.startUnitFirst(id)
+                }
               }}
-              onPickDestination={planning.pickDestination}
+              fuelRunPickMode={fuelRun.phase === 'pick-target'}
+              onPickFuelTarget={fuelRun.pickTarget}
+              onPickDestination={(lat, lon) =>
+                planning.waypointMode
+                  ? planning.addWaypoint(lat, lon)
+                  : planning.pickDestination(lat, lon)
+              }
               onClearSelection={clear}
             />
-            <GridLayoutControl precisionM={gridPrecisionM} onPrecision={setGridPrecisionM} />
             <ChatterLog messages={chatter} onSelect={setHighlightH3} onSelectEvent={locateEvent} />
             {canShow(role, 'strategicFeed') && (
               <ChatterLog
@@ -289,10 +420,46 @@ export default function App() {
                 recommendation={supplyOrders.recommendation}
                 busy={supplyOrders.busy}
                 message={supplyOrders.message}
+                platforms={fuelPlatforms.platforms}
+                selectedPlatformId={fuelPlatforms.selectedId}
+                onSelectPlatform={fuelPlatforms.setSelectedId}
+                onAddPlatform={(name) => void fuelPlatforms.addPlatform(name)}
+                onShowHistory={() => setOrderHistoryOpen(true)}
+                onShowDocs={() => setInfoDocsOpen(true)}
+                onLocate={locate}
+                onProposeRefuel={proposeSiteRefuel}
+                onCreateFuelRun={(truckId, truckName) => fuelRun.startTruckFirst(truckId, truckName)}
                 onBuy={supplyOrders.placeBuy}
                 onRefuel={supplyOrders.placeRefuel}
                 onConfirmRefuel={supplyOrders.confirmRefuel}
                 onCancelRefuel={supplyOrders.cancelRefuel}
+              />
+            )}
+            {canShow(role, 'supplyPanel') && orderHistoryOpen && (
+              <OrderHistoryPanel
+                orders={orderHistory.orders}
+                onClose={() => setOrderHistoryOpen(false)}
+              />
+            )}
+            {canShow(role, 'supplyPanel') && infoDocsOpen && (
+              <InfoDocsPanel groups={infoDocs.groups} onClose={() => setInfoDocsOpen(false)} />
+            )}
+            {canShow(role, 'supplyPanel') && (
+              <FuelRunPanel
+                phase={fuelRun.phase}
+                moverName={fuelRun.moverName}
+                targetName={fuelRun.targetName}
+                options={fuelRun.options}
+                metric={fuelRun.metric}
+                busy={fuelRun.busy}
+                message={fuelRun.message}
+                sourceKind={fuelRun.sourceKind}
+                truckSourceName={fuelRun.truckSourceName}
+                depotSourceName={fuelRun.depotSourceName}
+                onSelectMetric={fuelRun.selectMetric}
+                onSelectSource={fuelRun.selectSource}
+                onConfirm={fuelRun.confirm}
+                onCancel={fuelRun.cancel}
               />
             )}
             {obstacleActive && (
@@ -307,6 +474,11 @@ export default function App() {
                 selectedMetric={planning.selectedMetric}
                 mode={planning.mode}
                 onSelectMode={planning.setMode}
+                waypointMode={planning.waypointMode}
+                waypointCount={planning.waypoints.length}
+                onStartRouting={planning.startRouting}
+                onRemoveLastWaypoint={planning.removeLastWaypoint}
+                onEndRouting={planning.endRouting}
                 confirming={planning.confirming}
                 onSelectOption={planning.setSelectedMetric}
                 onConfirm={() => planning.confirmMove(clear)}

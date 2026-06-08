@@ -126,13 +126,17 @@ class TestRefuelPlanApi:
             assert resp.status_code == 200
             body = resp.json()
             assert body["kind"] == "refuel"
-            # One seeded tanker → exactly one (optimal) unit served, mapped to a refuel order.
+            # Three seeded tankers (v2 Wave 11) → one optimal assignment per truck (≤3 units
+            # served), each mapped to a refuel order with a distinct truck.
             recs = body["recommendations"]
-            assert len(recs) == 1
-            assert recs[0]["action"]["endpoint"] == "refuel-orders"
-            assert recs[0]["action"]["unit_id"] == recs[0]["target"]
-            assert recs[0]["rationale"]
-            assert recs[0]["score"] >= 0
+            assert 1 <= len(recs) <= 3
+            truck_ids = [r["action"]["truck_id"] for r in recs]
+            assert len(truck_ids) == len(set(truck_ids))  # no truck double-assigned
+            for r in recs:
+                assert r["action"]["endpoint"] == "refuel-orders"
+                assert r["action"]["unit_id"] == r["target"]
+                assert r["rationale"]
+                assert r["score"] >= 0
 
             cap = await client.get("/api/v1/advice/capabilities")
             assert "refuel" in cap.json()["kinds"]
