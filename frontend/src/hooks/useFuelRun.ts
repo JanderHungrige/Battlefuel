@@ -13,9 +13,11 @@ import type {
   UnitInstance,
   UnitType,
 } from '../api/types'
-import { nearestFuelSource } from '../lib/fuelRun'
+import { type FuelSource, fuelSourceOptions } from '../lib/fuelRun'
 
 type Phase = 'idle' | 'pick-target' | 'review'
+type SourceKind = 'truck' | 'depot'
+type UnitPoint = { id: string; name: string; lat: number; lon: number }
 type PushChatter = (text: string, kind?: ChatterMessage['kind']) => void
 type LivePositions = Record<string, { lat: number; lon: number }>
 
@@ -29,10 +31,18 @@ export interface FuelRunState {
   message: string | null
   /** Geometry of the selected route option, for the map (null = none). */
   routeGeometry: number[][] | null
+  /** Which source the unit-first run is using ('truck' = tanker → unit, 'depot' = unit → depot). */
+  sourceKind: SourceKind | null
+  /** Name of the offered tanker (unit-first only), or '' when none is available. */
+  truckSourceName: string
+  /** Name of the offered depot (unit-first only), or '' when none is available. */
+  depotSourceName: string
   startTruckFirst: (truckId: string, truckName: string) => void
   startUnitFirst: (unitId: string) => void
   pickTarget: (unitId: string) => void
   selectMetric: (m: RouteMetric) => void
+  /** Switch the unit-first source between the tanker and the depot, re-planning the route. */
+  selectSource: (kind: SourceKind) => void
   confirm: () => void
   cancel: () => void
 }
@@ -56,6 +66,11 @@ export function useFuelRun(
   const [metric, setMetric] = useState<RouteMetric | null>(null)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  // Unit-first source choice: the unit being refuelled plus the offered tanker / depot.
+  const [unitPoint, setUnitPoint] = useState<UnitPoint | null>(null)
+  const [truckSource, setTruckSource] = useState<FuelSource | null>(null)
+  const [depotSource, setDepotSource] = useState<FuelSource | null>(null)
+  const [sourceKind, setSourceKind] = useState<SourceKind | null>(null)
 
   const unitPos = useCallback(
     (u: UnitInstance): { lat: number; lon: number } => live[u.id] ?? { lat: u.lat, lon: u.lon },
@@ -78,6 +93,10 @@ export function useFuelRun(
     setOptions([])
     setMetric(null)
     setMessage(null)
+    setUnitPoint(null)
+    setTruckSource(null)
+    setDepotSource(null)
+    setSourceKind(null)
   }, [])
 
   const planTo = useCallback(
@@ -121,6 +140,30 @@ export function useFuelRun(
     [units, unitPos, moverId, planTo],
   )
 
+  // Point a unit-first run at one source. A tanker drives to the unit; a fixed depot can't
+  // move, so the unit drives to the depot (v2 W12 F2). Re-plans the route for the new mover.
+  const applySource = useCallback(
+    (kind: SourceKind, unit: UnitPoint, truck: FuelSource | null, depot: FuelSource | null) => {
+      setSourceKind(kind)
+      if (kind === 'truck' && truck) {
+        setMoverId(truck.id)
+        setMoverName(truck.name)
+        setTruckId(truck.id)
+        setDepotId('')
+        setTarget({ id: unit.id, name: unit.name, lat: unit.lat, lon: unit.lon })
+        planTo(truck.id, unit.lat, unit.lon)
+      } else if (depot) {
+        setMoverId(unit.id)
+        setMoverName(unit.name)
+        setDepotId(depot.id)
+        setTruckId('')
+        setTarget({ id: depot.id, name: depot.name, lat: depot.lat, lon: depot.lon })
+        planTo(unit.id, depot.lat, depot.lon)
+      }
+    },
+    [planTo],
+  )
+
   const startUnitFirst = useCallback(
     (unitId: string) => {
       reset()
@@ -128,7 +171,9 @@ export function useFuelRun(
       if (!unit) return
       const fuelType = unitFuelType(unit)
       const p = unitPos(unit)
+      const unitPt: UnitPoint = { id: unit.id, name: unit.name, lat: p.lat, lon: p.lon }
       setUnitId(unit.id)
+      setUnitPoint(unitPt)
       const depots = (overview?.depots ?? []).map((d) => ({
         id: d.depot.id,
         name: d.depot.name,
@@ -136,32 +181,30 @@ export function useFuelRun(
         lon: d.depot.lon,
         stocks: d.stocks,
       }))
-      const source = fuelType
-        ? nearestFuelSource(p.lat, p.lon, overview?.trucks ?? [], depots, fuelType)
-        : null
-      if (!source) {
+      const { truck, depot } = fuelType
+        ? fuelSourceOptions(p.lat, p.lon, overview?.trucks ?? [], depots, fuelType)
+        : { truck: null, depot: null }
+      setTruckSource(truck)
+      setDepotSource(depot)
+      // Always prefer the tanker (it comes to the unit); fall back to a depot only when no
+      // tanker is available. Both stay offered so the operator can switch.
+      if (truck) applySource('truck', unitPt, truck, depot)
+      else if (depot) applySource('depot', unitPt, truck, depot)
+      else {
         setPhase('review')
         setTarget({ id: unit.id, name: unit.name, lat: p.lat, lon: p.lon })
         setMessage('No compatible fuel source available.')
-        return
-      }
-      if (source.kind === 'truck') {
-        // Truck comes to the unit.
-        setMoverId(source.id)
-        setMoverName(source.name)
-        setTruckId(source.id)
-        setTarget({ id: unit.id, name: unit.name, lat: p.lat, lon: p.lon })
-        planTo(source.id, p.lat, p.lon)
-      } else {
-        // Fixed depot can't move — the unit drives to the depot (v2 W12 F2).
-        setMoverId(unit.id)
-        setMoverName(unit.name)
-        setDepotId(source.id)
-        setTarget({ id: source.id, name: source.name, lat: source.lat, lon: source.lon })
-        planTo(unit.id, source.lat, source.lon)
       }
     },
-    [reset, units, unitFuelType, unitPos, overview, planTo],
+    [reset, units, unitFuelType, unitPos, overview, applySource],
+  )
+
+  const selectSource = useCallback(
+    (kind: SourceKind) => {
+      if (!unitPoint || kind === sourceKind) return
+      applySource(kind, unitPoint, truckSource, depotSource)
+    },
+    [unitPoint, sourceKind, truckSource, depotSource, applySource],
   )
 
   const confirm = useCallback(() => {
@@ -203,10 +246,14 @@ export function useFuelRun(
     busy,
     message,
     routeGeometry,
+    sourceKind,
+    truckSourceName: truckSource?.name ?? '',
+    depotSourceName: depotSource?.name ?? '',
     startTruckFirst,
     startUnitFirst,
     pickTarget,
     selectMetric: setMetric,
+    selectSource,
     confirm,
     cancel: reset,
   }

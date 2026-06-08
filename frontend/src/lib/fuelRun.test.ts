@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { type DepotLike, type TruckLike, nearestFuelSource, nearestFuelTruck } from './fuelRun'
+import {
+  type DepotLike,
+  type TruckLike,
+  fuelSourceOptions,
+  nearestFuelTruck,
+  nearestStockedDepot,
+} from './fuelRun'
 
 const trucks: TruckLike[] = [
   { instance_id: 't1', name: 'TANKER', fuel_type: 'diesel', current_fuel_liters: 3800, lat: 49.20, lon: 11.83 },
@@ -29,21 +35,47 @@ const depots: DepotLike[] = [
   { id: 'd2', name: 'Empty', lat: 49.2, lon: 11.8, stocks: [{ fuel_type: 'diesel', quantity_liters: 0 }] },
 ]
 
-describe('nearestFuelSource', () => {
-  it('picks a nearby depot over a far truck', () => {
-    // At (49.2, 11.8): depot Main is adjacent; trucks are ~0.03° away.
-    const s = nearestFuelSource(49.2, 11.8, trucks, depots, 'diesel')
-    expect(s).toEqual({ kind: 'depot', id: 'd1', name: 'Main', lat: 49.2005, lon: 11.8005 })
-  })
-
-  it('picks a truck when it is closer than any stocked depot', () => {
-    const s = nearestFuelSource(49.23, 11.86, trucks, depots, 'diesel')
-    expect(s?.kind).toBe('truck')
-    expect(s?.id).toBe('t2')
+describe('nearestStockedDepot', () => {
+  it('picks the closest depot with stock of the fuel type', () => {
+    expect(nearestStockedDepot(49.2, 11.8, depots, 'diesel')).toEqual({
+      kind: 'depot',
+      id: 'd1',
+      name: 'Main',
+      lat: 49.2005,
+      lon: 11.8005,
+    })
   })
 
   it('ignores depots with no stock of the fuel type', () => {
-    const s = nearestFuelSource(49.2, 11.8, [], [depots[1]], 'diesel')
-    expect(s).toBeNull()
+    expect(nearestStockedDepot(49.2, 11.8, [depots[1]], 'diesel')).toBeNull()
+  })
+})
+
+describe('fuelSourceOptions', () => {
+  it('offers BOTH the nearest tanker and the nearest depot, even when the depot is closer', () => {
+    // At (49.2, 11.8) the depot Main is adjacent and the trucks are ~0.03° away — but the
+    // tanker must still be offered so the operator can dispatch it to the unit.
+    const { truck, depot } = fuelSourceOptions(49.2, 11.8, trucks, depots, 'diesel')
+    expect(truck?.kind).toBe('truck')
+    expect(truck?.id).toBe('t1') // TANKER is the closest fuelled diesel truck
+    expect(depot?.id).toBe('d1')
+  })
+
+  it('offers only a tanker when no depot is stocked', () => {
+    const { truck, depot } = fuelSourceOptions(49.23, 11.86, trucks, [depots[1]], 'diesel')
+    expect(truck?.id).toBe('t2')
+    expect(depot).toBeNull()
+  })
+
+  it('offers only a depot when no compatible tanker has fuel', () => {
+    const { truck, depot } = fuelSourceOptions(49.2, 11.8, [trucks[2]], depots, 'diesel')
+    expect(truck).toBeNull()
+    expect(depot?.id).toBe('d1')
+  })
+
+  it('returns neither when nothing compatible is available', () => {
+    const { truck, depot } = fuelSourceOptions(49.2, 11.8, trucks, depots, 'avgas')
+    expect(truck).toBeNull()
+    expect(depot).toBeNull()
   })
 })

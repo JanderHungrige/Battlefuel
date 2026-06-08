@@ -248,6 +248,33 @@ body {
   opacity: 0.8;
 }
 
+.fuel-run-sources {
+  display: flex;
+  gap: 6px;
+  margin: 6px 0;
+}
+
+.fuel-run-source {
+  flex: 1;
+  background: #1c222b;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.fuel-run-source.active {
+  border-color: var(--accent);
+  font-weight: 700;
+}
+
+.fuel-run-source:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
 .fuel-run-options {
   list-style: none;
   margin: 6px 0;

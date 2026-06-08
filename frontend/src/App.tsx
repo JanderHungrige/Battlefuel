@@ -445,7 +445,11 @@ export default function App() {
                 metric={fuelRun.metric}
                 busy={fuelRun.busy}
                 message={fuelRun.message}
+                sourceKind={fuelRun.sourceKind}
+                truckSourceName={fuelRun.truckSourceName}
+                depotSourceName={fuelRun.depotSourceName}
                 onSelectMetric={fuelRun.selectMetric}
+                onSelectSource={fuelRun.selectSource}
                 onConfirm={fuelRun.confirm}
                 onCancel={fuelRun.cancel}
               />

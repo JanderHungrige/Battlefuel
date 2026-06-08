@@ -11,7 +11,14 @@ export interface FuelRunPanelProps {
   metric: RouteMetric | null
   busy: boolean
   message: string | null
+  /** Unit-first source: 'truck' (tanker → unit) or 'depot' (unit → depot); null for truck-first. */
+  sourceKind: 'truck' | 'depot' | null
+  /** Offered tanker name ('' = none available). */
+  truckSourceName: string
+  /** Offered depot name ('' = none available). */
+  depotSourceName: string
   onSelectMetric: (m: RouteMetric) => void
+  onSelectSource: (kind: 'truck' | 'depot') => void
   onConfirm: () => void
   onCancel: () => void
 }
@@ -27,11 +34,17 @@ export function FuelRunPanel({
   metric,
   busy,
   message,
+  sourceKind,
+  truckSourceName,
+  depotSourceName,
   onSelectMetric,
+  onSelectSource,
   onConfirm,
   onCancel,
 }: FuelRunPanelProps) {
   if (phase === 'idle') return null
+  // Offer the source choice whenever a unit-first run has both a tanker and a depot available.
+  const showSourceToggle = phase === 'review' && truckSourceName !== '' && depotSourceName !== ''
   return (
     <aside className="fuel-run-panel" data-testid="fuel-run-panel">
       <div className="fuel-run-head">
@@ -44,6 +57,29 @@ export function FuelRunPanel({
       <p className="fuel-run-route">
         <strong>{moverName || '—'}</strong> → <strong>{targetName || '(pick a unit)'}</strong>
       </p>
+
+      {showSourceToggle && (
+        <div className="fuel-run-sources" data-testid="fuel-run-sources">
+          <button
+            type="button"
+            className={`fuel-run-source ${sourceKind === 'truck' ? 'active' : ''}`}
+            data-testid="fuel-run-source-truck"
+            disabled={busy}
+            onClick={() => onSelectSource('truck')}
+          >
+            🚚 {truckSourceName} → unit
+          </button>
+          <button
+            type="button"
+            className={`fuel-run-source ${sourceKind === 'depot' ? 'active' : ''}`}
+            data-testid="fuel-run-source-depot"
+            disabled={busy}
+            onClick={() => onSelectSource('depot')}
+          >
+            unit → 🏭 {depotSourceName}
+          </button>
+        </div>
+      )}
 
       {phase === 'pick-target' && (
         <p className="fuel-run-hint" data-testid="fuel-run-hint">
