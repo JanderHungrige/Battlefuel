@@ -2,8 +2,8 @@
 id: battlefuel-v2
 title: BattleFuel v2 — Combat UX, Routing, Scenarios & Onboarding
 status: planned
-version: 8
-hash: 76bb7275
+version: 9
+hash: b65ec818
 created: 2026-06-02
 ---
 
@@ -78,6 +78,7 @@ pass — track them as a checklist **in each wave doc** (not here — this is th
 | Wave 12 | waves/battlefuel-v2-wave-12.md | Fuel run — routed refuel (immediate, 2026-06-06): click a fuel truck → create fuel run → click target unit → Safe/Fast routes → confirm → truck routes to unit + transfers on arrival; reverse from a unit → nearest fuel source (truck or depot) → routes → confirm; if source is a fixed depot the unit routes to the depot and drains its stock. | planned |
 | Wave 13 | waves/battlefuel-v2-wave-13.md | Rendezvous fuel run (immediate, 2026-06-08): select a fuel truck → "Plan rendezvous" → click the target unit → click the meeting sector → Safe/Fast routes for BOTH movers (truck→sector + unit→sector) → "Order now" (both dispatch, transfer on meeting) OR "Plan rendezvous" → sim-clock date/time → "Send order" files it in the archive as planned; a reminder pops at the sim-time for confirm-to-launch; clicking a rendezvous order draws both units' routes. | planned |
 | Wave 14 | waves/battlefuel-v2-wave-14.md | Theater scenario — East/West frontline (immediate, 2026-06-08, build BEFORE Wave 13): reseed Hohenfels as a coherent East (OPFOR) vs West (NATO) battle split by an irregular N–S frontline (gaps + bulges); NATO combat units forward, depots + HQ in the rear, a few more frontline units; threats concentrated on the frontline with deeper-in sightings and a mostly-threat-filled East; slower threat tempo; light threats decay/disappear. | planned |
+| Wave 15 | waves/battlefuel-v2-wave-15.md | Branded landing page + faux security gate (immediate, 2026-06-08, build BETWEEN W14 and W13): a modern landing page with BattleFuel hero, "Powered by" Eraneos + World Fuel logos, a pretend "USER SECURITY ACCESS: APPROVED" clearance panel, and an "Enter BattleFuel" button that reveals the map app; gate shows once per browser session. (Delivers W8's landing-page portion — W8 reduced to the data-integration guide.) | planned |
 | Advanced | waves/battlefuel-v2-advanced.md | 3D terrain elevation on the map with an on/off switch (offline DEM). | planned |
 
 > Item→wave traceability for every line of the original request is kept in
@@ -89,6 +90,8 @@ pass — track them as a checklist **in each wave doc** (not here — this is th
 > `superseded`), then the original **W4–W8**. The wave *numbers* are creation ids, not build
 > order — `Status` tracks what's done.
 
-> **Build-order note (2026-06-08, requester):** after Wave 12, build **Wave 14 (theater
-> East/West frontline scenario)** *before* **Wave 13 (rendezvous fuel run)** — the reorganised
-> theater should be in place before the new rendezvous UI lands on it.
+> **Build-order note (2026-06-08, requester):** after Wave 12, the immediate build order is
+> **Wave 14 (theater East/West frontline)** → **Wave 15 (branded landing page + faux security
+> gate)** → **Wave 13 (rendezvous fuel run)**. W14 reorganises the theater before the new
+> rendezvous UI lands on it; W15 is a polished front door slotted in between. Wave 15 delivers the
+> **landing-page** portion of Wave 8, so W8 is reduced to its **data-integration guide** (+ pitch).
