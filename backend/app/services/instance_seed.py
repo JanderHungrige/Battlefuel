@@ -19,16 +19,25 @@ from app.models.unit_instance import UnitInstanceRow
 from app.providers.factory import build_unit_provider
 from app.services.tile_grid import DEFAULT_RESOLUTION
 
+# NATO holds the WEST of the irregular frontline (see ``app.domain.frontline``). Combat units sit
+# FORWARD (just west of the front, spread N-S); HQ + the fuel trucks sit in the REAR (deep west,
+# at/inside ``REAR_LON_MAX``). Positions are derived from ``frontline_lon`` so the whole force moves
+# with the front if the control points change; ``test_frontline`` re-derives and verifies
+# the west/forward/rear relationship (v2 Wave 14, frontline-theater-layout).
 # (id, callsign, unit_type_id, lat, lon, status, current_fuel_liters | None)
 SEED_PLACEMENTS: tuple[tuple[str, str, str, float, float, str, float | None], ...] = (
-    ("inst-hq", "HQ ANVIL", "hq-bn-main", 49.220, 11.850, "operational", 2000.0),
-    ("inst-armor-1", "TIGER", "armor-tank-coy", 49.232, 11.862, "operational", 15000.0),
-    ("inst-mech-1", "VIPER", "mech-inf-coy", 49.211, 11.840, "operational", 7000.0),
-    ("inst-recon-1", "HAWK", "recon-troop", 49.252, 11.885, "degraded", None),
-    ("inst-fuel-1", "TANKER", "fuel-supply-pl", 49.201, 11.831, "operational", 3800.0),
-    # Two more fuel trucks for the OF-8 supply fleet (v2 Wave 11).
-    ("inst-fuel-2", "BOWSER", "fuel-supply-pl", 49.207, 11.838, "operational", 4000.0),
-    ("inst-fuel-3", "CISTERN", "fuel-supply-pl", 49.198, 11.828, "operational", 1500.0),
+    # Forward combat line (west of the front), north to south:
+    ("inst-recon-1", "HAWK", "recon-troop", 49.255, 11.8356, "degraded", None),
+    ("inst-mech-2", "COBRA", "mech-inf-coy", 49.240, 11.830, "operational", 6500.0),
+    ("inst-armor-1", "TIGER", "armor-tank-coy", 49.230, 11.839, "operational", 15000.0),
+    ("inst-armor-2", "LION", "armor-tank-coy", 49.218, 11.8394, "operational", 14000.0),
+    ("inst-mech-1", "VIPER", "mech-inf-coy", 49.205, 11.829, "operational", 7000.0),
+    ("inst-inf-1", "FALCON", "inf-coy", 49.192, 11.8394, "operational", 3000.0),
+    # Rear echelon (deep west): HQ + the OF-8 fuel-supply fleet.
+    ("inst-hq", "HQ ANVIL", "hq-bn-main", 49.225, 11.805, "operational", 2000.0),
+    ("inst-fuel-1", "TANKER", "fuel-supply-pl", 49.232, 11.812, "operational", 3800.0),
+    ("inst-fuel-2", "BOWSER", "fuel-supply-pl", 49.215, 11.814, "operational", 4000.0),
+    ("inst-fuel-3", "CISTERN", "fuel-supply-pl", 49.200, 11.810, "operational", 1500.0),
 )
 
 

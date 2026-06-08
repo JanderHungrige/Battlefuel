@@ -25,30 +25,32 @@ class EnemyUnitProvider(ABC):
         """All placed enemy units."""
 
 
-# Illustrative hostile force around the Hohenfels theater.
+# Illustrative hostile force holding the EAST of the irregular frontline (see
+# ``app.domain.frontline``): each unit sits east of ``frontline_lon`` at its latitude, with the
+# recon screen forward (closest to the front) and the heavier mech/armor deeper east (v2 Wave 14).
 _SEED: tuple[EnemyUnit, ...] = (
     EnemyUnit(
         id="enemy-mech-1",
         name="OPFOR MECH 1",
         sidc="10061000151211020000",  # mechanized infantry, company
-        lat=49.236,
-        lon=11.872,
+        lat=49.238,
+        lon=11.865,
         echelon="company",
     ),
     EnemyUnit(
         id="enemy-armor-1",
         name="OPFOR ARMOR 1",
         sidc="10061000141205000000",  # armor, platoon
-        lat=49.248,
-        lon=11.858,
+        lat=49.250,
+        lon=11.8588,
         echelon="platoon",
     ),
     EnemyUnit(
         id="enemy-recon-1",
         name="OPFOR RECON 1",
         sidc="10061000131606000000",  # reconnaissance, section
-        lat=49.221,
-        lon=11.889,
+        lat=49.222,
+        lon=11.8676,
         echelon="section",
     ),
 )
