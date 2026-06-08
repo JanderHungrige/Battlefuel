@@ -14,6 +14,7 @@ import type { ObstacleKind } from './components/obstacleKinds'
 import { RoleToggle } from './components/RoleToggle'
 import { InfoDocsPanel } from './components/InfoDocsPanel'
 import { FuelRunPanel } from './components/FuelRunPanel'
+import { LandingPage } from './components/LandingPage'
 import { OrderHistoryPanel } from './components/OrderHistoryPanel'
 import { SupplyPanel } from './components/SupplyPanel'
 import { UnitOverview } from './components/UnitOverview'
@@ -39,6 +40,9 @@ import { MapView } from './map/MapView'
 import { cellIdFor, cellMgrsLabel, DEFAULT_PRECISION_M, GRID_PRECISIONS } from './map/mgrsGrid'
 
 export default function App() {
+  // Branded landing gate (v2 Wave 15): in-memory only (not persisted), so the landing + faux
+  // security check show on every page load / refresh.
+  const [entered, setEntered] = useState(false)
   const [role, setRole] = useState<Role>('OF4')
   const { theater, tiles, units, setUnits, unitTypes, enemyUnits, error } = useTheaterData()
 
@@ -252,6 +256,10 @@ export default function App() {
   const ready = theater !== null
   // Obstacle placement is an OF-4 tactical tool; never active in the OF-8 supply view.
   const obstacleActive = canShow(role, 'obstacleMode') && obstacleMode
+
+  if (!entered) {
+    return <LandingPage onEnter={() => setEntered(true)} />
+  }
 
   return (
     <div className="app">

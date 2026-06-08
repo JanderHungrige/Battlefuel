@@ -49,6 +49,9 @@ deploy: ## Deploy the stack to the provisioned host (explicit; never auto-runs)
 prod-bootstrap: ## One-time data bootstrap on the prod stack (migrate + seed + routing graph)
 	@bash scripts/prod-bootstrap.sh
 
+reseed-stack: ## Reseed a DEPLOYED stack's DB to the canonical scenario (host): make reseed-stack ENV=deploy/.env.dev
+	@bash deploy/reseed-stack.sh "$(ENV)"
+
 backup: ## Run an on-demand production DB backup (pg_dump + retention)
 	@bash scripts/backup.sh
 

@@ -24,7 +24,7 @@ describe('buildBasemapStyle', () => {
     const bg = style.layers.find((l) => l.id === 'background')
     expect(bg?.type).toBe('background')
     const color = bg?.type === 'background' ? bg.paint?.['background-color'] : undefined
-    expect(color).toBe('#f4f1e8')
+    expect(color).toBe('#eadbc8')
     expect(color).not.toBe('#0e1116')
   })
 })

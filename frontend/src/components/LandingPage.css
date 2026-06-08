@@ -1,0 +1,294 @@
+/* Branded landing page (v2 Wave 15). Dark, modern, with a subtle animated background.
+   Accents: amber #FFD9BD (app accent) + NATO blue. Respects prefers-reduced-motion. */
+
+.landing {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: #070a10;
+  color: #e8edf4;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* ---- animated background ---- */
+.landing-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.landing-grid {
+  position: absolute;
+  inset: -50%;
+  background-image:
+    linear-gradient(rgba(120, 160, 220, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120, 160, 220, 0.07) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(circle at 50% 45%, #000 0%, transparent 72%);
+  animation: landing-grid-drift 26s linear infinite;
+}
+
+.landing-glow {
+  position: absolute;
+  width: 60vmax;
+  height: 60vmax;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: 0.5;
+}
+
+.landing-glow-amber {
+  background: radial-gradient(circle, rgba(255, 184, 120, 0.45), transparent 60%);
+  top: -16vmax;
+  left: -10vmax;
+  animation: landing-float-a 18s ease-in-out infinite alternate;
+}
+
+.landing-glow-blue {
+  background: radial-gradient(circle, rgba(64, 110, 200, 0.5), transparent 60%);
+  bottom: -18vmax;
+  right: -12vmax;
+  animation: landing-float-b 22s ease-in-out infinite alternate;
+}
+
+/* slow vertical scanning sweep */
+.landing-scan {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(255, 217, 189, 0.05) 48%,
+    rgba(255, 217, 189, 0.09) 50%,
+    transparent 52%,
+    transparent 100%
+  );
+  animation: landing-scan 7s linear infinite;
+}
+
+@keyframes landing-grid-drift {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(44px, 44px, 0); }
+}
+@keyframes landing-float-a {
+  from { transform: translate(0, 0); }
+  to { transform: translate(8vmax, 6vmax); }
+}
+@keyframes landing-float-b {
+  from { transform: translate(0, 0); }
+  to { transform: translate(-7vmax, -5vmax); }
+}
+@keyframes landing-scan {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(100%); }
+}
+
+/* ---- foreground card ---- */
+.landing-card {
+  position: relative;
+  z-index: 1;
+  width: min(92vw, 560px);
+  padding: 48px 44px 32px;
+  text-align: center;
+  background: rgba(16, 22, 32, 0.62);
+  border: 1px solid rgba(255, 217, 189, 0.18);
+  border-radius: 18px;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  animation: landing-rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes landing-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.landing-eyebrow {
+  margin: 0 0 14px;
+  font-size: 11px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: rgba(255, 217, 189, 0.78);
+}
+
+.landing-wordmark {
+  margin: 0;
+  font-size: clamp(42px, 8vw, 68px);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  color: #f4f7fb;
+}
+
+.landing-wordmark-accent {
+  color: #ffb878;
+  text-shadow: 0 0 28px rgba(255, 184, 120, 0.5);
+}
+
+.landing-tagline {
+  margin: 16px auto 26px;
+  max-width: 42ch;
+  font-size: 14px;
+  line-height: 1.5;
+  color: rgba(220, 230, 244, 0.72);
+}
+
+/* ---- faux clearance check ---- */
+.landing-clearance {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  /* Block-level + auto margins: always its own line (so Enter sits below from the start), centered. */
+  margin: 0 auto 26px;
+  border-radius: 999px;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+  border: 1px solid transparent;
+}
+
+.landing-clearance.is-checking {
+  color: #ffce9a;
+  border-color: rgba(255, 184, 120, 0.35);
+  background: rgba(255, 184, 120, 0.08);
+}
+
+.landing-clearance.is-approved {
+  color: #58e09a;
+  border-color: rgba(88, 224, 154, 0.45);
+  background: rgba(88, 224, 154, 0.1);
+  animation: landing-approve-pop 0.4s ease;
+}
+
+@keyframes landing-approve-pop {
+  0% { transform: scale(0.96); opacity: 0.4; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.landing-clearance-tick {
+  font-weight: 800;
+}
+
+.landing-spinner {
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(255, 206, 154, 0.35);
+  border-top-color: #ffce9a;
+  border-radius: 50%;
+  animation: landing-spin 0.8s linear infinite;
+}
+
+@keyframes landing-spin {
+  to { transform: rotate(360deg); }
+}
+
+.landing-dots::after {
+  content: "";
+  animation: landing-dots 1.4s steps(4, end) infinite;
+}
+@keyframes landing-dots {
+  0% { content: ""; }
+  25% { content: "."; }
+  50% { content: ".."; }
+  75% { content: "..."; }
+}
+
+/* ---- enter button ---- */
+.landing-enter {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 30px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #1a1206;
+  background: linear-gradient(135deg, #ffd9bd, #ffb878);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+  box-shadow: 0 10px 30px rgba(255, 184, 120, 0.35);
+}
+
+.landing-enter:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 40px rgba(255, 184, 120, 0.5);
+}
+
+.landing-enter:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.landing-enter-arrow {
+  transition: transform 0.15s ease;
+}
+.landing-enter:hover:not(:disabled) .landing-enter-arrow {
+  transform: translateX(4px);
+}
+
+/* ---- powered by ---- */
+.landing-powered {
+  margin-top: 34px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.landing-powered-label {
+  font-size: 10px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: rgba(220, 230, 244, 0.45);
+}
+
+/* No frame: the logos sit directly on the dark background. */
+.landing-powered-logos {
+  display: inline-flex;
+  align-items: center;
+  gap: 26px;
+  margin-top: 4px;
+}
+
+.landing-powered-logos img {
+  height: 26px;
+  width: auto;
+  display: block;
+}
+
+/* Eraneos: black-on-transparent mark recoloured to white for the dark background, 30% smaller. */
+.landing-powered-logos img[alt="Eraneos"] {
+  height: 18px;
+  filter: brightness(0) invert(1);
+  /* Nudge down ~1/4 its height so the wordmark sits on the World Fuel text line. */
+  transform: translateY(4.5px);
+}
+
+/* World Fuel logo: most of the image is the circle + "Services" subtext, so it must be ~3x the
+   Eraneos height for its main "World Fuel" text to read at the same size; nudged down so that
+   main text aligns with the Eraneos wordmark (the subtext otherwise pulls it high). Brand colours. */
+.landing-powered-logos img[alt="World Fuel Services"] {
+  height: 52px;
+  transform: translateY(3px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-grid,
+  .landing-glow-amber,
+  .landing-glow-blue,
+  .landing-scan,
+  .landing-card,
+  .landing-spinner,
+  .landing-dots::after {
+    animation: none;
+  }
+}
