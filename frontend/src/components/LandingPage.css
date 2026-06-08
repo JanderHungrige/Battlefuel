@@ -272,6 +272,11 @@
   height: 18px;
 }
 
+/* World Fuel logo 10% larger than the base height. */
+.landing-powered-logos img[alt="World Fuel Services"] {
+  height: 29px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .landing-grid,
   .landing-glow-amber,

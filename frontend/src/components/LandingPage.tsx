@@ -77,8 +77,8 @@ export function LandingPage({ onEnter, verifyMs = 1600 }: LandingPageProps) {
         <div className="landing-powered">
           <span className="landing-powered-label">powered by</span>
           <span className="landing-powered-logos">
-            <img src="/logos/eraneos_Logo-and-BrandSign-black.png" alt="Eraneos" />
             <img src="/logos/World-Fuel-Services-Logo.png" alt="World Fuel Services" />
+            <img src="/logos/eraneos_Logo-and-BrandSign-black.png" alt="Eraneos" />
           </span>
         </div>
       </main>
