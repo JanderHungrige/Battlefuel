@@ -269,8 +269,8 @@
 .landing-powered-logos img[alt="Eraneos"] {
   height: 18px;
   filter: brightness(0) invert(1);
-  /* Nudge down ~half its height so the wordmark sits on the World Fuel text line. */
-  transform: translateY(9px);
+  /* Nudge down ~1/4 its height so the wordmark sits on the World Fuel text line. */
+  transform: translateY(4.5px);
 }
 
 /* World Fuel logo: most of the image is the circle + "Services" subtext, so it must be ~3x the
