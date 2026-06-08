@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from random import Random
 
 from app.api.ws import ConnectionManager
+from app.domain.frontline import threat_weight
 from app.domain.tile import IntelLevel, RoadCondition, Tile, TileMutation, Weather
 from app.providers.tiles import TileDataProvider
 from app.services.tile_mutation import apply_tile_mutation, tile_update_frame
@@ -108,17 +109,48 @@ class _Revert:
 class EventEngine:
     """Fires catalog events and schedules reverts. Decision logic is pure + injectable."""
 
-    def __init__(self, rng: Random, *, mean_interval_game_s: float, enabled: bool) -> None:
+    def __init__(
+        self,
+        rng: Random,
+        *,
+        mean_interval_game_s: float,
+        enabled: bool,
+        decay_interval_game_s: float = 600.0,
+        decay_chance: float = 0.2,
+        light_threat_max: int = 2,
+    ) -> None:
         self._rng = rng
         self._mean_interval = mean_interval_game_s
         self._enabled = enabled
         self._pending: list[_Revert] = []
+        self._decay_interval = decay_interval_game_s
+        self._decay_chance = decay_chance
+        self._light_threat_max = light_threat_max
+        self._next_decay_s = decay_interval_game_s  # first decay pass one interval in
 
     def collect_due_reverts(self, now_s: float) -> list[tuple[str, TileMutation]]:
         """Pop and return reverts whose time has come (pure list bookkeeping)."""
         due = [(r.h3_index, r.mutation) for r in self._pending if r.at_game_s <= now_s]
         self._pending = [r for r in self._pending if r.at_game_s > now_s]
         return due
+
+    def decay_due(self, tiles: Sequence[Tile], now_s: float) -> list[tuple[str, TileMutation]]:
+        """When a decay interval elapses, step *some* light-threat tiles (1..max) down by one.
+
+        Decay is **probabilistic per tile** (``decay_chance``), not a synchronized purge: light
+        threats fade gradually and at any moment most persist, so the contested east stays visibly
+        threatened (replenished by ``maybe_fire``) while stale sightings clear over time. Heavier
+        threats (combat zones at 3+) never decay (v2 Wave 14).
+        """
+        if not self._enabled or now_s < self._next_decay_s:
+            return []
+        self._next_decay_s = now_s + self._decay_interval
+        return [
+            (t.h3_index, TileMutation(threat_level=t.threat_level - 1))
+            for t in tiles
+            if 0 < t.threat_level <= self._light_threat_max
+            and self._rng.random() < self._decay_chance
+        ]
 
     def maybe_fire(
         self, tiles: Sequence[Tile], now_s: float, dt_game_s: float
@@ -128,7 +160,11 @@ class EventEngine:
             return None
         if self._rng.random() >= min(1.0, dt_game_s / self._mean_interval):
             return None
-        tile = self._rng.choice(list(tiles))
+        # Weight the spawn toward the frontline + the OPFOR east (v2 Wave 14): the event lands where
+        # the fighting is, not on a uniform-random tile across the whole theater.
+        pool = list(tiles)
+        weights = [threat_weight(t.center_lat, t.center_lon) for t in pool]
+        tile = self._rng.choices(pool, weights=weights, k=1)[0]
         spec = self._rng.choice(list(EVENT_CATALOG))
         if spec.duration_game_s > 0:
             self._pending.append(
@@ -152,6 +188,11 @@ class EventEngine:
                 await manager.broadcast(tile_update_frame(tile))
                 applied += 1
         all_tiles = await tiles.list_tiles(session)  # type: ignore[arg-type]
+        for h3_index, mutation in self.decay_due(all_tiles, now_s):
+            tile = await apply_tile_mutation(session, tiles, h3_index, mutation)  # type: ignore[arg-type]
+            if tile is not None:
+                await manager.broadcast(tile_update_frame(tile))
+                applied += 1
         fired = self.maybe_fire(all_tiles, now_s, dt_game_s)
         if fired is not None:
             tile = await apply_tile_mutation(session, tiles, fired[0], fired[1])  # type: ignore[arg-type]
