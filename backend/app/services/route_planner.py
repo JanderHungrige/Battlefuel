@@ -109,15 +109,23 @@ async def plan_routes(
     dest_lon: float,
     *,
     mode: RouteMode = RouteMode.ROAD,
+    offroad: RoutingProvider | None = None,
 ) -> list[RouteOption]:
     """Compute fastest + safest route options from the unit's position to the destination.
 
     ``mode`` selects the router and the speed: ``road`` uses the injected road provider at road
     speed; ``offroad`` and ``direct`` use the terrain / straight-line routers at off-road speed;
     ``hybrid`` returns, per metric, the better of the road and off-road options.
+
+    **SAFE auto-detour (v2 Wave 16):** on ``road`` and ``hybrid`` the SAFE metric *always* also
+    evaluates the off-road route and keeps whichever is safer (lower threat_max, then duration) —
+    so when the only road runs through threat/enemy danger, SAFE takes a longer cross-country
+    detour around it while FAST stays on the short, exposed road. ``offroad`` is injectable for
+    tests; it defaults to the terrain router.
     """
     road_kph = unit_type.movement.speed_road_kph
     offroad_kph = unit_type.movement.speed_offroad_kph
+    offroad = offroad or build_routing_provider_for_mode(RouteMode.OFFROAD)
     start_fuel = (
         instance.current_fuel_liters
         if instance.current_fuel_liters is not None
@@ -125,7 +133,11 @@ async def plan_routes(
     )
     options: list[RouteOption] = []
     for metric, label in _METRICS:
-        if mode is RouteMode.HYBRID:
+        # Consider an off-road detour for HYBRID (both metrics) and for SAFE on a ROAD plan.
+        consider_offroad = mode is RouteMode.HYBRID or (
+            metric is RouteMetric.SAFE and mode is RouteMode.ROAD
+        )
+        if consider_offroad:
             road_opt = await _build_for_provider(
                 session,
                 routing,
@@ -140,7 +152,7 @@ async def plan_routes(
             )
             off_opt = await _build_for_provider(
                 session,
-                build_routing_provider_for_mode(RouteMode.OFFROAD),
+                offroad,
                 instance,
                 unit_type,
                 dest_lat,
