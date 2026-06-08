@@ -83,6 +83,8 @@ class SimEngine:
             Random(),
             mean_interval_game_s=settings.event_mean_interval_game_s,
             enabled=settings.game_mode,
+            decay_interval_game_s=settings.threat_decay_interval_game_s,
+            light_threat_max=settings.light_threat_max,
         )
         dt_game = settings.sim_tick_seconds * settings.sim_time_scale
         while not self._stop.is_set():

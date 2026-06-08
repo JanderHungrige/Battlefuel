@@ -134,6 +134,55 @@ class TestMaybeFire:
         assert eng.collect_due_reverts(1e9) == []  # drained
 
 
+class TestLightThreatDecay:
+    """Light threats (1..max) drift toward 0 each decay interval; heavier threats persist (W14)."""
+
+    def _engine(self) -> EventEngine:
+        # Disable spawning (mean_interval huge) so we isolate decay behaviour.
+        return EventEngine(
+            Random(0),
+            mean_interval_game_s=1e12,
+            enabled=True,
+            decay_interval_game_s=600.0,
+            light_threat_max=2,
+        )
+
+    def test_no_decay_before_the_interval(self) -> None:
+        eng = self._engine()
+        assert eng.decay_due([_tile_at(0, 49.2, 11.86)], now_s=599.0) == []
+
+    def test_light_threats_step_down_after_the_interval(self) -> None:
+        eng = self._engine()
+        tiles = [_tile_at(1, 49.2, 11.86)]  # threat_level 2 (light)
+        due = eng.decay_due(tiles, now_s=600.0)
+        assert len(due) == 1
+        h3_index, mutation = due[0]
+        assert h3_index == tiles[0].h3_index
+        assert mutation.threat_level == 1  # 2 -> 1
+
+    def test_heavy_threats_do_not_decay(self) -> None:
+        eng = self._engine()
+        heavy = _tile_at(2, 49.2, 11.86)
+        heavy = heavy.model_copy(update={"threat_level": 4})
+        assert eng.decay_due([heavy], now_s=600.0) == []
+
+    def test_benign_tiles_do_not_decay(self) -> None:
+        eng = self._engine()
+        benign = _tile_at(3, 49.2, 11.86).model_copy(update={"threat_level": 0})
+        assert eng.decay_due([benign], now_s=600.0) == []
+
+    def test_decay_is_rate_limited_to_one_pass_per_interval(self) -> None:
+        eng = self._engine()
+        tiles = [_tile_at(4, 49.2, 11.86)]
+        assert eng.decay_due(tiles, now_s=600.0)  # first pass fires
+        assert eng.decay_due(tiles, now_s=900.0) == []  # within the next interval → nothing
+        assert eng.decay_due(tiles, now_s=1200.0)  # next interval → fires again
+
+    def test_disabled_engine_never_decays(self) -> None:
+        eng = EventEngine(Random(0), mean_interval_game_s=1e12, enabled=False)
+        assert eng.decay_due([_tile_at(0, 49.2, 11.86)], now_s=1e9) == []
+
+
 class TestFrontlineWeightedSpawn:
     """Spawns are weighted toward the front + the OPFOR east, not uniform (v2 Wave 14)."""
 
