@@ -47,34 +47,49 @@ export interface FuelSource {
   lon: number
 }
 
-/** Closest fuel source (mobile truck OR stocked depot) of the matching fuel type, or null. */
-export function nearestFuelSource(
+/** Closest stocked depot of the matching fuel type to (lat, lon), or null if none. */
+export function nearestStockedDepot(
+  lat: number,
+  lon: number,
+  depots: readonly DepotLike[],
+  fuelType: string,
+): FuelSource | null {
+  let best: FuelSource | null = null
+  let bestD = Infinity
+  for (const d of depots) {
+    const stock = d.stocks.find((s) => s.fuel_type === fuelType)
+    if (!stock || stock.quantity_liters <= 0) continue
+    const dist = (d.lat - lat) ** 2 + (d.lon - lon) ** 2
+    if (dist < bestD) {
+      bestD = dist
+      best = { kind: 'depot', id: d.id, name: d.name, lat: d.lat, lon: d.lon }
+    }
+  }
+  return best
+}
+
+export interface FuelSourceOptions {
+  /** Nearest fuelled tanker — the preferred mover (it drives to the unit). Null if none. */
+  truck: FuelSource | null
+  /** Nearest stocked depot — a fixed asset the unit must drive to. Null if none. */
+  depot: FuelSource | null
+}
+
+/**
+ * The fuel-source options for a unit-first refuel: the nearest tanker AND the nearest depot,
+ * each independently. A tanker is always offered when one exists (the caller defaults to it,
+ * so the tanker comes to the unit); the depot is the fallback / alternative the unit drives to.
+ */
+export function fuelSourceOptions(
   lat: number,
   lon: number,
   trucks: readonly TruckLike[],
   depots: readonly DepotLike[],
   fuelType: string,
-): FuelSource | null {
-  const candidates: FuelSource[] = []
-  for (const t of trucks) {
-    if (t.fuel_type === fuelType && (t.current_fuel_liters ?? 0) > 0) {
-      candidates.push({ kind: 'truck', id: t.instance_id, name: t.name, lat: t.lat, lon: t.lon })
-    }
+): FuelSourceOptions {
+  const truck = nearestFuelTruck(lat, lon, trucks, fuelType)
+  return {
+    truck: truck && { kind: 'truck', id: truck.instance_id, name: truck.name, lat: truck.lat, lon: truck.lon },
+    depot: nearestStockedDepot(lat, lon, depots, fuelType),
   }
-  for (const d of depots) {
-    const stock = d.stocks.find((s) => s.fuel_type === fuelType)
-    if (stock && stock.quantity_liters > 0) {
-      candidates.push({ kind: 'depot', id: d.id, name: d.name, lat: d.lat, lon: d.lon })
-    }
-  }
-  let best: FuelSource | null = null
-  let bestD = Infinity
-  for (const c of candidates) {
-    const dist = (c.lat - lat) ** 2 + (c.lon - lon) ** 2
-    if (dist < bestD) {
-      bestD = dist
-      best = c
-    }
-  }
-  return best
 }
