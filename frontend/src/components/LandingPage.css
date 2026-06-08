@@ -270,9 +270,9 @@
   filter: brightness(0) invert(1);
 }
 
-/* World Fuel logo 10% larger than the base height (keeps its brand colours). */
+/* World Fuel logo 15% larger than the base height (keeps its brand colours). */
 .landing-powered-logos img[alt="World Fuel Services"] {
-  height: 29px;
+  height: 30px;
 }
 
 @media (prefers-reduced-motion: reduce) {
