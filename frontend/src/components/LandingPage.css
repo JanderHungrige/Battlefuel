@@ -251,14 +251,11 @@
   color: rgba(220, 230, 244, 0.45);
 }
 
+/* No frame: the logos sit directly on the dark background. */
 .landing-powered-logos {
   display: inline-flex;
   align-items: center;
-  gap: 18px;
-  padding: 10px 18px;
-  background: #fff;
-  border-radius: 10px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  gap: 24px;
 }
 
 .landing-powered-logos img {
@@ -267,12 +264,13 @@
   display: block;
 }
 
-/* Eraneos mark reads larger than the World Fuel logo at the same height — 30% smaller. */
+/* Eraneos: black-on-transparent mark recoloured to white for the dark background, 30% smaller. */
 .landing-powered-logos img[alt="Eraneos"] {
   height: 18px;
+  filter: brightness(0) invert(1);
 }
 
-/* World Fuel logo 10% larger than the base height. */
+/* World Fuel logo 10% larger than the base height (keeps its brand colours). */
 .landing-powered-logos img[alt="World Fuel Services"] {
   height: 29px;
 }
