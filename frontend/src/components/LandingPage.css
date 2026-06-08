@@ -255,7 +255,8 @@
 .landing-powered-logos {
   display: inline-flex;
   align-items: center;
-  gap: 24px;
+  gap: 26px;
+  margin-top: 4px;
 }
 
 .landing-powered-logos img {
@@ -270,9 +271,12 @@
   filter: brightness(0) invert(1);
 }
 
-/* World Fuel logo enlarged (keeps its brand colours). */
+/* World Fuel logo: most of the image is the circle + "Services" subtext, so it must be ~3x the
+   Eraneos height for its main "World Fuel" text to read at the same size; nudged down so that
+   main text aligns with the Eraneos wordmark (the subtext otherwise pulls it high). Brand colours. */
 .landing-powered-logos img[alt="World Fuel Services"] {
-  height: 33px;
+  height: 52px;
+  transform: translateY(3px);
 }
 
 @media (prefers-reduced-motion: reduce) {
