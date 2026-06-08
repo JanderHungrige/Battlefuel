@@ -22,6 +22,10 @@ RUN npm ci
 # Frontend sources + the committed offline basemap (sync:assets reads ../../data).
 COPY frontend ./
 COPY data/hohenfels.pmtiles /app/data/hohenfels.pmtiles
+# Branding logos + official PDFs — sync:assets copies these into public/logos and public/docs.
+# They resolve at the repo root (/app); without them the build silently ships no logos/docs.
+COPY ["company Logos", "/app/company Logos"]
+COPY ["Official logistic documents", "/app/Official logistic documents"]
 
 # Same-origin defaults are wrong for prod; inject the real domain at build time.
 ARG VITE_API_BASE
