@@ -7,7 +7,7 @@ status: planned
 depends_on: none
 demo_state: "On opening BattleFuel the user first lands on a modern, branded landing page — a hero with the BattleFuel identity and tagline, a 'Powered by' row showing the Eraneos and World Fuel Services logos, and a faux security panel that briefly 'verifies clearance' and then reads 'USER SECURITY ACCESS: APPROVED'. An 'Enter BattleFuel' button then takes the user into the operational map app. The gate shows once per browser session (a reload within the session goes straight to the app)."
 created: 2026-06-08
-hash: 589d01b5
+hash: 245463cf
 ---
 
 # Wave 15: Branded landing page + faux security gate
@@ -37,8 +37,9 @@ Build order: 1 → 2.
 **Build status (2026-06-08):** both features built + green (frontend 219 tests, tsc, eslint, prod
 build; frontend-only). Dark/modern look with an animated background (drifting grid + floating
 glows + scan sweep), faux "USER SECURITY ACCESS: APPROVED" clearance, Enter button, Eraneos +
-World Fuel "powered by" logos; gate shows once per browser session (`sessionStorage`). Wave stays
-**open** — Done-When gates below not yet met (awaiting local demo → `:3001` → prod).
+World Fuel "powered by" logos; gate is **in-memory only — the landing shows on every page load /
+refresh** (requester 2026-06-08; the once-per-session `sessionStorage` version was dropped). Wave
+stays **open** — Done-When gates below not yet met (awaiting local demo → `:3001` → prod).
 
 ### Feature notes (requester 2026-06-08)
 - **F1 branded-landing-page** — a new, visually polished `LandingPage` component (modern hero with

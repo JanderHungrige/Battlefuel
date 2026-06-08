@@ -1,12 +1,21 @@
-import { render, screen } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Theater } from './api/types'
-import { ENTRY_KEY } from './lib/entryGate'
 
 // Stub the WebGL map (jsdom has no canvas/WebGL) and the API client.
 vi.mock('./map/MapView', () => ({
   MapView: ({ theater }: { theater: Theater }) => (
     <div data-testid="map">{theater.name}</div>
+  ),
+}))
+
+// Stub the landing gate to a single Enter button so shell tests can step past it deterministically
+// (the real landing's faux clearance timer + visuals are covered in LandingPage.test).
+vi.mock('./components/LandingPage', () => ({
+  LandingPage: ({ onEnter }: { onEnter: () => void }) => (
+    <button data-testid="enter-app" onClick={onEnter}>
+      enter
+    </button>
   ),
 }))
 
@@ -44,45 +53,43 @@ const HOHENFELS: Theater = {
   default_zoom: 12,
 }
 
-beforeEach(() => {
-  // Skip the v2 W15 landing gate so the shell tests render the app directly.
-  sessionStorage.setItem(ENTRY_KEY, '1')
-})
-
 afterEach(() => {
   vi.clearAllMocks()
-  sessionStorage.clear()
 })
 
+// Render App and step past the landing gate into the app shell.
+async function renderEntered(): Promise<void> {
+  const { default: App } = await import('./App')
+  render(<App />)
+  fireEvent.click(screen.getByTestId('enter-app'))
+}
+
 describe('App shell', () => {
-  it('always shows the brand and OSM attribution', async () => {
+  it('gates the app behind the landing until Enter', async () => {
     getTheater.mockResolvedValue(HOHENFELS)
     const { default: App } = await import('./App')
     render(<App />)
+    // Before entering: the landing is shown, the map is not.
+    expect(screen.getByTestId('enter-app')).toBeInTheDocument()
+    expect(screen.queryByTestId('map')).not.toBeInTheDocument()
+  })
+
+  it('always shows the brand and OSM attribution', async () => {
+    getTheater.mockResolvedValue(HOHENFELS)
+    await renderEntered()
     expect(screen.getByText('BattleFuel')).toBeInTheDocument()
     expect(screen.getByText(/OpenStreetMap contributors/)).toBeInTheDocument()
   })
 
   it('renders the map with the theater once loaded', async () => {
     getTheater.mockResolvedValue(HOHENFELS)
-    const { default: App } = await import('./App')
-    render(<App />)
+    await renderEntered()
     expect(await screen.findByTestId('map')).toHaveTextContent('Hohenfels Training Area')
-  })
-
-  it('shows the landing gate before entering, not the map', async () => {
-    sessionStorage.clear() // not entered → landing should gate the app
-    getTheater.mockResolvedValue(HOHENFELS)
-    const { default: App } = await import('./App')
-    render(<App />)
-    expect(screen.getByTestId('landing')).toBeInTheDocument()
-    expect(screen.queryByTestId('map')).not.toBeInTheDocument()
   })
 
   it('shows an error when the theater fails to load', async () => {
     getTheater.mockRejectedValue(new Error('network down'))
-    const { default: App } = await import('./App')
-    render(<App />)
+    await renderEntered()
     expect(await screen.findByText(/Failed to load/)).toBeInTheDocument()
   })
 })

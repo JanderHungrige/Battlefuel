@@ -1,8 +1,8 @@
 // Branded landing page (v2 Wave 15 F1): a dark, modern front door with an animated background,
 // the BattleFuel hero, a faux "security clearance" check that resolves to APPROVED, an Enter
 // button into the app, and a "powered by" row (Eraneos + World Fuel). Presentational — the parent
-// owns whether the gate is shown (see lib/entryGate + App). The verify delay is injectable so
-// tests don't wait on a real timer.
+// (App) owns whether the gate is shown; the gate is in-memory only, so it shows on every page
+// load / refresh. The verify delay is injectable so tests don't wait on a real timer.
 
 import { useEffect, useState } from 'react'
 import './LandingPage.css'

@@ -8,7 +8,6 @@ import { GridLayoutControl } from './components/GridLayoutControl'
 import { HaltBanner } from './components/HaltBanner'
 import { InspectPanel, type InspectCell } from './components/InspectPanel'
 import { MoveRoutesPanel } from './components/MoveRoutesPanel'
-import { hasEntered, markEntered } from './lib/entryGate'
 import { firstHaltedUnit } from './lib/halt'
 import { ObstacleKindPicker } from './components/ObstacleKindPicker'
 import type { ObstacleKind } from './components/obstacleKinds'
@@ -41,8 +40,9 @@ import { MapView } from './map/MapView'
 import { cellIdFor, cellMgrsLabel, DEFAULT_PRECISION_M, GRID_PRECISIONS } from './map/mgrsGrid'
 
 export default function App() {
-  // Branded landing gate (v2 Wave 15): show the landing once per browser session.
-  const [entered, setEntered] = useState(() => hasEntered(sessionStorage))
+  // Branded landing gate (v2 Wave 15): in-memory only (not persisted), so the landing + faux
+  // security check show on every page load / refresh.
+  const [entered, setEntered] = useState(false)
   const [role, setRole] = useState<Role>('OF4')
   const { theater, tiles, units, setUnits, unitTypes, enemyUnits, error } = useTheaterData()
 
@@ -258,14 +258,7 @@ export default function App() {
   const obstacleActive = canShow(role, 'obstacleMode') && obstacleMode
 
   if (!entered) {
-    return (
-      <LandingPage
-        onEnter={() => {
-          markEntered(sessionStorage)
-          setEntered(true)
-        }}
-      />
-    )
+    return <LandingPage onEnter={() => setEntered(true)} />
   }
 
   return (
