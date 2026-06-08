@@ -2,8 +2,8 @@
 id: battlefuel-v2
 title: BattleFuel v2 — Combat UX, Routing, Scenarios & Onboarding
 status: planned
-version: 6
-hash: 5d3977e1
+version: 8
+hash: 76bb7275
 created: 2026-06-02
 ---
 
@@ -76,6 +76,8 @@ pass — track them as a checklist **in each wave doc** (not here — this is th
 | Wave 10 | waves/battlefuel-v2-wave-10.md | Routing & movement overhaul (absorbs Wave 6): a unit always reaches its destination and never freezes — Safe (route around threat, cross only if no alternative) vs Fast (shortest, crosses at a penalty) posture + a road/off-road/hybrid/direct travel mode (off-road carries a speed+fuel penalty); bold primary + lighter alternative routes with duration/fuel/threat and a warning when crossing a threat-level-5 sector; smooth small movement ticks; waypoint routing (Start → set points → Remove last → End → Confirm); hand-draw a passage the engine uses; add fuel depots; remove manual obstacles; Esc exits any mode; unit-symbol centre = route start. | complete |
 | Wave 11 | waves/battlefuel-v2-wave-11.md | OF-8 fuel ordering & supply UX (immediate, 2026-06-05): order fuel (renamed from buy) with a fuel-management-platform selector (World Fuel DFMS default / Shell FM / add new) + a faked branded order mask (prefilled, inform JLSG/JTF HQ, Place order); Order History panel tracking the NATO stages (placed->JLSG->JTF->provider->on route->reached JLSG->reached OPCON); fix the initial main-supply-point empty-dropdown bug; clickable supply points + add typed stocked logistic sites (BSA/CSSBN/DOB/FLS/TLB, AJP-4.6) that are refuelable and propose a redistribution order when low; refuel-by-unit-click; OF-8 on-map per-unit fuel bar (selected on top, toggleable; ammo dropped); Official Info Docs tab (folder PDFs); order status auto-advances on sim clock 30s/stage. | planned |
 | Wave 12 | waves/battlefuel-v2-wave-12.md | Fuel run — routed refuel (immediate, 2026-06-06): click a fuel truck → create fuel run → click target unit → Safe/Fast routes → confirm → truck routes to unit + transfers on arrival; reverse from a unit → nearest fuel source (truck or depot) → routes → confirm; if source is a fixed depot the unit routes to the depot and drains its stock. | planned |
+| Wave 13 | waves/battlefuel-v2-wave-13.md | Rendezvous fuel run (immediate, 2026-06-08): select a fuel truck → "Plan rendezvous" → click the target unit → click the meeting sector → Safe/Fast routes for BOTH movers (truck→sector + unit→sector) → "Order now" (both dispatch, transfer on meeting) OR "Plan rendezvous" → sim-clock date/time → "Send order" files it in the archive as planned; a reminder pops at the sim-time for confirm-to-launch; clicking a rendezvous order draws both units' routes. | planned |
+| Wave 14 | waves/battlefuel-v2-wave-14.md | Theater scenario — East/West frontline (immediate, 2026-06-08, build BEFORE Wave 13): reseed Hohenfels as a coherent East (OPFOR) vs West (NATO) battle split by an irregular N–S frontline (gaps + bulges); NATO combat units forward, depots + HQ in the rear, a few more frontline units; threats concentrated on the frontline with deeper-in sightings and a mostly-threat-filled East; slower threat tempo; light threats decay/disappear. | planned |
 | Advanced | waves/battlefuel-v2-advanced.md | 3D terrain elevation on the map with an on/off switch (offline DEM). | planned |
 
 > Item→wave traceability for every line of the original request is kept in
@@ -86,3 +88,7 @@ pass — track them as a checklist **in each wave doc** (not here — this is th
 > planned — fixes unit-stall-on-blocked-tile and absorbs the whole of Wave 6, which is therefore
 > `superseded`), then the original **W4–W8**. The wave *numbers* are creation ids, not build
 > order — `Status` tracks what's done.
+
+> **Build-order note (2026-06-08, requester):** after Wave 12, build **Wave 14 (theater
+> East/West frontline scenario)** *before* **Wave 13 (rendezvous fuel run)** — the reorganised
+> theater should be in place before the new rendezvous UI lands on it.
