@@ -8,12 +8,14 @@ import { GridLayoutControl } from './components/GridLayoutControl'
 import { HaltBanner } from './components/HaltBanner'
 import { InspectPanel, type InspectCell } from './components/InspectPanel'
 import { MoveRoutesPanel } from './components/MoveRoutesPanel'
+import { hasEntered, markEntered } from './lib/entryGate'
 import { firstHaltedUnit } from './lib/halt'
 import { ObstacleKindPicker } from './components/ObstacleKindPicker'
 import type { ObstacleKind } from './components/obstacleKinds'
 import { RoleToggle } from './components/RoleToggle'
 import { InfoDocsPanel } from './components/InfoDocsPanel'
 import { FuelRunPanel } from './components/FuelRunPanel'
+import { LandingPage } from './components/LandingPage'
 import { OrderHistoryPanel } from './components/OrderHistoryPanel'
 import { SupplyPanel } from './components/SupplyPanel'
 import { UnitOverview } from './components/UnitOverview'
@@ -39,6 +41,8 @@ import { MapView } from './map/MapView'
 import { cellIdFor, cellMgrsLabel, DEFAULT_PRECISION_M, GRID_PRECISIONS } from './map/mgrsGrid'
 
 export default function App() {
+  // Branded landing gate (v2 Wave 15): show the landing once per browser session.
+  const [entered, setEntered] = useState(() => hasEntered(sessionStorage))
   const [role, setRole] = useState<Role>('OF4')
   const { theater, tiles, units, setUnits, unitTypes, enemyUnits, error } = useTheaterData()
 
@@ -252,6 +256,17 @@ export default function App() {
   const ready = theater !== null
   // Obstacle placement is an OF-4 tactical tool; never active in the OF-8 supply view.
   const obstacleActive = canShow(role, 'obstacleMode') && obstacleMode
+
+  if (!entered) {
+    return (
+      <LandingPage
+        onEnter={() => {
+          markEntered(sessionStorage)
+          setEntered(true)
+        }}
+      />
+    )
+  }
 
   return (
     <div className="app">

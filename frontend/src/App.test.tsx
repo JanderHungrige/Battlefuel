@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Theater } from './api/types'
+import { ENTRY_KEY } from './lib/entryGate'
 
 // Stub the WebGL map (jsdom has no canvas/WebGL) and the API client.
 vi.mock('./map/MapView', () => ({
@@ -43,8 +44,14 @@ const HOHENFELS: Theater = {
   default_zoom: 12,
 }
 
+beforeEach(() => {
+  // Skip the v2 W15 landing gate so the shell tests render the app directly.
+  sessionStorage.setItem(ENTRY_KEY, '1')
+})
+
 afterEach(() => {
   vi.clearAllMocks()
+  sessionStorage.clear()
 })
 
 describe('App shell', () => {
@@ -61,6 +68,15 @@ describe('App shell', () => {
     const { default: App } = await import('./App')
     render(<App />)
     expect(await screen.findByTestId('map')).toHaveTextContent('Hohenfels Training Area')
+  })
+
+  it('shows the landing gate before entering, not the map', async () => {
+    sessionStorage.clear() // not entered → landing should gate the app
+    getTheater.mockResolvedValue(HOHENFELS)
+    const { default: App } = await import('./App')
+    render(<App />)
+    expect(screen.getByTestId('landing')).toBeInTheDocument()
+    expect(screen.queryByTestId('map')).not.toBeInTheDocument()
   })
 
   it('shows an error when the theater fails to load', async () => {
