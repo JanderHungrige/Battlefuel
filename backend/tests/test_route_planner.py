@@ -173,3 +173,86 @@ class TestStitchPaths:
         assert s.threat_max == 5
         assert s.threat_avg == pytest.approx(2.0)  # distance-weighted: (1*100 + 3*100) / 200
         assert s.degraded is True
+
+
+class _FakeProvider:
+    """A routing provider that always returns one canned path (re-tagged to the asked metric)."""
+
+    def __init__(self, path: RoutePath) -> None:
+        self._path = path
+
+    async def shortest_path(
+        self,
+        session: object,
+        start_lat: float,
+        start_lon: float,
+        dest_lat: float,
+        dest_lon: float,
+        metric: RouteMetric,
+    ) -> RoutePath:
+        return self._path.model_copy(update={"metric": metric})
+
+
+_ROAD_GEOM = [[11.80, 49.20], [11.86, 49.23]]
+_OFF_GEOM = [[11.80, 49.20], [11.79, 49.25], [11.86, 49.23]]
+
+
+def _unit_and_instance() -> tuple[object, object]:
+    from app.domain.unit_instance import InstanceStatus, UnitInstance
+    from app.providers.factory import build_unit_provider
+
+    unit_type = build_unit_provider().get_unit("armor-tank-coy")
+    assert unit_type is not None
+    inst = UnitInstance(
+        id="x",
+        name="TEST",
+        unit_type_id="armor-tank-coy",
+        lat=49.20,
+        lon=11.80,
+        h3_index="88abc",
+        status=InstanceStatus.OPERATIONAL,
+        current_fuel_liters=15000.0,
+    )
+    return unit_type, inst
+
+
+class TestSafeAutoDetour:
+    """v2 Wave 16 F2: on a ROAD plan, SAFE auto-considers an off-road detour and takes it only
+    when the road is genuinely more dangerous; FAST stays on the short road."""
+
+    async def test_safe_detours_offroad_when_road_is_dangerous(self) -> None:
+        from app.domain.route import RouteMode
+        from app.services.route_planner import plan_routes
+
+        road = _FakeProvider(
+            _leg(_ROAD_GEOM, distance=3000, effective=3000, fuel=3000, threat_max=5, threat_avg=4.0)
+        )
+        offroad = _FakeProvider(
+            _leg(_OFF_GEOM, distance=6000, effective=6000, fuel=6000, threat_max=0, threat_avg=0.0)
+        )
+        unit_type, inst = _unit_and_instance()
+        opts = await plan_routes(
+            None, road, inst, unit_type, 49.23, 11.86, mode=RouteMode.ROAD, offroad=offroad
+        )
+        by_metric = {o.metric: o for o in opts}
+        assert by_metric[RouteMetric.FAST].threat_max == 5  # FAST stays on the exposed road
+        assert by_metric[RouteMetric.SAFE].threat_max == 0  # SAFE detours off-road around danger
+        assert by_metric[RouteMetric.SAFE].geometry == _OFF_GEOM
+
+    async def test_safe_stays_on_a_clear_road(self) -> None:
+        from app.domain.route import RouteMode
+        from app.services.route_planner import plan_routes
+
+        road = _FakeProvider(
+            _leg(_ROAD_GEOM, distance=3000, effective=3000, fuel=3000, threat_max=0, threat_avg=0.0)
+        )
+        offroad = _FakeProvider(
+            _leg(_OFF_GEOM, distance=6000, effective=6000, fuel=6000, threat_max=0, threat_avg=0.0)
+        )
+        unit_type, inst = _unit_and_instance()
+        opts = await plan_routes(
+            None, road, inst, unit_type, 49.23, 11.86, mode=RouteMode.ROAD, offroad=offroad
+        )
+        safe = next(o for o in opts if o.metric is RouteMetric.SAFE)
+        # Equal threat → no needless detour: SAFE keeps the shorter road geometry.
+        assert safe.geometry == _ROAD_GEOM

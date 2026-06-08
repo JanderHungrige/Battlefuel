@@ -2,8 +2,8 @@
 id: battlefuel-v2
 title: BattleFuel v2 — Combat UX, Routing, Scenarios & Onboarding
 status: planned
-version: 9
-hash: b65ec818
+version: 10
+hash: 7cc804a5
 created: 2026-06-02
 ---
 
@@ -79,6 +79,7 @@ pass — track them as a checklist **in each wave doc** (not here — this is th
 | Wave 13 | waves/battlefuel-v2-wave-13.md | Rendezvous fuel run (immediate, 2026-06-08): select a fuel truck → "Plan rendezvous" → click the target unit → click the meeting sector → Safe/Fast routes for BOTH movers (truck→sector + unit→sector) → "Order now" (both dispatch, transfer on meeting) OR "Plan rendezvous" → sim-clock date/time → "Send order" files it in the archive as planned; a reminder pops at the sim-time for confirm-to-launch; clicking a rendezvous order draws both units' routes. | planned |
 | Wave 14 | waves/battlefuel-v2-wave-14.md | Theater scenario — East/West frontline (immediate, 2026-06-08, build BEFORE Wave 13): reseed Hohenfels as a coherent East (OPFOR) vs West (NATO) battle split by an irregular N–S frontline (gaps + bulges); NATO combat units forward, depots + HQ in the rear, a few more frontline units; threats concentrated on the frontline with deeper-in sightings and a mostly-threat-filled East; slower threat tempo; light threats decay/disappear. | planned |
 | Wave 15 | waves/battlefuel-v2-wave-15.md | Branded landing page + faux security gate (immediate, 2026-06-08, build BETWEEN W14 and W13): a modern landing page with BattleFuel hero, "Powered by" Eraneos + World Fuel logos, a pretend "USER SECURITY ACCESS: APPROVED" clearance panel, and an "Enter BattleFuel" button that reveals the map app; gate shows once per browser session. (Delivers W8's landing-page portion — W8 reduced to the data-integration guide.) | planned |
+| Wave 16 | waves/battlefuel-v2-wave-16.md | Routing safety (immediate, 2026-06-08, build BEFORE Wave 13): SAFE genuinely diverges from FAST — avoids enemy troops via an echelon-scaled danger circle around each OPFOR unit, avoids high-threat tiles, and takes longer OFF-ROAD detours around danger when the only road runs through it (FAST stays short/exposed); plus per-leg waypoint modes (each manual leg picks its own road/offroad/hybrid/direct, changing one leg re-plans only that leg). | planned |
 | Advanced | waves/battlefuel-v2-advanced.md | 3D terrain elevation on the map with an on/off switch (offline DEM). | planned |
 
 > Item→wave traceability for every line of the original request is kept in
@@ -92,6 +93,9 @@ pass — track them as a checklist **in each wave doc** (not here — this is th
 
 > **Build-order note (2026-06-08, requester):** after Wave 12, the immediate build order is
 > **Wave 14 (theater East/West frontline)** → **Wave 15 (branded landing page + faux security
-> gate)** → **Wave 13 (rendezvous fuel run)**. W14 reorganises the theater before the new
-> rendezvous UI lands on it; W15 is a polished front door slotted in between. Wave 15 delivers the
-> **landing-page** portion of Wave 8, so W8 is reduced to its **data-integration guide** (+ pitch).
+> gate)** → **Wave 16 (routing safety)** → **Wave 13 (rendezvous fuel run)**. W14 reorganises the
+> theater before the new rendezvous UI lands on it; W15 is a polished front door slotted in between;
+> W16 makes SAFE routing actually safe (enemy avoidance + off-road detours) before the rendezvous
+> fuel run (W13) — which relies on Safe/Fast routing — is built. Wave 15 delivers the **landing-page**
+> portion of Wave 8, so W8 is reduced to its **data-integration guide** (+ pitch).
+> **W14 + W15 are DEPLOYED to prod** (2026-06-08); W16 then W13 are next.
