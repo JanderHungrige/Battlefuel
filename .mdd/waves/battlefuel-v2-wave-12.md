@@ -3,11 +3,11 @@ id: battlefuel-v2-wave-12
 title: "Wave 12: Fuel Run — routed refuel"
 initiative: battlefuel-v2
 initiative_version: 6
-status: planned
+status: complete
 depends_on: battlefuel-v2-wave-11
 demo_state: "In OF-8 the operator runs a 'fuel run'. Truck-first: click a fuel truck → Create fuel run → click the target unit on the map → the engine computes Safe + Fast routes → the operator picks one and confirms → the truck routes to the unit and fuel transfers on arrival (co-location). Unit-first: click a unit → Refuel → the engine finds the closest fuel source (mobile truck or fixed depot) and computes Safe/Fast routes → on confirm the truck routes to the unit and transfers; BUT if the closest source is a fixed depot, the unit routes to the depot instead and fills from the depot's stock (which is decremented). Reuses the Wave-10 Safe/Fast routing + never-stall movement and the co-location transfer."
 created: 2026-06-06
-hash:
+hash: 72ddc302
 ---
 
 # Wave 12: Fuel Run — routed refuel
@@ -22,9 +22,9 @@ See frontmatter `demo_state`.
 
 ## Done-When (close-out gate)
 Mark `complete` only after ALL three gates pass (never on a localhost demo):
-- [ ] **tested local** — `make dev`, demoed on localhost
-- [ ] **tested online** — merged to `dev-deployment`, deployed to `:3001`, verified there
-- [ ] **merged into main / deployed in prod** — on `main`, live `:3000` (needs approval first)
+- [x] **tested local** — `make dev`, demoed on localhost
+- [x] **tested online** — on `dev-deployment`, deployed to `:3001`, verified
+- [x] **merged into main / deployed in prod** — in `main` (prod merge `7195a07`), live `:3000`
 
 ## Features
 | # | Feature | Doc | Status | Depends on |
