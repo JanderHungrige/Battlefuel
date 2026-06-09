@@ -86,3 +86,64 @@ class TestMoveWithRefuel:
         finally:
             await client.aclose()
             await engine.dispose()
+
+
+@pytest.mark.db
+class TestMoveRefuelOptions:
+    async def test_options_list_tankers_without_dispatching(self) -> None:
+        try:
+            client, engine, maker = await _client()
+        except SQLAlchemyError as exc:
+            pytest.skip(f"database unavailable: {exc}")
+        try:
+            from app.providers.move_orders import build_move_order_provider
+
+            instances = build_unit_instance_provider()
+            async with maker() as s:
+                unit = await instances.get_instance(s, "inst-armor-1")
+            assert unit is not None
+            body = {
+                "instance_id": "inst-armor-1",
+                "dest_lat": unit.lat + 0.01,
+                "dest_lon": unit.lon + 0.01,
+                "metric": "safe",
+            }
+            resp = await client.post("/api/v1/move-orders/refuel-options", json=body)
+            assert resp.status_code == 200
+            options = resp.json()
+            if not options:
+                pytest.skip("no routable tanker option in this seed")
+            # Each option previews both legs + a tanker, and carries fuel/threat.
+            first = options[0]
+            assert first["truck_id"]
+            assert first["unit_geometry"] and first["tanker_geometry"]
+            assert "unit_fuel_l" in first and "threat_max" in first
+            # Previewing did NOT dispatch anything.
+            async with maker() as s:
+                assert await build_move_order_provider().list_active(s) == []
+
+            # Confirming a chosen option dispatches that exact tanker.
+            exec_body = {**body, "truck_id": first["truck_id"]}
+            ex = await client.post("/api/v1/move-orders/with-refuel", json=exec_body)
+            if ex.status_code == 422:
+                pytest.skip("chosen tanker unroutable")
+            assert ex.status_code == 201
+            data = ex.json()
+            assert data["tanker_move_order"]["instance_id"] == first["truck_id"]
+            assert data["unit_move_order"]["status"] == "active"
+        finally:
+            await client.aclose()
+            await engine.dispose()
+
+    async def test_options_unknown_unit_404(self) -> None:
+        try:
+            client, engine, _ = await _client()
+        except SQLAlchemyError as exc:
+            pytest.skip(f"database unavailable: {exc}")
+        try:
+            body = {"instance_id": "nope", "dest_lat": 49.2, "dest_lon": 11.83}
+            resp = await client.post("/api/v1/move-orders/refuel-options", json=body)
+            assert resp.status_code == 404
+        finally:
+            await client.aclose()
+            await engine.dispose()

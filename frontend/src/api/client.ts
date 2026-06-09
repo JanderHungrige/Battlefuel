@@ -14,6 +14,8 @@ import type {
   CreateWaypointMoveOrderRequest,
   ConfirmLaunchResponse,
   FuelRunResponse,
+  MoveRefuelOption,
+  MoveRefuelOptionsRequest,
   MoveWithRefuelRequest,
   MoveWithRefuelResponse,
   EnemyUnit,
@@ -95,7 +97,10 @@ export const api = {
     postJson<MoveOrder>('/move-orders', req),
   createWaypointMoveOrder: (req: CreateWaypointMoveOrderRequest): Promise<MoveOrder> =>
     postJson<MoveOrder>('/move-orders/waypoints', req),
-  // Plan a move with a refuel stop on the way (nearest tanker rendezvous) (v2 W13 F6).
+  // Preview refuel-stop options (per tanker) for a planned move — no dispatch (v2 W13).
+  moveRefuelOptions: (req: MoveRefuelOptionsRequest): Promise<MoveRefuelOption[]> =>
+    postJson<MoveRefuelOption[]>('/move-orders/refuel-options', req),
+  // Execute a move with a refuel stop on the way (the chosen tanker) (v2 W13 F6).
   moveWithRefuel: (req: MoveWithRefuelRequest): Promise<MoveWithRefuelResponse> =>
     postJson<MoveWithRefuelResponse>('/move-orders/with-refuel', req),
   confirmMoveOrder: (id: string): Promise<MoveOrder> =>

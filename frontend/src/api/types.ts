@@ -403,6 +403,28 @@ export interface RendezvousResponse {
   refuel_order: RefuelOrder
 }
 
+/** Preview the refuel-stop choices (per tanker) for a planned move (v2 W13 correction). */
+export interface MoveRefuelOptionsRequest {
+  instance_id: string
+  dest_lat: number
+  dest_lon: number
+  metric: RouteMetric
+  mode?: RouteMode
+}
+
+export interface MoveRefuelOption {
+  truck_id: string
+  truck_name: string
+  sector_lat: number
+  sector_lon: number
+  sector_h3: string
+  unit_geometry: number[][]
+  tanker_geometry: number[][]
+  unit_fuel_l: number
+  tanker_fuel_l: number
+  threat_max: number
+}
+
 /** Plan a move with a refuel stop on the way (v2 Wave 13 F6). */
 export interface MoveWithRefuelRequest {
   instance_id: string
@@ -410,6 +432,8 @@ export interface MoveWithRefuelRequest {
   dest_lon: number
   metric: RouteMetric
   mode?: RouteMode
+  /** The tanker chosen from the options; nearest compatible when omitted. */
+  truck_id?: string
 }
 
 export interface MoveWithRefuelResponse {

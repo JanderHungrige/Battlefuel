@@ -124,3 +124,34 @@ describe('MoveRoutesPanel — add refuel stop (v2 W13 F6)', () => {
     expect(screen.getByTestId('add-refuel-stop')).toBeDisabled()
   })
 })
+
+import type { MoveRefuelOption } from '../api/types'
+
+const refuelOpt: MoveRefuelOption = {
+  truck_id: 'inst-fuel-1',
+  truck_name: 'BOWSER',
+  sector_lat: 49.2,
+  sector_lon: 11.8,
+  sector_h3: '8abc',
+  unit_geometry: [[11.8, 49.2], [11.81, 49.21]],
+  tanker_geometry: [[11.82, 49.22], [11.81, 49.21]],
+  unit_fuel_l: 30,
+  tanker_fuel_l: 10,
+  threat_max: 2,
+}
+
+describe('MoveRoutesPanel — refuel-stop picker (v2 W13)', () => {
+  it('shows the tanker option and confirms the chosen one', () => {
+    const onRefuelConfirm = vi.fn()
+    setup({ refuelActive: true, refuelOptions: [refuelOpt], onRefuelConfirm })
+    expect(screen.getByTestId('refuel-truck-name')).toHaveTextContent('BOWSER')
+    fireEvent.click(screen.getByTestId('refuel-confirm'))
+    expect(onRefuelConfirm).toHaveBeenCalledOnce()
+  })
+
+  it('hides the add/plan buttons while the picker is active', () => {
+    setup({ refuelActive: true, refuelOptions: [refuelOpt], onAddRefuelStop: vi.fn() })
+    expect(screen.queryByTestId('add-refuel-stop')).toBeNull()
+    expect(screen.getByTestId('refuel-picker')).toBeInTheDocument()
+  })
+})

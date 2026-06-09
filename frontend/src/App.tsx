@@ -33,6 +33,7 @@ import { useFuelPlatforms } from './hooks/useFuelPlatforms'
 import { useInfoDocs } from './hooks/useInfoDocs'
 import { useFuelRun } from './hooks/useFuelRun'
 import { usePlanRendezvous } from './hooks/usePlanRendezvous'
+import { useMoveRefuelStop } from './hooks/useMoveRefuelStop'
 import { useRendezvousArchive } from './hooks/useRendezvousArchive'
 import { type SupplyTab, dimDepots, dimmedUnitIds } from './lib/supplyFocus'
 import { useOrderHistory } from './hooks/useOrderHistory'
@@ -146,8 +147,12 @@ export default function App() {
   const [orderHistoryOpen, setOrderHistoryOpen] = useState(false)
   // OF-8 active supply tab — drives per-tab map focus (dim irrelevant units) (v2 W13).
   const [supplyTab, setSupplyTab] = useState<SupplyTab>('overview')
-  // Routes drawn after "Add refuel stop" (the dispatched unit + tanker legs) (v2 W13).
-  const [refuelStopRoutes, setRefuelStopRoutes] = useState<{ metric: string; geometry: number[][] }[]>([])
+  // Refuel-stop option picker (v2 W13): preview tanker options, confirm one to execute.
+  const closeMovePanel = useCallback(() => {
+    setSelectedUnitId(null)
+    planning.resetPlanning()
+  }, [planning])
+  const refuelStop = useMoveRefuelStop(pushChatter, supply.refetch, closeMovePanel)
   // Rendezvous archive + reminder (v2 Wave 13 F4).
   const rdvArchive = useRendezvousArchive(role === 'OF8', supplyTick, pushChatter)
   const [dismissedReminders, setDismissedReminders] = useState<Set<string>>(new Set())
@@ -192,8 +197,8 @@ export default function App() {
     planning.resetPlanning()
     planRdv.cancel()
     rdvArchive.clearSelection()
-    setRefuelStopRoutes([])
-  }, [planning, planRdv, rdvArchive])
+    refuelStop.cancel()
+  }, [planning, planRdv, rdvArchive, refuelStop])
 
   // Click a tagged combat chatter line: focus its MGRS square (clearing any other selection), and
   // clicking the same line again toggles the highlight off. Clearing also happens via `clear`
@@ -243,29 +248,12 @@ export default function App() {
     planning.resetPlanning()
     setSelectedUnitId(halted.instanceId)
   }, [halted, planning])
-  // Plan the current move with a refuel stop on the way (nearest tanker) (v2 W13 F6).
-  const addRefuelStop = useCallback(() => {
+  // Start the refuel-stop option picker for the current move (no dispatch until Confirm) (v2 W13).
+  const startRefuelStop = useCallback(() => {
     const dest = planning.destination
     if (!selectedUnitId || !dest || !planning.selectedMetric) return
-    api
-      .moveWithRefuel({
-        instance_id: selectedUnitId,
-        dest_lat: dest.lat,
-        dest_lon: dest.lon,
-        metric: planning.selectedMetric,
-        mode: planning.mode,
-      })
-      .then((res) => {
-        pushChatter(`Move with refuel stop planned: ${selectedUnit?.name ?? selectedUnitId}`, 'order')
-        clear()
-        // Draw the dispatched unit + tanker legs on the rendezvous-routes layer (v2 W13).
-        setRefuelStopRoutes([
-          { metric: res.unit_move_order.metric, geometry: res.unit_move_order.geometry },
-          { metric: res.tanker_move_order.metric, geometry: res.tanker_move_order.geometry },
-        ])
-      })
-      .catch((e: unknown) => pushChatter(errorMessage(e), 'status'))
-  }, [selectedUnitId, planning.destination, planning.selectedMetric, planning.mode, selectedUnit, pushChatter, clear])
+    refuelStop.start(selectedUnitId, dest.lat, dest.lon, planning.selectedMetric, planning.mode)
+  }, [selectedUnitId, planning.destination, planning.selectedMetric, planning.mode, refuelStop])
 
   // OF-8 map focus (v2 W13): orange-highlight the chosen Plan-rendezvous units, and dim units /
   // depots that are not relevant to the active supply tab.
@@ -290,13 +278,13 @@ export default function App() {
       ? planRdv.previewRoutes
       : rdvArchive.selectedId
         ? rdvArchive.previewRoutes
-        : refuelStopRoutes
+        : refuelStop.previewRoutes
   const rdvMetric =
     planRdv.phase !== 'idle'
       ? planRdv.metric
       : rdvArchive.selectedId
         ? rdvArchive.previewMetric
-        : (refuelStopRoutes[0]?.metric ?? null)
+        : (refuelStop.previewRoutes[0]?.metric ?? null)
 
   // Manually place a fuel depot — or a typed stocked logistic site (v2 Wave 10 F6 / W11 F5).
   const placeDepot = useCallback(
@@ -611,7 +599,15 @@ export default function App() {
                 confirming={planning.confirming}
                 onSelectOption={planning.setSelectedMetric}
                 onConfirm={() => planning.confirmMove(clear)}
-                onAddRefuelStop={addRefuelStop}
+                onAddRefuelStop={startRefuelStop}
+                refuelActive={refuelStop.active}
+                refuelOptions={refuelStop.options}
+                refuelIndex={refuelStop.index}
+                refuelBusy={refuelStop.busy}
+                refuelMessage={refuelStop.message}
+                onRefuelSelect={refuelStop.select}
+                onRefuelConfirm={refuelStop.confirm}
+                onRefuelCancel={refuelStop.cancel}
                 onCancel={clear}
               />
             )}

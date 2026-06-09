@@ -1,7 +1,7 @@
 // Planning panel: shows fastest/safest route options for the selected unit and
 // confirms a move order. All numeric values come straight from the backend planner.
 
-import type { RouteMetric, RouteMode, RouteOption } from '../api/types'
+import type { MoveRefuelOption, RouteMetric, RouteMode, RouteOption } from '../api/types'
 
 interface MoveRoutesPanelProps {
   unitName: string
@@ -19,8 +19,19 @@ interface MoveRoutesPanelProps {
   confirming: boolean
   onSelectOption: (metric: RouteMetric) => void
   onConfirm: () => void
-  /** Plan this move with a refuel stop on the way (nearest tanker) (v2 W13 F6). */
+  /** Start the refuel-stop option picker (v2 W13). */
   onAddRefuelStop?: () => void
+  /** Start a unit-first rendezvous for this unit (pick tanker + sector) (v2 W13). */
+  onPlanRendezvous?: () => void
+  // Refuel-stop option picker (v2 W13): click through tanker options, confirm one to execute.
+  refuelActive?: boolean
+  refuelOptions?: MoveRefuelOption[]
+  refuelIndex?: number
+  refuelBusy?: boolean
+  refuelMessage?: string | null
+  onRefuelSelect?: (index: number) => void
+  onRefuelConfirm?: () => void
+  onRefuelCancel?: () => void
   onCancel: () => void
 }
 
@@ -101,8 +112,18 @@ export function MoveRoutesPanel({
   onSelectOption,
   onConfirm,
   onAddRefuelStop,
+  onPlanRendezvous,
+  refuelActive = false,
+  refuelOptions = [],
+  refuelIndex = 0,
+  refuelBusy = false,
+  refuelMessage = null,
+  onRefuelSelect,
+  onRefuelConfirm,
+  onRefuelCancel,
   onCancel,
 }: MoveRoutesPanelProps) {
+  const cur = refuelOptions[refuelIndex]
   return (
     <aside className="move-panel" data-testid="move-panel">
       <button className="inspect-close" onClick={onCancel} aria-label="Close planning">
@@ -193,17 +214,90 @@ export function MoveRoutesPanel({
         </button>
       )}
 
-      {options.length > 0 && onAddRefuelStop && (
-        <button
-          type="button"
-          className="move-add-refuel"
-          data-testid="add-refuel-stop"
-          disabled={selectedMetric === null || confirming}
-          onClick={onAddRefuelStop}
-          title="Insert the nearest tanker as a refuel stop on the way"
-        >
-          + Add refuel stop
-        </button>
+      {options.length > 0 && !refuelActive && (
+        <div className="move-refuel-actions">
+          {onAddRefuelStop && (
+            <button
+              type="button"
+              className="move-add-refuel"
+              data-testid="add-refuel-stop"
+              disabled={selectedMetric === null || confirming}
+              onClick={onAddRefuelStop}
+              title="Pick a tanker to refuel from on the way"
+            >
+              + Add refuel stop
+            </button>
+          )}
+          {onPlanRendezvous && (
+            <button
+              type="button"
+              className="move-plan-rdv"
+              data-testid="plan-rendezvous"
+              disabled={confirming}
+              onClick={onPlanRendezvous}
+              title="Plan a rendezvous: meet a tanker at a sector"
+            >
+              Plan rendezvous
+            </button>
+          )}
+        </div>
+      )}
+
+      {refuelActive && (
+        <div className="refuel-picker" data-testid="refuel-picker">
+          {cur ? (
+            <>
+              <div className="refuel-picker-head">
+                Refuel via <strong data-testid="refuel-truck-name">{cur.truck_name}</strong>{' '}
+                ({refuelIndex + 1}/{refuelOptions.length})
+              </div>
+              <div className="refuel-picker-meta">
+                unit {Math.round(cur.unit_fuel_l)} L · tanker {Math.round(cur.tanker_fuel_l)} L · threat{' '}
+                {cur.threat_max}
+              </div>
+              <div className="refuel-picker-nav">
+                <button
+                  type="button"
+                  data-testid="refuel-prev"
+                  disabled={refuelIndex === 0}
+                  onClick={() => onRefuelSelect?.(refuelIndex - 1)}
+                >
+                  ‹ Prev
+                </button>
+                <button
+                  type="button"
+                  data-testid="refuel-next"
+                  disabled={refuelIndex >= refuelOptions.length - 1}
+                  onClick={() => onRefuelSelect?.(refuelIndex + 1)}
+                >
+                  Next ›
+                </button>
+              </div>
+              <button
+                type="button"
+                className="move-confirm"
+                data-testid="refuel-confirm"
+                disabled={refuelBusy}
+                onClick={onRefuelConfirm}
+              >
+                {refuelBusy ? 'Confirming…' : 'Confirm move order'}
+              </button>
+            </>
+          ) : (
+            <div className="move-hint" data-testid="refuel-empty">
+              {refuelBusy ? 'Finding tankers…' : (refuelMessage ?? 'No tanker available.')}
+            </div>
+          )}
+          <button
+            type="button"
+            className="ghost"
+            data-testid="refuel-cancel"
+            onClick={onRefuelCancel}
+          >
+            Cancel refuel stop
+          </button>
+          {cur && refuelMessage && <div className="supply-msg">{refuelMessage}</div>}
+        </div>
       )}
     </aside>
   )

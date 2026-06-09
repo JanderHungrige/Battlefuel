@@ -20,7 +20,7 @@ from app.providers.routing import RoutingProvider, build_routing_provider
 from app.providers.tiles import TileDataProvider, build_tile_provider
 from app.providers.unit_instances import UnitInstanceProvider, build_unit_instance_provider
 from app.services.move_order_service import create_move_order, create_move_order_waypoints
-from app.services.move_refuel_service import plan_move_with_refuel
+from app.services.move_refuel_service import plan_move_refuel_options, plan_move_with_refuel
 
 router = APIRouter(tags=["move-orders"])
 
@@ -198,12 +198,35 @@ async def continue_order(order_id: str, session: SessionDep, orders: OrderDep) -
     return updated
 
 
+class MoveRefuelOptionsRequest(BaseModel):
+    instance_id: str
+    dest_lat: float
+    dest_lon: float
+    metric: RouteMetric = RouteMetric.SAFE
+    mode: RouteMode = RouteMode.ROAD
+
+
+class MoveRefuelOptionView(BaseModel):
+    truck_id: str
+    truck_name: str
+    sector_lat: float
+    sector_lon: float
+    sector_h3: str
+    unit_geometry: list[list[float]]
+    tanker_geometry: list[list[float]]
+    unit_fuel_l: float
+    tanker_fuel_l: float
+    threat_max: int
+
+
 class MoveWithRefuelRequest(BaseModel):
     instance_id: str
     dest_lat: float
     dest_lon: float
     metric: RouteMetric = RouteMetric.SAFE
     mode: RouteMode = RouteMode.ROAD
+    # The tanker the operator chose from the options; nearest compatible if omitted.
+    truck_id: str | None = None
 
 
 class _RefuelSector(BaseModel):
@@ -217,6 +240,49 @@ class MoveWithRefuelResponse(BaseModel):
     unit_move_order: MoveOrder
     tanker_move_order: MoveOrder
     refuel_order: RefuelOrder
+
+
+@router.post("/move-orders/refuel-options")
+async def move_refuel_options(
+    req: MoveRefuelOptionsRequest,
+    session: SessionDep,
+    routing: RoutingDep,
+    instances: InstanceDep,
+    units: Annotated[UnitDataProvider, Depends(get_unit_data_provider)],
+    tiles: Annotated[TileDataProvider, Depends(get_tile_provider)],
+) -> list[MoveRefuelOptionView]:
+    """Preview the nearest refuel-stop choices (per tanker) for the operator to click through — no
+    dispatch (v2 W13 correction)."""
+    try:
+        options = await plan_move_refuel_options(
+            session,
+            routing,
+            instances,
+            units,
+            tiles,
+            instance_id=req.instance_id,
+            dest_lat=req.dest_lat,
+            dest_lon=req.dest_lon,
+            metric=req.metric,
+            mode=req.mode,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return [
+        MoveRefuelOptionView(
+            truck_id=o.truck_id,
+            truck_name=o.truck_name,
+            sector_lat=o.sector_lat,
+            sector_lon=o.sector_lon,
+            sector_h3=o.sector_h3,
+            unit_geometry=o.unit_geometry,
+            tanker_geometry=o.tanker_geometry,
+            unit_fuel_l=o.unit_fuel_l,
+            tanker_fuel_l=o.tanker_fuel_l,
+            threat_max=o.threat_max,
+        )
+        for o in options
+    ]
 
 
 @router.post("/move-orders/with-refuel", status_code=201)
@@ -246,6 +312,7 @@ async def move_with_refuel(
             dest_lon=req.dest_lon,
             metric=req.metric,
             mode=req.mode,
+            truck_id=req.truck_id,
         )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
