@@ -178,6 +178,7 @@ export interface CreateMoveOrderRequest {
 export interface WaypointInput {
   lat: number
   lon: number
+  mode?: RouteMode // per-leg travel mode (v2 W16 F3); falls back to the request mode
 }
 
 export interface PlanWaypointsRequest {
