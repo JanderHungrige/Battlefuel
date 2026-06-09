@@ -14,6 +14,8 @@ import type { ObstacleKind } from './components/obstacleKinds'
 import { RoleToggle } from './components/RoleToggle'
 import { InfoDocsPanel } from './components/InfoDocsPanel'
 import { FuelRunPanel } from './components/FuelRunPanel'
+import { PlanRendezvousPanel } from './components/PlanRendezvousPanel'
+import { RendezvousReminderBanner } from './components/RendezvousReminderBanner'
 import { LandingPage } from './components/LandingPage'
 import { OrderHistoryPanel } from './components/OrderHistoryPanel'
 import { SupplyPanel } from './components/SupplyPanel'
@@ -30,6 +32,10 @@ import { useMovePlanning } from './hooks/useMovePlanning'
 import { useFuelPlatforms } from './hooks/useFuelPlatforms'
 import { useInfoDocs } from './hooks/useInfoDocs'
 import { useFuelRun } from './hooks/useFuelRun'
+import { usePlanRendezvous } from './hooks/usePlanRendezvous'
+import { useMoveRefuelStop } from './hooks/useMoveRefuelStop'
+import { useRendezvousArchive } from './hooks/useRendezvousArchive'
+import { type SupplyTab, dimDepots, dimmedUnitIds } from './lib/supplyFocus'
 import { useOrderHistory } from './hooks/useOrderHistory'
 import { useSupply } from './hooks/useSupply'
 import { useSupplyOrders } from './hooks/useSupplyOrders'
@@ -60,8 +66,16 @@ export default function App() {
     localStorage.setItem('bf.gridPrecisionM', String(gridPrecisionM))
   }, [gridPrecisionM])
 
-  const { positions: live, tileUpdates, combatEvents, chatter, strategic, pushChatter, supplyTick } =
-    useSimSocket()
+  const {
+    positions: live,
+    tileUpdates,
+    combatEvents,
+    chatter,
+    strategic,
+    pushChatter,
+    supplyTick,
+    rendezvousReminder,
+  } = useSimSocket()
 
   // Operator ops: obstacles + tile edits + the obstacle-placement mode and chosen kind.
   const { obstacles, placeObstacle, removeObstacle, mutateTile } = useObstacleOps()
@@ -131,6 +145,25 @@ export default function App() {
   const fuelPlatforms = useFuelPlatforms(role === 'OF8')
   const orderHistory = useOrderHistory(role === 'OF8', supplyTick)
   const [orderHistoryOpen, setOrderHistoryOpen] = useState(false)
+  // OF-8 active supply tab — drives per-tab map focus (dim irrelevant units) (v2 W13).
+  const [supplyTab, setSupplyTab] = useState<SupplyTab>('overview')
+  // Refuel-stop option picker (v2 W13): preview tanker options, confirm one to execute.
+  const closeMovePanel = useCallback(() => {
+    setSelectedUnitId(null)
+    planning.resetPlanning()
+  }, [planning])
+  const refuelStop = useMoveRefuelStop(pushChatter, supply.refetch, closeMovePanel)
+  // Rendezvous archive + reminder (v2 Wave 13 F4).
+  const rdvArchive = useRendezvousArchive(role === 'OF8', supplyTick, pushChatter)
+  const [dismissedReminders, setDismissedReminders] = useState<Set<string>>(new Set())
+  const activeReminder =
+    rendezvousReminder && !dismissedReminders.has(rendezvousReminder.order_id)
+      ? rendezvousReminder
+      : null
+  const reminderName = useCallback(
+    (id: string) => units.find((u) => u.id === id)?.name ?? id,
+    [units],
+  )
   const infoDocs = useInfoDocs(role === 'OF8')
   const [infoDocsOpen, setInfoDocsOpen] = useState(false)
   const roster = useUnitOverview(setUnits)
@@ -148,6 +181,8 @@ export default function App() {
   }, [live])
   const selectedLive = selectedUnitId ? live[selectedUnitId] : undefined
   const fuelRun = useFuelRun(units, unitTypes, supply.overview, livePositions, pushChatter, supply.refetch)
+  // Plan rendezvous (v2 Wave 13 F3): truck → pick unit → pick sector → dual routes → order/schedule.
+  const planRdv = usePlanRendezvous(units, pushChatter, supply.refetch)
 
   // A clicked advisor recommendation marked on the map: highlight + a movement arrow.
   const [selectedAdvice, setSelectedAdvice] = useState<Recommendation | null>(null)
@@ -160,7 +195,10 @@ export default function App() {
     setHighlightEventId(null)
     setLocatePoint(null)
     planning.resetPlanning()
-  }, [planning])
+    planRdv.cancel()
+    rdvArchive.clearSelection()
+    refuelStop.cancel()
+  }, [planning, planRdv, rdvArchive, refuelStop])
 
   // Click a tagged combat chatter line: focus its MGRS square (clearing any other selection), and
   // clicking the same line again toggles the highlight off. Clearing also happens via `clear`
@@ -193,6 +231,16 @@ export default function App() {
       .catch((e: unknown) => pushChatter(errorMessage(e), 'status'))
       .finally(() => setProceeding(false))
   }, [halted, haltedName, pushChatter])
+  // "Continue" — cross the threat tile at normal speed (v2 W13 F5).
+  const continueHalted = useCallback(() => {
+    if (!halted) return
+    setProceeding(true)
+    api
+      .continueMoveOrder(halted.orderId)
+      .then(() => pushChatter(`Continuing at normal speed: ${haltedName}`, 'order'))
+      .catch((e: unknown) => pushChatter(errorMessage(e), 'status'))
+      .finally(() => setProceeding(false))
+  }, [halted, haltedName, pushChatter])
   const rerouteHalted = useCallback(() => {
     if (!halted) return
     setSelectedCell(null)
@@ -200,6 +248,37 @@ export default function App() {
     planning.resetPlanning()
     setSelectedUnitId(halted.instanceId)
   }, [halted, planning])
+  // Start the refuel-stop option picker for the current move (no dispatch until Confirm) (v2 W13).
+  const startRefuelStop = useCallback(() => {
+    const dest = planning.destination
+    if (!selectedUnitId || !dest || !planning.selectedMetric) return
+    refuelStop.start(selectedUnitId, dest.lat, dest.lon, planning.selectedMetric, planning.mode)
+  }, [selectedUnitId, planning.destination, planning.selectedMetric, planning.mode, refuelStop])
+
+  // OF-8 map focus (v2 W13): orange-highlight the chosen Plan-rendezvous units, and dim units /
+  // depots that are not relevant to the active supply tab.
+  const isOf8 = canShow(role, 'supplyPanel')
+  const truckIds = useMemo(
+    () => (supply.overview?.trucks ?? []).map((t) => t.instance_id),
+    [supply.overview],
+  )
+  const dimmedUnits = useMemo(
+    () => (isOf8 ? dimmedUnitIds(supplyTab, units.map((u) => u.id), truckIds) : []),
+    [isOf8, supplyTab, units, truckIds],
+  )
+  // Rendezvous preview precedence: an active plan flow → a clicked archive order → an added refuel stop.
+  const rdvRoutes =
+    planRdv.phase !== 'idle'
+      ? planRdv.previewRoutes
+      : rdvArchive.selectedId
+        ? rdvArchive.previewRoutes
+        : refuelStop.previewRoutes
+  const rdvMetric =
+    planRdv.phase !== 'idle'
+      ? planRdv.metric
+      : rdvArchive.selectedId
+        ? rdvArchive.previewMetric
+        : (refuelStop.previewRoutes[0]?.metric ?? null)
 
   // Manually place a fuel depot — or a typed stocked logistic site (v2 Wave 10 F6 / W11 F5).
   const placeDepot = useCallback(
@@ -395,6 +474,16 @@ export default function App() {
               }}
               fuelRunPickMode={fuelRun.phase === 'pick-target'}
               onPickFuelTarget={fuelRun.pickTarget}
+              rendezvousRoutes={rdvRoutes}
+              rendezvousMetric={rdvMetric}
+              rendezvousPickUnit={planRdv.phase === 'pick-unit'}
+              onPickRendezvousUnit={planRdv.pickUnit}
+              rendezvousPickTruck={planRdv.phase === 'pick-truck'}
+              onPickRendezvousTruck={planRdv.pickTruck}
+              rendezvousPickSector={planRdv.phase === 'pick-sector'}
+              onPickRendezvousSector={planRdv.pickSector}
+              dimmedUnitIds={dimmedUnits}
+              dimDepots={isOf8 && dimDepots(supplyTab)}
               onPickDestination={(lat, lon) =>
                 planning.waypointMode
                   ? planning.addWaypoint(lat, lon)
@@ -416,6 +505,7 @@ export default function App() {
               <SupplyPanel
                 overview={supply.overview}
                 depots={supply.depots}
+                unitTypes={unitTypes}
                 refuelTargets={supplyOrders.refuelTargets}
                 recommendation={supplyOrders.recommendation}
                 busy={supplyOrders.busy}
@@ -429,6 +519,8 @@ export default function App() {
                 onLocate={locate}
                 onProposeRefuel={proposeSiteRefuel}
                 onCreateFuelRun={(truckId, truckName) => fuelRun.startTruckFirst(truckId, truckName)}
+                onPlanRendezvous={(truckId, truckName) => planRdv.start(truckId, truckName)}
+                onTabChange={setSupplyTab}
                 onBuy={supplyOrders.placeBuy}
                 onRefuel={supplyOrders.placeRefuel}
                 onConfirmRefuel={supplyOrders.confirmRefuel}
@@ -439,6 +531,10 @@ export default function App() {
               <OrderHistoryPanel
                 orders={orderHistory.orders}
                 onClose={() => setOrderHistoryOpen(false)}
+                rendezvousOrders={rdvArchive.orders}
+                selectedRendezvousId={rdvArchive.selectedId}
+                onSelectRendezvous={rdvArchive.select}
+                onCancelRendezvous={rdvArchive.cancel}
               />
             )}
             {canShow(role, 'supplyPanel') && infoDocsOpen && (
@@ -462,6 +558,22 @@ export default function App() {
                 onCancel={fuelRun.cancel}
               />
             )}
+            {(canShow(role, 'supplyPanel') || planRdv.phase !== 'idle') && (
+              <PlanRendezvousPanel
+                phase={planRdv.phase}
+                truckName={planRdv.truckName}
+                unitName={planRdv.unitName}
+                truckRoutes={planRdv.truckRoutes}
+                unitRoutes={planRdv.unitRoutes}
+                metric={planRdv.metric}
+                busy={planRdv.busy}
+                message={planRdv.message}
+                onSelectMetric={planRdv.selectMetric}
+                onOrderNow={planRdv.orderNow}
+                onSchedule={planRdv.schedule}
+                onCancel={planRdv.cancel}
+              />
+            )}
             {obstacleActive && (
               <ObstacleKindPicker selected={obstacleKind} onSelect={setObstacleKind} />
             )}
@@ -482,6 +594,18 @@ export default function App() {
                 confirming={planning.confirming}
                 onSelectOption={planning.setSelectedMetric}
                 onConfirm={() => planning.confirmMove(clear)}
+                onAddRefuelStop={startRefuelStop}
+                onPlanRendezvous={() =>
+                  selectedUnitId && planRdv.startUnitFirst(selectedUnitId, selectedUnit.name)
+                }
+                refuelActive={refuelStop.active}
+                refuelOptions={refuelStop.options}
+                refuelIndex={refuelStop.index}
+                refuelBusy={refuelStop.busy}
+                refuelMessage={refuelStop.message}
+                onRefuelSelect={refuelStop.select}
+                onRefuelConfirm={refuelStop.confirm}
+                onRefuelCancel={refuelStop.cancel}
                 onCancel={clear}
               />
             )}
@@ -491,8 +615,24 @@ export default function App() {
                 unitName={haltedName}
                 proceeding={proceeding}
                 onProceed={proceedHalted}
+                onContinue={continueHalted}
                 onReroute={rerouteHalted}
                 onDismiss={() => setDismissedHalt(halted.orderId)}
+              />
+            )}
+            {canShow(role, 'supplyPanel') && activeReminder && (
+              <RendezvousReminderBanner
+                reminder={activeReminder}
+                truckName={reminderName(activeReminder.truck_id)}
+                unitName={reminderName(activeReminder.unit_id)}
+                busy={rdvArchive.busy}
+                onConfirm={() => {
+                  rdvArchive.confirmLaunch(activeReminder.order_id)
+                  setDismissedReminders((s) => new Set(s).add(activeReminder.order_id))
+                }}
+                onDismiss={() =>
+                  setDismissedReminders((s) => new Set(s).add(activeReminder.order_id))
+                }
               />
             )}
             {canShow(role, 'advisor') && advisor.open && (

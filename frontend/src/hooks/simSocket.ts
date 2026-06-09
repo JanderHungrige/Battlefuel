@@ -5,6 +5,7 @@ import type {
   BuyOrderUpdate,
   CombatEvent,
   RefuelOrderUpdate,
+  RendezvousReminder,
   StrategicMessage,
   TileUpdate,
   UnitUpdate,
@@ -124,6 +125,20 @@ export function describeBuyOrderUpdate(u: BuyOrderUpdate): string {
 /** A short human-readable summary of a completed refuel, for the chatter/strategic feed. */
 export function describeRefuelOrderUpdate(u: RefuelOrderUpdate): string {
   return `Refuel complete: ${Math.round(u.transferred_liters)} L ${u.fuel_type} → ${u.unit_id}`
+}
+
+/** Parse a raw WS frame into a RendezvousReminder, or null if not a valid rendezvous_reminder. */
+export function parseRendezvousReminder(raw: string): RendezvousReminder | null {
+  const msg = parse(raw)
+  if (msg && msg.type === 'rendezvous_reminder' && typeof msg.order_id === 'string') {
+    return msg as unknown as RendezvousReminder
+  }
+  return null
+}
+
+/** A short human-readable summary of a due rendezvous, for the strategic feed. */
+export function describeRendezvousReminder(r: RendezvousReminder): string {
+  return `Rendezvous due: tanker ${r.truck_id} ↔ unit ${r.unit_id} at ${r.sector_h3}. Confirm to launch.`
 }
 
 /** Latest frame per instance wins. Returns a new map (never mutates the input). */

@@ -124,6 +124,13 @@ def _as_crossing(step: SimStep) -> SimStep:
     return SimStep(step.progress_m, step.lon, step.lat, step.fuel_l, MoveOrderStatus.CROSSING)
 
 
+def _as_continuing(step: SimStep) -> SimStep:
+    """Tag a step CONTINUING (normal-speed cross) unless it already arrived (COMPLETE wins)."""
+    if step.status is MoveOrderStatus.COMPLETE:
+        return step
+    return SimStep(step.progress_m, step.lon, step.lat, step.fuel_l, MoveOrderStatus.CONTINUING)
+
+
 def advance_with_terrain(
     order: MoveOrder,
     fuel_l: float,
@@ -132,21 +139,60 @@ def advance_with_terrain(
     *,
     factors: TileFactors,
     threat_level: int,
+    currently_in_threat: bool = False,
 ) -> SimStep:
     """Posture- and tile-aware traversal (v2 Wave 10, never-stall-traversal-threat-crossing).
 
     Decides whether the unit moves, crosses at a penalty, or halts cleanly — so it is *never*
     frozen (0 progress while burning fuel). ``factors``/``threat_level`` describe the tile the
-    unit is entering this step; posture is ``order.metric`` and ``order.status == CROSSING``
-    means the operator already chose "proceed slowly". Pure — delegates kinematics to ``advance``.
+    unit is entering this step; ``currently_in_threat`` is whether the unit's *current* tile is
+    already a threat-L5 sector. Posture is ``order.metric``; ``CROSSING`` means the operator chose
+    "proceed slowly" and ``CONTINUING`` means "Continue" (normal speed). Pure.
 
     - **crossing** order: crawl across a block (heavy penalty) or threat (lighter); on a clear,
       sub-L5 tile it reverts to normal ACTIVE movement.
-    - **active** order: a physically blocked tile HALTS (either posture); a threat-L5 tile HALTS
-      in SAFE posture but is crossed at a penalty in FAST; otherwise it advances normally.
+    - **continuing** order: cross the current threat at normal speed (a block still crawls); on a
+      clear tile it reverts to normal ACTIVE movement (so the next threat re-prompts).
+    - **active** order: a physically blocked tile HALTS (either posture). A threat-L5 tile HALTS
+      in SAFE posture **only on the transition into it** (not when already in threat — e.g. the
+      unit started in a threat tile); FAST crosses at a penalty; otherwise advances normally.
     """
     blocked = not factors.passable
     in_threat = threat_level >= THREAT_L5
+
+    if order.status is MoveOrderStatus.CONTINUING:
+        if blocked:
+            # A physical block cannot be taken at normal speed — crawl it like CROSSING.
+            return _as_continuing(
+                advance(
+                    order,
+                    fuel_l,
+                    unit_type,
+                    dt_game_s,
+                    speed_factor=BLOCK_CROSS_SPEED_FACTOR,
+                    fuel_factor=factors.fuel_factor * BLOCK_CROSS_FUEL_FACTOR,
+                )
+            )
+        if in_threat:
+            return _as_continuing(
+                advance(
+                    order,
+                    fuel_l,
+                    unit_type,
+                    dt_game_s,
+                    speed_factor=factors.speed_factor,
+                    fuel_factor=factors.fuel_factor,
+                )
+            )
+        # cleared the threat → resume normal movement (next threat tile re-prompts)
+        return advance(
+            order,
+            fuel_l,
+            unit_type,
+            dt_game_s,
+            speed_factor=factors.speed_factor,
+            fuel_factor=factors.fuel_factor,
+        )
 
     if order.status is MoveOrderStatus.CROSSING:
         if blocked:
@@ -185,9 +231,11 @@ def advance_with_terrain(
     if blocked:
         return _halted(order, fuel_l)
     if in_threat:
-        if order.metric is RouteMetric.SAFE:
+        # No new halt when the unit is already in a threat tile (e.g. it started in threat, or is
+        # moving through one): the popup fires only on the transition INTO a threat tile (v2 W13 F5).
+        if order.metric is RouteMetric.SAFE and not currently_in_threat:
             return _halted(order, fuel_l)
-        # FAST accepted the fast route → cross the threat sector at a penalty, never halt.
+        # FAST accepted the fast route, or the unit is already in threat → cross at a penalty.
         return advance(
             order,
             fuel_l,

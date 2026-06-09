@@ -1,7 +1,8 @@
 // OF-8 supply panel (Wave 5 of8-supply-ui): fuel distribution + buy / refuel order placement.
 
-import { useMemo, useState } from 'react'
-import type { FuelDepot, FuelPlatform, RefuelOrder, SupplyOverview } from '../api/types'
+import { useEffect, useMemo, useState } from 'react'
+import type { FuelDepot, FuelPlatform, RefuelOrder, SupplyOverview, UnitType } from '../api/types'
+import { unitTypeName } from '../lib/callSign'
 import { logisticSiteShort } from '../lib/logisticSite'
 import { type OrderMeta, OrderFuelMask } from './OrderFuelMask'
 
@@ -17,6 +18,8 @@ export interface RecommendationView {
 export interface SupplyPanelProps {
   overview: SupplyOverview | null
   depots: FuelDepot[]
+  /** Unit-type catalog, to show the unit type behind fleet call signs (v2 W13). */
+  unitTypes?: UnitType[]
   refuelTargets: { id: string; name: string }[]
   recommendation: RecommendationView | null
   busy?: boolean
@@ -34,6 +37,10 @@ export interface SupplyPanelProps {
   onLocate?: (lat: number, lon: number) => void
   /** Start a routed fuel run from a truck (v2 Wave 12): pick a target unit next. */
   onCreateFuelRun?: (truckId: string, truckName: string) => void
+  /** Start a rendezvous plan from a truck (v2 Wave 13): pick a unit + a sector next. */
+  onPlanRendezvous?: (truckId: string, truckName: string) => void
+  /** Notifies the active tab so the map can focus on the relevant units (v2 W13). */
+  onTabChange?: (tab: 'overview' | 'fleet' | 'order') => void
   /** Ask the advisor to propose a refuel for a low site (v2 Wave 11 F5). */
   onProposeRefuel?: (depotId: string) => void
   onBuy: (depotId: string, fuelType: string, quantityLiters: number, meta?: OrderMeta) => void
@@ -47,6 +54,7 @@ const fmt = (n: number): string => Math.round(n).toLocaleString()
 export function SupplyPanel({
   overview,
   depots,
+  unitTypes = [],
   refuelTargets,
   recommendation,
   busy = false,
@@ -59,6 +67,8 @@ export function SupplyPanel({
   onShowDocs,
   onLocate,
   onCreateFuelRun,
+  onPlanRendezvous,
+  onTabChange,
   onProposeRefuel,
   onBuy,
   onRefuel,
@@ -74,6 +84,9 @@ export function SupplyPanel({
   // Three tabs: read-only status Overview, the Supply fleet (trucks + availability), and the
   // fuel-ordering actions (v2 Wave 11).
   const [tab, setTab] = useState<'overview' | 'fleet' | 'order'>('overview')
+  useEffect(() => {
+    onTabChange?.(tab)
+  }, [tab, onTabChange])
 
   const trucks = overview?.trucks ?? []
   const standbyCount = trucks.filter((t) => !t.assigned_unit_id).length
@@ -260,6 +273,11 @@ export function SupplyPanel({
                   title="Mark + locate on map"
                 >
                   {t.name}
+                  {unitTypeName(t.unit_type_id, unitTypes) && (
+                    <span className="truck-fleet-type" data-testid={`truck-type-${t.instance_id}`}>
+                      {' '}· {unitTypeName(t.unit_type_id, unitTypes)}
+                    </span>
+                  )}
                 </button>
                 <span
                   className={`truck-status ${t.assigned_unit_id ? 'tasked' : 'standby'}`}
@@ -276,6 +294,16 @@ export function SupplyPanel({
                   onClick={() => onCreateFuelRun(t.instance_id, t.name)}
                 >
                   Create fuel run
+                </button>
+              )}
+              {onPlanRendezvous && (
+                <button
+                  type="button"
+                  className="ghost rdv-start"
+                  data-testid={`rdv-start-${t.instance_id}`}
+                  onClick={() => onPlanRendezvous(t.instance_id, t.name)}
+                >
+                  Plan rendezvous
                 </button>
               )}
               <div className="stock-row">

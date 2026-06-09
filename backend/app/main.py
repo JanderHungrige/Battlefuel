@@ -24,6 +24,7 @@ from app.api.fuel_runs import router as fuel_runs_router
 from app.api.move_orders import router as move_orders_router
 from app.api.obstacles import router as obstacles_router
 from app.api.refuel_orders import router as refuel_orders_router
+from app.api.rendezvous import router as rendezvous_router
 from app.api.routes import router as routes_router
 from app.api.supply import router as supply_router
 from app.api.theater import router as theater_router
@@ -80,6 +81,7 @@ def create_app(enable_sim: bool = False) -> FastAPI:
     api_v1.include_router(buy_orders_router)
     api_v1.include_router(fuel_platforms_router)
     api_v1.include_router(fuel_runs_router)
+    api_v1.include_router(rendezvous_router)
     api_v1.include_router(advice_router)
     api_v1.include_router(advice_refuel_router)
     api_v1.include_router(advice_redistribution_router)

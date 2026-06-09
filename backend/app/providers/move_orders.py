@@ -83,10 +83,16 @@ class DbMoveOrderProvider(MoveOrderProvider):
         return [_to_order(r) for r in rows]
 
     async def list_active(self, session: AsyncSession) -> Sequence[MoveOrder]:
-        # ACTIVE and CROSSING orders are both advanced by the sim (a CROSSING order is crawling
-        # across an obstruction the operator chose to push through).
+        # ACTIVE, CROSSING and CONTINUING orders are all advanced by the sim (CROSSING crawls an
+        # obstruction; CONTINUING crosses a threat at normal speed — both operator-chosen).
         stmt = select(MoveOrderRow).where(
-            MoveOrderRow.status.in_([MoveOrderStatus.ACTIVE.value, MoveOrderStatus.CROSSING.value])
+            MoveOrderRow.status.in_(
+                [
+                    MoveOrderStatus.ACTIVE.value,
+                    MoveOrderStatus.CROSSING.value,
+                    MoveOrderStatus.CONTINUING.value,
+                ]
+            )
         )
         rows = (await session.execute(stmt)).scalars().all()
         return [_to_order(r) for r in rows]

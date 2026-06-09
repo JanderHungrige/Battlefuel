@@ -97,6 +97,22 @@ export interface MapViewProps {
   /** Fuel-run target-pick mode (v2 Wave 12): clicking a unit picks it as the refuel target. */
   fuelRunPickMode?: boolean
   onPickFuelTarget?: (unitId: string) => void
+  /** Rendezvous route preview (v2 Wave 13): both movers' Safe/Fast routes; selected drawn bold. */
+  rendezvousRoutes?: { metric: string; geometry: number[][] }[]
+  rendezvousMetric?: string | null
+  /** Rendezvous unit-pick mode: clicking a unit picks the unit to refuel. */
+  rendezvousPickUnit?: boolean
+  onPickRendezvousUnit?: (unitId: string) => void
+  /** Rendezvous truck-pick mode (unit-first): clicking a unit picks the tanker. */
+  rendezvousPickTruck?: boolean
+  onPickRendezvousTruck?: (unitId: string) => void
+  /** Rendezvous sector-pick mode: any map click picks the meeting sector point. */
+  rendezvousPickSector?: boolean
+  onPickRendezvousSector?: (lat: number, lon: number) => void
+  /** Friendly unit instance ids to dim on the map (OF-8 per-tab focus) (v2 W13). */
+  dimmedUnitIds?: string[]
+  /** Dim the depots layer (OF-8 supply-fleet tab focus) (v2 W13). */
+  dimDepots?: boolean
   onClearSelection: () => void
 }
 
@@ -317,6 +333,8 @@ function initLayers(map: maplibregl.Map): void {
     type: 'symbol',
     source: 'units',
     layout: { 'icon-image': ['get', 'sidc'], 'icon-size': 1, 'icon-allow-overlap': true },
+    // Per-tab focus dimming (v2 W13): irrelevant units are faded; updated via setPaintProperty.
+    paint: { 'icon-opacity': 1 },
   })
 
   // Per-unit fuel bars (v2 Wave 11 F7): a small colour-coded bar below each unit symbol. Two
@@ -434,11 +452,12 @@ function initLayers(map: maplibregl.Map): void {
     id: 'locate-marker',
     type: 'circle',
     source: 'locate-marker',
+    // Purple indicator for a located/selected fuel unit (depot or tanker) (v2 W13 correction).
     paint: {
       'circle-radius': 14,
-      'circle-color': 'rgba(63,208,255,0.18)',
+      'circle-color': 'rgba(168,85,247,0.25)',
       'circle-stroke-width': 3,
-      'circle-stroke-color': '#3fd0ff',
+      'circle-stroke-color': '#a855f7',
     },
   })
 
@@ -455,10 +474,25 @@ function initLayers(map: maplibregl.Map): void {
       'line-opacity': ['case', ['get', 'selected'], 0.95, 0.4],
     },
   })
+
+  // Rendezvous route preview (v2 Wave 13): both movers' routes, amber, selected metric bold.
+  map.addSource('rendezvous-routes', { type: 'geojson', data: EMPTY })
+  map.addLayer({
+    id: 'rendezvous-routes',
+    type: 'line',
+    source: 'rendezvous-routes',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: {
+      'line-color': '#ffb000',
+      'line-width': ['case', ['get', 'selected'], 5, 2],
+      'line-opacity': ['case', ['get', 'selected'], 0.95, 0.35],
+    },
+  })
 }
 
-function syncFuelRunRoutes(
+function syncRouteLines(
   map: maplibregl.Map,
+  sourceId: string,
   options: { metric: string; geometry: number[][] }[] | undefined,
   metric: string | null | undefined,
 ): void {
@@ -469,7 +503,15 @@ function syncFuelRunRoutes(
       geometry: { type: 'LineString', coordinates: o.geometry },
       properties: { selected: o.metric === metric },
     }))
-  setData(map, 'fuel-run-routes', { type: 'FeatureCollection', features })
+  setData(map, sourceId, { type: 'FeatureCollection', features })
+}
+
+function syncFuelRunRoutes(
+  map: maplibregl.Map,
+  options: { metric: string; geometry: number[][] }[] | undefined,
+  metric: string | null | undefined,
+): void {
+  syncRouteLines(map, 'fuel-run-routes', options, metric)
 }
 
 function syncUnits(
@@ -725,12 +767,27 @@ function wireInteraction(map: maplibregl.Map, propsRef: { current: MapViewProps 
       p.onPlaceObstacle(e.lngLat.lat, e.lngLat.lng)
       return
     }
+    // Rendezvous sector pick (v2 Wave 13): any map click sets the meeting sector point.
+    if (p.rendezvousPickSector && p.onPickRendezvousSector) {
+      p.onPickRendezvousSector(e.lngLat.lat, e.lngLat.lng)
+      return
+    }
     const hitUnits = map.queryRenderedFeatures(e.point, { layers: ['units'] })
     if (hitUnits.length > 0) {
       const unitId = String(hitUnits[0].properties?.id)
       // Fuel-run target pick (v2 Wave 12): clicking a unit picks it as the refuel target.
       if (p.fuelRunPickMode && p.onPickFuelTarget) {
         p.onPickFuelTarget(unitId)
+        return
+      }
+      // Rendezvous unit pick (v2 Wave 13): clicking a unit picks the unit to refuel.
+      if (p.rendezvousPickUnit && p.onPickRendezvousUnit) {
+        p.onPickRendezvousUnit(unitId)
+        return
+      }
+      // Rendezvous truck pick (unit-first, v2 W13): clicking a unit picks the tanker.
+      if (p.rendezvousPickTruck && p.onPickRendezvousTruck) {
+        p.onPickRendezvousTruck(unitId)
         return
       }
       p.onSelectUnit(unitId)
@@ -905,6 +962,15 @@ export function MapView(props: MapViewProps) {
   }, [props.fuelRunOptions, props.fuelRunMetric])
   useEffect(() => {
     if (readyRef.current && mapRef.current)
+      syncRouteLines(
+        mapRef.current,
+        'rendezvous-routes',
+        props.rendezvousRoutes,
+        props.rendezvousMetric,
+      )
+  }, [props.rendezvousRoutes, props.rendezvousMetric])
+  useEffect(() => {
+    if (readyRef.current && mapRef.current)
       setData(mapRef.current, 'combat-events', combatEventsToGeoJSON(props.combatEvents))
   }, [props.combatEvents])
   // Highlight + recentre only when the *selected event* changes — NOT on every combat_event frame
@@ -975,6 +1041,21 @@ export function MapView(props: MapViewProps) {
     mapRef.current.setFilter('unit-fuel-bars', ['!=', ['get', 'id'], sel || ' '])
     mapRef.current.setFilter('unit-fuel-bars-selected', ['==', ['get', 'id'], sel])
   }, [props.selectedUnitId])
+  // OF-8 per-tab focus: dim irrelevant units + (on the fleet tab) depots (v2 W13).
+  useEffect(() => {
+    if (!readyRef.current || !mapRef.current) return
+    const ids = props.dimmedUnitIds ?? []
+    mapRef.current.setPaintProperty('units', 'icon-opacity', [
+      'case',
+      ['in', ['get', 'id'], ['literal', ids]],
+      0.25,
+      1,
+    ])
+  }, [props.dimmedUnitIds])
+  useEffect(() => {
+    if (!readyRef.current || !mapRef.current) return
+    mapRef.current.setPaintProperty('depots', 'icon-opacity', props.dimDepots ? 0.3 : 1)
+  }, [props.dimDepots])
   useEffect(() => {
     if (!readyRef.current || !mapRef.current) return
     const c = props.selectedCell
