@@ -490,7 +490,7 @@ class TestThreatHaltPopupFix:
         from app.services.cost_model import TileFactors
         from app.services.sim import advance_with_terrain
 
-        # SAFE unit already in a threat tile (currently_in_threat) entering threat → moves, no halt.
+        # SAFE unit moving WITHIN the threat tile it started in (no cell change) → moves, no halt.
         step = advance_with_terrain(
             self._order(metric=RouteMetric.SAFE),
             fuel_l=18000,
@@ -499,9 +499,45 @@ class TestThreatHaltPopupFix:
             factors=TileFactors(speed_factor=1.0, fuel_factor=1.0),
             threat_level=5,
             currently_in_threat=True,
+            entering_new_cell=False,
         )
         assert step.status != "halted"
-        assert step.progress_m > 0.0  # it moved out instead of freezing at move start
+        assert step.progress_m > 0.0  # it moved instead of freezing at move start
+
+    def test_second_adjacent_threat_tile_re_halts(self) -> None:
+        from app.services.cost_model import TileFactors
+        from app.services.sim import advance_with_terrain
+
+        # SAFE unit crossing from one threat tile INTO a different threat tile → fresh halt
+        # (each threat tile prompts, not just the first — the "second threat" bug fix).
+        step = advance_with_terrain(
+            self._order(metric=RouteMetric.SAFE),
+            fuel_l=18000,
+            unit_type=_ARMOR,
+            dt_game_s=30,
+            factors=TileFactors(speed_factor=1.0, fuel_factor=1.0),
+            threat_level=5,
+            currently_in_threat=True,
+            entering_new_cell=True,
+        )
+        assert step.status == "halted"
+
+    def test_continue_authorization_covers_one_tile_then_re_halts(self) -> None:
+        from app.services.cost_model import TileFactors
+        from app.services.sim import advance_with_terrain
+
+        # A CONTINUING unit leaving its authorized threat tile INTO a new threat tile re-halts.
+        step = advance_with_terrain(
+            self._order(metric=RouteMetric.SAFE, status=MoveOrderStatus.CONTINUING),
+            fuel_l=18000,
+            unit_type=_ARMOR,
+            dt_game_s=30,
+            factors=TileFactors(speed_factor=1.0, fuel_factor=1.0),
+            threat_level=5,
+            currently_in_threat=True,
+            entering_new_cell=True,
+        )
+        assert step.status == "halted"
 
     def test_transition_into_threat_halts_in_safe(self) -> None:
         from app.services.cost_model import TileFactors

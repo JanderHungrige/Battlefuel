@@ -140,68 +140,58 @@ def advance_with_terrain(
     factors: TileFactors,
     threat_level: int,
     currently_in_threat: bool = False,
+    entering_new_cell: bool = True,
 ) -> SimStep:
     """Posture- and tile-aware traversal (v2 Wave 10, never-stall-traversal-threat-crossing).
 
     Decides whether the unit moves, crosses at a penalty, or halts cleanly — so it is *never*
     frozen (0 progress while burning fuel). ``factors``/``threat_level`` describe the tile the
-    unit is entering this step; ``currently_in_threat`` is whether the unit's *current* tile is
-    already a threat-L5 sector. Posture is ``order.metric``; ``CROSSING`` means the operator chose
-    "proceed slowly" and ``CONTINUING`` means "Continue" (normal speed). Pure.
+    unit is *entering* this step; ``entering_new_cell`` is whether that is a different H3 cell than
+    the unit's current one, and ``currently_in_threat`` whether the current cell is itself a
+    threat-L5 sector. Posture is ``order.metric``; ``CROSSING`` = "proceed slowly", ``CONTINUING``
+    = "Continue" (normal speed). Pure.
 
-    - **crossing** order: crawl across a block (heavy penalty) or threat (lighter); on a clear,
-      sub-L5 tile it reverts to normal ACTIVE movement.
-    - **continuing** order: cross the current threat at normal speed (a block still crawls); on a
-      clear tile it reverts to normal ACTIVE movement (so the next threat re-prompts).
-    - **active** order: a physically blocked tile HALTS (either posture). A threat-L5 tile HALTS
-      in SAFE posture **only on the transition into it** (not when already in threat — e.g. the
-      unit started in a threat tile); FAST crosses at a penalty; otherwise advances normally.
+    - **active** order: a blocked tile HALTS. A threat-L5 tile HALTS in SAFE posture on each
+      **transition into a (new) threat cell** — so two threat tiles in a row each prompt, and a
+      unit that *started* inside threat (no cell change yet) does not pop. FAST crosses at a
+      penalty; clear tiles advance normally.
+    - **crossing / continuing** order: a Continue/Proceed authorization covers exactly ONE threat
+      tile — the unit crawls (CROSSING) or runs (CONTINUING) across it, then on leaving that cell
+      it reverts to ACTIVE so the *next* threat tile re-prompts.
     """
     blocked = not factors.passable
     in_threat = threat_level >= THREAT_L5
 
-    if order.status is MoveOrderStatus.CONTINUING:
+    # The authorization to cross applies to one tile: once the unit leaves it (a new cell while it
+    # was in threat), drop back to ACTIVE handling so the next threat tile raises a fresh halt.
+    authorized = order.status in (MoveOrderStatus.CONTINUING, MoveOrderStatus.CROSSING) and not (
+        entering_new_cell and currently_in_threat
+    )
+
+    if authorized and order.status is MoveOrderStatus.CONTINUING:
         if blocked:
             # A physical block cannot be taken at normal speed — crawl it like CROSSING.
             return _as_continuing(
                 advance(
-                    order,
-                    fuel_l,
-                    unit_type,
-                    dt_game_s,
+                    order, fuel_l, unit_type, dt_game_s,
                     speed_factor=BLOCK_CROSS_SPEED_FACTOR,
                     fuel_factor=factors.fuel_factor * BLOCK_CROSS_FUEL_FACTOR,
                 )
             )
         if in_threat:
             return _as_continuing(
-                advance(
-                    order,
-                    fuel_l,
-                    unit_type,
-                    dt_game_s,
-                    speed_factor=factors.speed_factor,
-                    fuel_factor=factors.fuel_factor,
-                )
+                advance(order, fuel_l, unit_type, dt_game_s,
+                        speed_factor=factors.speed_factor, fuel_factor=factors.fuel_factor)
             )
-        # cleared the threat → resume normal movement (next threat tile re-prompts)
-        return advance(
-            order,
-            fuel_l,
-            unit_type,
-            dt_game_s,
-            speed_factor=factors.speed_factor,
-            fuel_factor=factors.fuel_factor,
-        )
+        # cleared the threat → resume normal movement
+        return advance(order, fuel_l, unit_type, dt_game_s,
+                       speed_factor=factors.speed_factor, fuel_factor=factors.fuel_factor)
 
-    if order.status is MoveOrderStatus.CROSSING:
+    if authorized and order.status is MoveOrderStatus.CROSSING:
         if blocked:
             return _as_crossing(
                 advance(
-                    order,
-                    fuel_l,
-                    unit_type,
-                    dt_game_s,
+                    order, fuel_l, unit_type, dt_game_s,
                     speed_factor=BLOCK_CROSS_SPEED_FACTOR,
                     fuel_factor=factors.fuel_factor * BLOCK_CROSS_FUEL_FACTOR,
                 )
@@ -209,46 +199,28 @@ def advance_with_terrain(
         if in_threat:
             return _as_crossing(
                 advance(
-                    order,
-                    fuel_l,
-                    unit_type,
-                    dt_game_s,
+                    order, fuel_l, unit_type, dt_game_s,
                     speed_factor=factors.speed_factor * THREAT_CROSS_SPEED_FACTOR,
                     fuel_factor=factors.fuel_factor * THREAT_CROSS_FUEL_FACTOR,
                 )
             )
         # cleared the obstruction → resume normal movement
-        return advance(
-            order,
-            fuel_l,
-            unit_type,
-            dt_game_s,
-            speed_factor=factors.speed_factor,
-            fuel_factor=factors.fuel_factor,
-        )
+        return advance(order, fuel_l, unit_type, dt_game_s,
+                       speed_factor=factors.speed_factor, fuel_factor=factors.fuel_factor)
 
-    # ACTIVE order entering this tile.
+    # ACTIVE order (or an authorized cross that just left its tile) entering this tile.
     if blocked:
         return _halted(order, fuel_l)
     if in_threat:
-        # No new halt when the unit is already in a threat tile (e.g. it started in threat, or is
-        # moving through one): the popup fires only on the transition INTO a threat tile (v2 W13 F5).
-        if order.metric is RouteMetric.SAFE and not currently_in_threat:
+        # SAFE halts on each transition INTO a (new) threat cell — but not while still inside the
+        # cell it is already in (e.g. a unit that started in threat), which makes no cell change.
+        if order.metric is RouteMetric.SAFE and entering_new_cell:
             return _halted(order, fuel_l)
-        # FAST accepted the fast route, or the unit is already in threat → cross at a penalty.
+        # FAST took the fast route, or the unit is moving within a threat cell → cross at penalty.
         return advance(
-            order,
-            fuel_l,
-            unit_type,
-            dt_game_s,
+            order, fuel_l, unit_type, dt_game_s,
             speed_factor=factors.speed_factor * THREAT_CROSS_SPEED_FACTOR,
             fuel_factor=factors.fuel_factor * THREAT_CROSS_FUEL_FACTOR,
         )
-    return advance(
-        order,
-        fuel_l,
-        unit_type,
-        dt_game_s,
-        speed_factor=factors.speed_factor,
-        fuel_factor=factors.fuel_factor,
-    )
+    return advance(order, fuel_l, unit_type, dt_game_s,
+                   speed_factor=factors.speed_factor, fuel_factor=factors.fuel_factor)
