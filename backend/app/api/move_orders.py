@@ -161,6 +161,26 @@ async def proceed_order(order_id: str, session: SessionDep, orders: OrderDep) ->
     return updated
 
 
+@router.post("/move-orders/{order_id}/continue")
+async def continue_order(order_id: str, session: SessionDep, orders: OrderDep) -> MoveOrder:
+    """Operator opts a halted order into "Continue" → continuing (cross the threat at normal speed).
+
+    Unlike "proceed slowly" (a crawl penalty), this crosses the current threat tile at normal
+    speed and reverts to active once clear, so the next threat tile re-prompts. Only a halted
+    order may continue (v2 Wave 13 F5)."""
+    order = await orders.get(session, order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail=f"move order {order_id!r} not found")
+    if order.status is not MoveOrderStatus.HALTED:
+        raise HTTPException(
+            status_code=409,
+            detail=f"move order {order_id!r} is {order.status.value}, not halted",
+        )
+    updated = await orders.set_status(session, order_id, MoveOrderStatus.CONTINUING)
+    assert updated is not None
+    return updated
+
+
 @router.get("/move-orders")
 async def list_orders(session: SessionDep, orders: OrderDep) -> list[MoveOrder]:
     return list(await orders.list_all(session))

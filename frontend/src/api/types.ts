@@ -131,6 +131,7 @@ export type MoveOrderStatus =
   | 'cancelled'
   | 'halted' // stopped at an obstruction; awaiting operator (Wave 10 F1)
   | 'crossing' // operator chose "proceed slowly": crawling across the obstruction (Wave 10 F1)
+  | 'continuing' // operator chose "Continue": crossing the threat at normal speed (v2 W13 F5)
 
 /** One planning option returned by POST /routes/plan. geometry is [lon, lat] pairs. */
 export interface RouteOption {
@@ -206,6 +207,8 @@ export interface UnitUpdate {
   progress_m: number
   distance_m: number
   reason?: 'blocked' | 'threat' // why the unit halted, set when status === 'halted' (Wave 10 F1)
+  /** Adjusted fuel to crawl the remaining threat tiles slowly; set on a threat halt (v2 W13 F5). */
+  slow_mode_fuel_l?: number
 }
 
 /** Operator-placed fuel depot request (v2 Wave 10 F6). */

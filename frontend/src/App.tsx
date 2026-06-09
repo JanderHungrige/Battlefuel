@@ -220,6 +220,16 @@ export default function App() {
       .catch((e: unknown) => pushChatter(errorMessage(e), 'status'))
       .finally(() => setProceeding(false))
   }, [halted, haltedName, pushChatter])
+  // "Continue" — cross the threat tile at normal speed (v2 W13 F5).
+  const continueHalted = useCallback(() => {
+    if (!halted) return
+    setProceeding(true)
+    api
+      .continueMoveOrder(halted.orderId)
+      .then(() => pushChatter(`Continuing at normal speed: ${haltedName}`, 'order'))
+      .catch((e: unknown) => pushChatter(errorMessage(e), 'status'))
+      .finally(() => setProceeding(false))
+  }, [halted, haltedName, pushChatter])
   const rerouteHalted = useCallback(() => {
     if (!halted) return
     setSelectedCell(null)
@@ -547,6 +557,7 @@ export default function App() {
                 unitName={haltedName}
                 proceeding={proceeding}
                 onProceed={proceedHalted}
+                onContinue={continueHalted}
                 onReroute={rerouteHalted}
                 onDismiss={() => setDismissedHalt(halted.orderId)}
               />

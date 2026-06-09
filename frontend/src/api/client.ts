@@ -100,6 +100,9 @@ export const api = {
   // "Proceed slowly" across an obstruction a unit halted at: halted → crossing (v2 Wave 10 F1).
   proceedMoveOrder: (id: string): Promise<MoveOrder> =>
     postJson<MoveOrder>(`/move-orders/${id}/proceed`),
+  // "Continue" across a threat tile at normal speed: halted → continuing (v2 W13 F5).
+  continueMoveOrder: (id: string): Promise<MoveOrder> =>
+    postJson<MoveOrder>(`/move-orders/${id}/continue`),
   listMoveOrders: (): Promise<MoveOrder[]> => getJson<MoveOrder[]>('/move-orders'),
 
   // Operator ops (Wave 4).
