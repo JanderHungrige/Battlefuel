@@ -80,6 +80,7 @@ async def create_order(
 class Waypoint(BaseModel):
     lat: float
     lon: float
+    mode: RouteMode | None = None  # per-leg travel mode (v2 W16 F3); falls back to the request mode
 
 
 class CreateWaypointMoveOrderRequest(BaseModel):
@@ -115,6 +116,7 @@ async def create_waypoint_order(
         [(w.lat, w.lon) for w in req.waypoints],
         req.metric,
         mode=req.mode,
+        modes=[w.mode or req.mode for w in req.waypoints],
     )
     if order is None:
         raise HTTPException(status_code=422, detail="no route through the given waypoints")

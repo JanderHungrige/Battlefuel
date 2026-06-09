@@ -256,3 +256,42 @@ class TestSafeAutoDetour:
         safe = next(o for o in opts if o.metric is RouteMetric.SAFE)
         # Equal threat → no needless detour: SAFE keeps the shorter road geometry.
         assert safe.geometry == _ROAD_GEOM
+
+
+class TestPerLegModes:
+    """v2 Wave 16 F3: each waypoint leg can use its own mode; aggregation sums per-leg estimates."""
+
+    def test_leg_modes_for_fills_default_or_passes_explicit(self) -> None:
+        from app.domain.route import RouteMode
+        from app.services.route_planner import leg_modes_for
+
+        assert leg_modes_for(None, RouteMode.ROAD, 3) == [RouteMode.ROAD] * 3
+        explicit = [RouteMode.ROAD, RouteMode.OFFROAD]
+        assert leg_modes_for(explicit, RouteMode.ROAD, 2) == explicit
+
+    def test_leg_modes_for_length_mismatch_raises(self) -> None:
+        from app.domain.route import RouteMode
+        from app.services.route_planner import leg_modes_for
+
+        with pytest.raises(ValueError, match="leg modes"):
+            leg_modes_for([RouteMode.ROAD], RouteMode.ROAD, 2)
+
+    def test_aggregate_sums_per_leg_duration_fuel_at_each_speed(self) -> None:
+        from app.services.route_planner import aggregate_leg_options
+
+        # leg1: 6 km @ 60 kph = 6 min / 6 L; leg2 (off-road, slower): 6 km @ 30 kph = 12 min / 12 L.
+        leg1 = _leg([[0, 0], [1, 1]], distance=6000, effective=6000, fuel=6000, threat_max=1)
+        leg2 = _leg([[1, 1], [2, 2]], distance=6000, effective=6000, fuel=6000, threat_max=3)
+        opt = aggregate_leg_options(
+            [(leg1, 60.0), (leg2, 30.0)],
+            label="x",
+            metric=RouteMetric.SAFE,
+            consumption_normal_lph=60.0,
+            start_fuel_l=1000.0,
+        )
+        assert opt is not None
+        assert opt.duration_s == pytest.approx((6 + 12) * 60, rel=1e-3)
+        assert opt.fuel_consumed_l == pytest.approx(18.0, rel=1e-3)
+        assert opt.distance_m == pytest.approx(12000)
+        assert opt.threat_max == 3
+        assert opt.geometry == [[0, 0], [1, 1], [2, 2]]  # legs stitched, shared point deduped
