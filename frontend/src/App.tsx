@@ -34,6 +34,7 @@ import { useInfoDocs } from './hooks/useInfoDocs'
 import { useFuelRun } from './hooks/useFuelRun'
 import { usePlanRendezvous } from './hooks/usePlanRendezvous'
 import { useRendezvousArchive } from './hooks/useRendezvousArchive'
+import { type SupplyTab, dimDepots, dimmedUnitIds } from './lib/supplyFocus'
 import { useOrderHistory } from './hooks/useOrderHistory'
 import { useSupply } from './hooks/useSupply'
 import { useSupplyOrders } from './hooks/useSupplyOrders'
@@ -143,6 +144,10 @@ export default function App() {
   const fuelPlatforms = useFuelPlatforms(role === 'OF8')
   const orderHistory = useOrderHistory(role === 'OF8', supplyTick)
   const [orderHistoryOpen, setOrderHistoryOpen] = useState(false)
+  // OF-8 active supply tab — drives per-tab map focus (dim irrelevant units) (v2 W13).
+  const [supplyTab, setSupplyTab] = useState<SupplyTab>('overview')
+  // Routes drawn after "Add refuel stop" (the dispatched unit + tanker legs) (v2 W13).
+  const [refuelStopRoutes, setRefuelStopRoutes] = useState<{ metric: string; geometry: number[][] }[]>([])
   // Rendezvous archive + reminder (v2 Wave 13 F4).
   const rdvArchive = useRendezvousArchive(role === 'OF8', supplyTick, pushChatter)
   const [dismissedReminders, setDismissedReminders] = useState<Set<string>>(new Set())
@@ -187,6 +192,7 @@ export default function App() {
     planning.resetPlanning()
     planRdv.cancel()
     rdvArchive.clearSelection()
+    setRefuelStopRoutes([])
   }, [planning, planRdv, rdvArchive])
 
   // Click a tagged combat chatter line: focus its MGRS square (clearing any other selection), and
@@ -249,12 +255,46 @@ export default function App() {
         metric: planning.selectedMetric,
         mode: planning.mode,
       })
-      .then(() => {
+      .then((res) => {
         pushChatter(`Move with refuel stop planned: ${selectedUnit?.name ?? selectedUnitId}`, 'order')
         clear()
+        // Draw the dispatched unit + tanker legs on the rendezvous-routes layer (v2 W13).
+        setRefuelStopRoutes([
+          { metric: res.unit_move_order.metric, geometry: res.unit_move_order.geometry },
+          { metric: res.tanker_move_order.metric, geometry: res.tanker_move_order.geometry },
+        ])
       })
       .catch((e: unknown) => pushChatter(errorMessage(e), 'status'))
   }, [selectedUnitId, planning.destination, planning.selectedMetric, planning.mode, selectedUnit, pushChatter, clear])
+
+  // OF-8 map focus (v2 W13): orange-highlight the chosen Plan-rendezvous units, and dim units /
+  // depots that are not relevant to the active supply tab.
+  const isOf8 = canShow(role, 'supplyPanel')
+  const truckIds = useMemo(
+    () => (supply.overview?.trucks ?? []).map((t) => t.instance_id),
+    [supply.overview],
+  )
+  const chosenSupplyUnitIds = useMemo(
+    () => (planRdv.phase !== 'idle' ? [planRdv.truckId, planRdv.unitId].filter(Boolean) : []),
+    [planRdv.phase, planRdv.truckId, planRdv.unitId],
+  )
+  const dimmedUnits = useMemo(
+    () => (isOf8 ? dimmedUnitIds(supplyTab, units.map((u) => u.id), truckIds) : []),
+    [isOf8, supplyTab, units, truckIds],
+  )
+  // Rendezvous preview precedence: an active plan flow → a clicked archive order → an added refuel stop.
+  const rdvRoutes =
+    planRdv.phase !== 'idle'
+      ? planRdv.previewRoutes
+      : rdvArchive.selectedId
+        ? rdvArchive.previewRoutes
+        : refuelStopRoutes
+  const rdvMetric =
+    planRdv.phase !== 'idle'
+      ? planRdv.metric
+      : rdvArchive.selectedId
+        ? rdvArchive.previewMetric
+        : (refuelStopRoutes[0]?.metric ?? null)
 
   // Manually place a fuel depot — or a typed stocked logistic site (v2 Wave 10 F6 / W11 F5).
   const placeDepot = useCallback(
@@ -450,14 +490,15 @@ export default function App() {
               }}
               fuelRunPickMode={fuelRun.phase === 'pick-target'}
               onPickFuelTarget={fuelRun.pickTarget}
-              rendezvousRoutes={
-                planRdv.phase !== 'idle' ? planRdv.previewRoutes : rdvArchive.previewRoutes
-              }
-              rendezvousMetric={planRdv.phase !== 'idle' ? planRdv.metric : rdvArchive.previewMetric}
+              rendezvousRoutes={rdvRoutes}
+              rendezvousMetric={rdvMetric}
               rendezvousPickUnit={planRdv.phase === 'pick-unit'}
               onPickRendezvousUnit={planRdv.pickUnit}
               rendezvousPickSector={planRdv.phase === 'pick-sector'}
               onPickRendezvousSector={planRdv.pickSector}
+              chosenSupplyUnitIds={chosenSupplyUnitIds}
+              dimmedUnitIds={dimmedUnits}
+              dimDepots={isOf8 && dimDepots(supplyTab)}
               onPickDestination={(lat, lon) =>
                 planning.waypointMode
                   ? planning.addWaypoint(lat, lon)
@@ -493,6 +534,7 @@ export default function App() {
                 onProposeRefuel={proposeSiteRefuel}
                 onCreateFuelRun={(truckId, truckName) => fuelRun.startTruckFirst(truckId, truckName)}
                 onPlanRendezvous={(truckId, truckName) => planRdv.start(truckId, truckName)}
+                onTabChange={setSupplyTab}
                 onBuy={supplyOrders.placeBuy}
                 onRefuel={supplyOrders.placeRefuel}
                 onConfirmRefuel={supplyOrders.confirmRefuel}

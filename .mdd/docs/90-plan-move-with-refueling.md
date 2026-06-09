@@ -81,6 +81,10 @@ action to the move-planning panel (enabled once a destination is chosen).
 Greenfield over F1/W12 pieces. The unit move order's geometry is the stitched multi-leg path;
 the refuel order's rendezvous is the chosen cell.
 
+**Map preview (2026-06-09 correction):** on success the App draws the dispatched unit and tanker
+legs on the shared `rendezvous-routes` layer (via `refuelStopRoutes`) instead of clearing them, so
+the operator sees the stitched route + the tanker's leg immediately.
+
 ## Dependencies
 
 - **85-rendezvous-routing** — the dispatch-the-pair-+-refuel pattern (`start_rendezvous`) reused.

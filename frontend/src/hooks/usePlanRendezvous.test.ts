@@ -59,6 +59,9 @@ describe('usePlanRendezvous', () => {
     act(() => result.current.pickUnit('inst-armor-1'))
     expect(result.current.phase).toBe('pick-sector')
     expect(result.current.unitName).toBe('LION')
+    // Chosen ids are exposed for the orange map highlight (v2 W13 correction).
+    expect(result.current.truckId).toBe('inst-fuel-1')
+    expect(result.current.unitId).toBe('inst-armor-1')
 
     act(() => result.current.pickSector(49.21, 11.81))
     await waitFor(() => expect(result.current.phase).toBe('review'))

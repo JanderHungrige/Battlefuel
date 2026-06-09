@@ -106,6 +106,12 @@ export interface MapViewProps {
   /** Rendezvous sector-pick mode: any map click picks the meeting sector point. */
   rendezvousPickSector?: boolean
   onPickRendezvousSector?: (lat: number, lon: number) => void
+  /** Instance ids highlighted orange as the chosen supply units (Plan rendezvous) (v2 W13). */
+  chosenSupplyUnitIds?: string[]
+  /** Friendly unit instance ids to dim on the map (OF-8 per-tab focus) (v2 W13). */
+  dimmedUnitIds?: string[]
+  /** Dim the depots layer (OF-8 supply-fleet tab focus) (v2 W13). */
+  dimDepots?: boolean
   onClearSelection: () => void
 }
 
@@ -321,11 +327,28 @@ function initLayers(map: maplibregl.Map): void {
       'circle-stroke-color': SELECTED_UNIT_RING,
     },
   })
+  // Chosen-supply halo (orange), for the Plan-rendezvous truck + picked unit (v2 W13). Drawn over
+  // the yellow selection halo but under the icon; filter from chosenSupplyUnitIds.
+  map.addLayer({
+    id: 'units-chosen-supply',
+    type: 'circle',
+    source: 'units',
+    filter: ['in', ['get', 'id'], ['literal', []]],
+    paint: {
+      'circle-radius': 16,
+      'circle-color': '#ff8c00',
+      'circle-opacity': 0.5,
+      'circle-stroke-width': 2.5,
+      'circle-stroke-color': '#ff6500',
+    },
+  })
   map.addLayer({
     id: 'units',
     type: 'symbol',
     source: 'units',
     layout: { 'icon-image': ['get', 'sidc'], 'icon-size': 1, 'icon-allow-overlap': true },
+    // Per-tab focus dimming (v2 W13): irrelevant units are faded; updated via setPaintProperty.
+    paint: { 'icon-opacity': 1 },
   })
 
   // Per-unit fuel bars (v2 Wave 11 F7): a small colour-coded bar below each unit symbol. Two
@@ -1026,6 +1049,27 @@ export function MapView(props: MapViewProps) {
     mapRef.current.setFilter('unit-fuel-bars', ['!=', ['get', 'id'], sel || ' '])
     mapRef.current.setFilter('unit-fuel-bars-selected', ['==', ['get', 'id'], sel])
   }, [props.selectedUnitId])
+  // Chosen-supply orange halo (Plan rendezvous truck + unit) (v2 W13).
+  useEffect(() => {
+    if (!readyRef.current || !mapRef.current) return
+    const ids = props.chosenSupplyUnitIds ?? []
+    mapRef.current.setFilter('units-chosen-supply', ['in', ['get', 'id'], ['literal', ids]])
+  }, [props.chosenSupplyUnitIds])
+  // OF-8 per-tab focus: dim irrelevant units + (on the fleet tab) depots (v2 W13).
+  useEffect(() => {
+    if (!readyRef.current || !mapRef.current) return
+    const ids = props.dimmedUnitIds ?? []
+    mapRef.current.setPaintProperty('units', 'icon-opacity', [
+      'case',
+      ['in', ['get', 'id'], ['literal', ids]],
+      0.25,
+      1,
+    ])
+  }, [props.dimmedUnitIds])
+  useEffect(() => {
+    if (!readyRef.current || !mapRef.current) return
+    mapRef.current.setPaintProperty('depots', 'icon-opacity', props.dimDepots ? 0.3 : 1)
+  }, [props.dimDepots])
   useEffect(() => {
     if (!readyRef.current || !mapRef.current) return
     const c = props.selectedCell

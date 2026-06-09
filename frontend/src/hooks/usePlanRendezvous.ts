@@ -12,6 +12,8 @@ type PushChatter = (text: string, kind?: ChatterMessage['kind']) => void
 
 export interface PlanRendezvousState {
   phase: Phase
+  truckId: string
+  unitId: string
   truckName: string
   unitName: string
   truckRoutes: RouteOption[]
@@ -171,6 +173,8 @@ export function usePlanRendezvous(
 
   return {
     phase,
+    truckId,
+    unitId,
     truckName,
     unitName,
     truckRoutes,

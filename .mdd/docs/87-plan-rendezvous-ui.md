@@ -11,6 +11,7 @@ source_files:
   - frontend/src/components/PlanRendezvousPanel.tsx
   - frontend/src/map/MapView.tsx
   - frontend/src/components/SupplyPanel.tsx
+  - frontend/src/lib/supplyFocus.ts
   - frontend/src/App.tsx
 routes: []
 models: []
@@ -71,6 +72,16 @@ Mirrors the Wave-12 `useFuelRun` + `FuelRunPanel` + map-preview pattern:
   click → `onPickRendezvousSector`).
 - **API client** — `planRendezvous`, `createRendezvous`, `scheduleRendezvous` (+ shared TS types
   matching the F1/F2 response shapes). Esc cancels the flow (reuses the existing Esc → `clear`).
+
+## Map indications (2026-06-09 correction)
+
+- **Chosen-supply highlight (orange).** The chosen tanker and the picked unit get an orange map
+  halo (`units-chosen-supply` circle layer, mirroring the yellow `units-selected`), driven by a new
+  `chosenSupplyUnitIds` MapView prop fed from `planRdv.{truckId,unitId}` while a plan flow is active.
+- **OF-8 per-tab focus** (`lib/supplyFocus.ts`, pure). The SupplyPanel reports its active tab
+  (`onTabChange`); the map dims units irrelevant to that tab: Overview → only fuel fleet + depots
+  bright; Supply fleet → only the fleet bright (depots dimmed); Order Fuel → only depots bright
+  (all units dimmed). Dimming is data-driven via `dimmedUnitIds` (icon-opacity) + `dimDepots`.
 
 ## Data Flow
 
