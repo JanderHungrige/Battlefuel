@@ -7,7 +7,7 @@ status: planned
 depends_on: none
 demo_state: "The SAFE metric now produces genuinely safer routes than FAST instead of collapsing onto the same road. It avoids enemy troops — each OPFOR unit projects a danger circle whose radius scales with its echelon (section < platoon < company) — and avoids high-threat tiles, and when the only road runs through danger it takes a longer OFF-ROAD detour around it and rejoins the road (Fast still takes the short, exposed road). In manual waypoint routing each leg can use its own travel mode (e.g. leg 1 on road, leg 2 off-road); changing one waypoint's mode re-plans only that leg, not the whole route."
 created: 2026-06-08
-hash: 07d9f6be
+hash: acfd2a5f
 ---
 
 # Wave 16: Routing safety — enemy avoidance + real Safe detours + per-leg waypoint modes
@@ -30,11 +30,13 @@ Mark `complete` only after ALL three gates pass (never on a localhost demo):
 ## Features
 | # | Feature | Doc | Status | Depends on |
 |---|---------|-----|--------|------------|
-| 1 | enemy-avoidance-cost | — | planned | — |
-| 2 | safe-offroad-detour | — | planned | enemy-avoidance-cost |
-| 3 | per-leg-waypoint-modes | — | planned | — |
+| 1 | enemy-avoidance-cost | docs/82-enemy-avoidance-cost.md | complete | — |
+| 2 | safe-offroad-detour | docs/83-safe-offroad-detour.md | complete | enemy-avoidance-cost |
+| 3 | per-leg-waypoint-modes | docs/84-per-leg-waypoint-modes.md | complete | — |
 
 Build order: 1 → 2, with 3 independent.
+
+**Build status (2026-06-09):** all 3 features built + green (backend 342 tests, frontend 218, mypy/ruff/tsc/eslint/prod-build). F1/F2 on dev (need `annotate_routing` to show — now auto on deploy via startup_data). Wave OPEN — Done-When gates pending.
 
 ### Current state (from code investigation 2026-06-08)
 - **SAFE vs FAST** (`cost_model.py:48-84`, `routing.py:34-37`): both run pgRouting over the **same

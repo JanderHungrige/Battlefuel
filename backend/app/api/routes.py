@@ -68,6 +68,7 @@ async def plan_route(
 class Waypoint(BaseModel):
     lat: float
     lon: float
+    mode: RouteMode | None = None  # per-leg travel mode (v2 W16 F3); falls back to the request mode
 
 
 class PlanWaypointsRequest(BaseModel):
@@ -101,6 +102,7 @@ async def plan_waypoints_route(
         unit_type,
         [(w.lat, w.lon) for w in req.waypoints],
         mode=req.mode,
+        modes=[w.mode or req.mode for w in req.waypoints],
     )
     if not options:
         raise HTTPException(status_code=422, detail="no route through the given waypoints")

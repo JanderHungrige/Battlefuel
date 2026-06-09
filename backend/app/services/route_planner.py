@@ -252,6 +252,81 @@ async def plan_legs(
     return legs
 
 
+def leg_modes_for(modes: list[RouteMode] | None, mode: RouteMode, n: int) -> list[RouteMode]:
+    """Per-leg modes: explicit ``modes`` if given (must match leg count), else ``mode`` for all
+    legs (v2 Wave 16 F3 — each waypoint leg can use its own travel mode)."""
+    if modes is None:
+        return [mode] * n
+    if len(modes) != n:
+        raise ValueError(f"expected {n} leg modes, got {len(modes)}")
+    return modes
+
+
+async def plan_legs_per_mode(
+    session: AsyncSession,
+    routing: RoutingProvider,
+    unit_type: UnitType,
+    start_lat: float,
+    start_lon: float,
+    waypoints: list[tuple[float, float]],
+    modes: list[RouteMode],
+    metric: RouteMetric,
+) -> list[tuple[RoutePath, float]] | None:
+    """Plan each leg with *its own* mode's provider + speed. Returns [(path, speed_kph)] or None."""
+    legs: list[tuple[RoutePath, float]] = []
+    cur_lat, cur_lon = start_lat, start_lon
+    for (wlat, wlon), lmode in zip(waypoints, modes, strict=True):
+        provider, speed = waypoint_provider_and_speed(routing, unit_type, lmode)
+        leg = await provider.shortest_path(session, cur_lat, cur_lon, wlat, wlon, metric)
+        if leg is None:
+            return None
+        legs.append((leg, speed))
+        cur_lat, cur_lon = wlat, wlon
+    return legs
+
+
+def aggregate_leg_options(
+    legs: list[tuple[RoutePath, float]],
+    *,
+    label: str,
+    metric: RouteMetric,
+    consumption_normal_lph: float,
+    start_fuel_l: float,
+) -> RouteOption | None:
+    """Combine per-leg (path, speed) into one option: duration + fuel summed **per leg** (each at
+    its own speed, so mixed road/off-road legs are estimated correctly), geometry stitched, threat
+    = max (v2 Wave 16 F3)."""
+    if not legs:
+        return None
+    stitched = stitch_paths([p for p, _ in legs])
+    if stitched is None:
+        return None
+    leg_opts = [
+        build_option(
+            p,
+            label=label,
+            speed_road_kph=s,
+            consumption_normal_lph=consumption_normal_lph,
+            start_fuel_l=start_fuel_l,
+        )
+        for p, s in legs
+    ]
+    total_fuel = sum(o.fuel_consumed_l for o in leg_opts)
+    remaining = start_fuel_l - total_fuel
+    return RouteOption(
+        label=label,
+        metric=metric,
+        geometry=stitched.geometry,
+        distance_m=round(stitched.distance_m, 1),
+        duration_s=round(sum(o.duration_s for o in leg_opts), 1),
+        threat_max=stitched.threat_max,
+        threat_avg=round(stitched.threat_avg, 3),
+        fuel_consumed_l=round(total_fuel, 1),
+        fuel_remaining_l=round(max(0.0, remaining), 1),
+        sufficient_fuel=remaining >= 0,
+    )
+
+
 async def plan_waypoint_routes(
     session: AsyncSession,
     routing: RoutingProvider,
@@ -260,11 +335,15 @@ async def plan_waypoint_routes(
     waypoints: list[tuple[float, float]],
     *,
     mode: RouteMode = RouteMode.ROAD,
+    modes: list[RouteMode] | None = None,
 ) -> list[RouteOption]:
-    """Fastest + safest options for a multi-leg waypoint route (v2 Wave 10, waypoint-routing)."""
+    """Fastest + safest options for a multi-leg waypoint route (v2 Wave 10; per-leg modes v2 W16).
+
+    ``modes`` gives each leg its own travel mode; when omitted, ``mode`` applies to every leg.
+    """
     if not waypoints:
         return []
-    provider, speed_kph = waypoint_provider_and_speed(routing, unit_type, mode)
+    leg_modes = leg_modes_for(modes, mode, len(waypoints))
     start_fuel = (
         instance.current_fuel_liters
         if instance.current_fuel_liters is not None
@@ -272,19 +351,18 @@ async def plan_waypoint_routes(
     )
     options: list[RouteOption] = []
     for metric, label in _METRICS:
-        legs = await plan_legs(session, provider, instance.lat, instance.lon, waypoints, metric)
+        legs = await plan_legs_per_mode(
+            session, routing, unit_type, instance.lat, instance.lon, waypoints, leg_modes, metric
+        )
         if legs is None:
             continue
-        stitched = stitch_paths(legs)
-        if stitched is None:
-            continue
-        options.append(
-            build_option(
-                stitched,
-                label=label,
-                speed_road_kph=speed_kph,
-                consumption_normal_lph=unit_type.fuel.consumption_normal_lph,
-                start_fuel_l=start_fuel,
-            )
+        opt = aggregate_leg_options(
+            legs,
+            label=label,
+            metric=metric,
+            consumption_normal_lph=unit_type.fuel.consumption_normal_lph,
+            start_fuel_l=start_fuel,
         )
+        if opt is not None:
+            options.append(opt)
     return options

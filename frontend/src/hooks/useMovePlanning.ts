@@ -24,7 +24,7 @@ export interface MovePlanningState {
   setSelectedMetric: (m: RouteMetric) => void
   mode: RouteMode
   setMode: (m: RouteMode) => void
-  waypoints: { lat: number; lon: number }[]
+  waypoints: { lat: number; lon: number; mode: RouteMode }[]
   waypointMode: boolean
   startRouting: () => void
   addWaypoint: (lat: number, lon: number) => void
@@ -50,7 +50,7 @@ export function useMovePlanning(
   const [routeOptions, setRouteOptions] = useState<RouteOption[]>([])
   const [selectedMetric, setSelectedMetric] = useState<RouteMetric | null>(null)
   const [mode, setModeState] = useState<RouteMode>('road')
-  const [waypoints, setWaypoints] = useState<{ lat: number; lon: number }[]>([])
+  const [waypoints, setWaypoints] = useState<{ lat: number; lon: number; mode: RouteMode }[]>([])
   const [waypointMode, setWaypointMode] = useState(false)
   const [planLoading, setPlanLoading] = useState(false)
   const [planError, setPlanError] = useState<string | null>(null)
@@ -115,7 +115,7 @@ export function useMovePlanning(
   // each point is dropped (unit → wp1, then unit → wp1 → wp2, …). Keeps the operator's
   // fastest/safest choice across re-plans.
   const planWaypointPreview = useCallback(
-    (wps: { lat: number; lon: number }[], m: RouteMode) => {
+    (wps: { lat: number; lon: number; mode: RouteMode }[], m: RouteMode) => {
       if (!selectedUnitId || wps.length === 0) {
         setRouteOptions([])
         setSelectedMetric(null)
@@ -140,10 +140,11 @@ export function useMovePlanning(
   const setMode = useCallback(
     (m: RouteMode) => {
       setModeState(m)
-      if (waypoints.length > 0) planWaypointPreview(waypoints, m)
-      else if (destination) planFor(destination.lat, destination.lon, m)
+      // During waypoint routing the mode applies to the NEXT point only — existing legs keep
+      // their own mode (v2 W16 F3), so we don't re-plan them. Otherwise re-plan the destination.
+      if (waypoints.length === 0 && destination) planFor(destination.lat, destination.lon, m)
     },
-    [destination, planFor, waypoints, planWaypointPreview],
+    [destination, planFor, waypoints],
   )
 
   // Waypoint routing (v2 Wave 10 F5): Start → drop waypoints (route extends to each new point
@@ -161,7 +162,9 @@ export function useMovePlanning(
   const addWaypoint = useCallback(
     (lat: number, lon: number) => {
       if (!selectedUnitId) return
-      const next = [...waypoints, { lat, lon }]
+      // Each waypoint captures the currently-selected mode (v2 W16 F3): set mode → click point →
+      // that leg uses that mode. Changing the mode later only affects the next point placed.
+      const next = [...waypoints, { lat, lon, mode }]
       setWaypoints(next)
       planWaypointPreview(next, mode)
     },
