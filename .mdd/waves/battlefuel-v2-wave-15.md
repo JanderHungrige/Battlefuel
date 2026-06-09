@@ -3,11 +3,11 @@ id: battlefuel-v2-wave-15
 title: "Wave 15: Branded landing page + faux security gate"
 initiative: battlefuel-v2
 initiative_version: 9
-status: planned
+status: complete
 depends_on: none
 demo_state: "On opening BattleFuel the user first lands on a modern, branded landing page — a hero with the BattleFuel identity and tagline, a 'Powered by' row showing the Eraneos and World Fuel Services logos, and a faux security panel that briefly 'verifies clearance' and then reads 'USER SECURITY ACCESS: APPROVED'. An 'Enter BattleFuel' button then takes the user into the operational map app. The gate shows once per browser session (a reload within the session goes straight to the app)."
 created: 2026-06-08
-hash: 245463cf
+hash: a52e7c2c
 ---
 
 # Wave 15: Branded landing page + faux security gate
@@ -22,9 +22,9 @@ See frontmatter `demo_state`.
 
 ## Done-When (close-out gate)
 Mark `complete` only after ALL three gates pass (never on a localhost demo):
-- [ ] **tested local** — `make dev`, demoed on localhost
-- [ ] **tested online** — merged to `dev-deployment`, deployed to `:3001`, verified there
-- [ ] **merged into main / deployed in prod** — on `main`, live `:3000` (needs approval first)
+- [x] **tested local** — `make dev`, demoed on localhost
+- [x] **tested online** — on `dev-deployment`, deployed to `:3001`, verified
+- [x] **merged into main / deployed in prod** — in `main` (prod merge `7195a07`), live `:3000`
 
 ## Features
 | # | Feature | Doc | Status | Depends on |

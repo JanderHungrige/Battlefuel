@@ -3,11 +3,11 @@ id: battlefuel-v2-wave-16
 title: "Wave 16: Routing safety — enemy avoidance + real Safe detours + per-leg waypoint modes"
 initiative: battlefuel-v2
 initiative_version: 10
-status: planned
+status: complete
 depends_on: none
 demo_state: "The SAFE metric now produces genuinely safer routes than FAST instead of collapsing onto the same road. It avoids enemy troops — each OPFOR unit projects a danger circle whose radius scales with its echelon (section < platoon < company) — and avoids high-threat tiles, and when the only road runs through danger it takes a longer OFF-ROAD detour around it and rejoins the road (Fast still takes the short, exposed road). In manual waypoint routing each leg can use its own travel mode (e.g. leg 1 on road, leg 2 off-road); changing one waypoint's mode re-plans only that leg, not the whole route."
 created: 2026-06-08
-hash: acfd2a5f
+hash: 5506369a
 ---
 
 # Wave 16: Routing safety — enemy avoidance + real Safe detours + per-leg waypoint modes
@@ -23,9 +23,9 @@ See frontmatter `demo_state`.
 
 ## Done-When (close-out gate)
 Mark `complete` only after ALL three gates pass (never on a localhost demo):
-- [ ] **tested local** — `make dev`, demoed on localhost
-- [ ] **tested online** — merged to `dev-deployment`, deployed to `:3001`, verified there
-- [ ] **merged into main / deployed in prod** — on `main`, live `:3000` (needs approval first)
+- [x] **tested local** — `make dev`, demoed on localhost
+- [x] **tested online** — on `dev-deployment`, deployed to `:3001`, verified
+- [x] **merged into main / deployed in prod** — in `main` (prod merge dev→main, 2026-06-09), live `:3000`
 
 ## Features
 | # | Feature | Doc | Status | Depends on |

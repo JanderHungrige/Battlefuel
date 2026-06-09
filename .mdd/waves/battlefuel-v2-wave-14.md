@@ -3,11 +3,11 @@ id: battlefuel-v2-wave-14
 title: "Wave 14: Theater scenario — East/West frontline"
 initiative: battlefuel-v2
 initiative_version: 8
-status: planned
+status: complete
 depends_on: none
 demo_state: "The default Hohenfels theater reads as a coherent East/West battle. NATO forces sit mostly in the WEST and OPFOR in the EAST, separated by an irregular North–South frontline (not a straight line — it has gaps and bulges). NATO combat units are positioned forward toward the frontline while depots and HQ sit in the rear (further west); there are a few more frontline combat units than before. Threats cluster around the frontline with a few sightings reaching deeper in, and the East sector is mostly threat-filled. New threats appear more slowly than today, and light threats (e.g. drone-activity sightings) fade away over time rather than persisting. Built on the existing seed + event-engine — no new map data."
 created: 2026-06-08
-hash: d32caa3d
+hash: 8ce8a903
 ---
 
 # Wave 14: Theater scenario — East/West frontline
@@ -26,9 +26,9 @@ See frontmatter `demo_state`.
 
 ## Done-When (close-out gate)
 Mark `complete` only after ALL three gates pass (never on a localhost demo):
-- [ ] **tested local** — `make dev`, demoed on localhost
-- [ ] **tested online** — merged to `dev-deployment`, deployed to `:3001`, verified there
-- [ ] **merged into main / deployed in prod** — on `main`, live `:3000` (needs approval first)
+- [x] **tested local** — `make dev`, demoed on localhost
+- [x] **tested online** — on `dev-deployment`, deployed to `:3001`, verified
+- [x] **merged into main / deployed in prod** — in `main` (prod merge `7195a07`), live `:3000`
 
 ## Features
 | # | Feature | Doc | Status | Depends on |
