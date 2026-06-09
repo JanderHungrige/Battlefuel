@@ -274,14 +274,16 @@ export default function App() {
     () => (supply.overview?.trucks ?? []).map((t) => t.instance_id),
     [supply.overview],
   )
-  const chosenSupplyUnitIds = useMemo(
-    () => (planRdv.phase !== 'idle' ? [planRdv.truckId, planRdv.unitId].filter(Boolean) : []),
-    [planRdv.phase, planRdv.truckId, planRdv.unitId],
-  )
   const dimmedUnits = useMemo(
     () => (isOf8 ? dimmedUnitIds(supplyTab, units.map((u) => u.id), truckIds) : []),
     [isOf8, supplyTab, units, truckIds],
   )
+  // Purple fleet halo on every fuel truck in OF-8, except those dimmed by the active tab (v2 W13).
+  const fleetUnitIds = useMemo(() => {
+    if (!isOf8) return []
+    const dimmed = new Set(dimmedUnits)
+    return truckIds.filter((id) => !dimmed.has(id))
+  }, [isOf8, truckIds, dimmedUnits])
   // Rendezvous preview precedence: an active plan flow → a clicked archive order → an added refuel stop.
   const rdvRoutes =
     planRdv.phase !== 'idle'
@@ -496,7 +498,7 @@ export default function App() {
               onPickRendezvousUnit={planRdv.pickUnit}
               rendezvousPickSector={planRdv.phase === 'pick-sector'}
               onPickRendezvousSector={planRdv.pickSector}
-              chosenSupplyUnitIds={chosenSupplyUnitIds}
+              fleetUnitIds={fleetUnitIds}
               dimmedUnitIds={dimmedUnits}
               dimDepots={isOf8 && dimDepots(supplyTab)}
               onPickDestination={(lat, lon) =>
@@ -520,6 +522,7 @@ export default function App() {
               <SupplyPanel
                 overview={supply.overview}
                 depots={supply.depots}
+                unitTypes={unitTypes}
                 refuelTargets={supplyOrders.refuelTargets}
                 recommendation={supplyOrders.recommendation}
                 busy={supplyOrders.busy}

@@ -106,8 +106,8 @@ export interface MapViewProps {
   /** Rendezvous sector-pick mode: any map click picks the meeting sector point. */
   rendezvousPickSector?: boolean
   onPickRendezvousSector?: (lat: number, lon: number) => void
-  /** Instance ids highlighted orange as the chosen supply units (Plan rendezvous) (v2 W13). */
-  chosenSupplyUnitIds?: string[]
+  /** Fuel-truck instance ids to mark with a purple fleet halo (OF-8 supply view) (v2 W13). */
+  fleetUnitIds?: string[]
   /** Friendly unit instance ids to dim on the map (OF-8 per-tab focus) (v2 W13). */
   dimmedUnitIds?: string[]
   /** Dim the depots layer (OF-8 supply-fleet tab focus) (v2 W13). */
@@ -327,19 +327,19 @@ function initLayers(map: maplibregl.Map): void {
       'circle-stroke-color': SELECTED_UNIT_RING,
     },
   })
-  // Chosen-supply halo (orange), for the Plan-rendezvous truck + picked unit (v2 W13). Drawn over
-  // the yellow selection halo but under the icon; filter from chosenSupplyUnitIds.
+  // Fuel-fleet halo (purple), behind every fuel truck in the OF-8 supply view (v2 W13). Drawn over
+  // the yellow selection halo but under the icon; filter from fleetUnitIds.
   map.addLayer({
-    id: 'units-chosen-supply',
+    id: 'units-fleet',
     type: 'circle',
     source: 'units',
     filter: ['in', ['get', 'id'], ['literal', []]],
     paint: {
       'circle-radius': 16,
-      'circle-color': '#ff8c00',
-      'circle-opacity': 0.5,
+      'circle-color': '#a855f7',
+      'circle-opacity': 0.55,
       'circle-stroke-width': 2.5,
-      'circle-stroke-color': '#ff6500',
+      'circle-stroke-color': '#7c3aed',
     },
   })
   map.addLayer({
@@ -1049,12 +1049,12 @@ export function MapView(props: MapViewProps) {
     mapRef.current.setFilter('unit-fuel-bars', ['!=', ['get', 'id'], sel || ' '])
     mapRef.current.setFilter('unit-fuel-bars-selected', ['==', ['get', 'id'], sel])
   }, [props.selectedUnitId])
-  // Chosen-supply orange halo (Plan rendezvous truck + unit) (v2 W13).
+  // Fuel-fleet purple halo (OF-8) (v2 W13).
   useEffect(() => {
     if (!readyRef.current || !mapRef.current) return
-    const ids = props.chosenSupplyUnitIds ?? []
-    mapRef.current.setFilter('units-chosen-supply', ['in', ['get', 'id'], ['literal', ids]])
-  }, [props.chosenSupplyUnitIds])
+    const ids = props.fleetUnitIds ?? []
+    mapRef.current.setFilter('units-fleet', ['in', ['get', 'id'], ['literal', ids]])
+  }, [props.fleetUnitIds])
   // OF-8 per-tab focus: dim irrelevant units + (on the fleet tab) depots (v2 W13).
   useEffect(() => {
     if (!readyRef.current || !mapRef.current) return

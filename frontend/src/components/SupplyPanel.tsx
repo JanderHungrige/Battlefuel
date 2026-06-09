@@ -1,7 +1,8 @@
 // OF-8 supply panel (Wave 5 of8-supply-ui): fuel distribution + buy / refuel order placement.
 
 import { useEffect, useMemo, useState } from 'react'
-import type { FuelDepot, FuelPlatform, RefuelOrder, SupplyOverview } from '../api/types'
+import type { FuelDepot, FuelPlatform, RefuelOrder, SupplyOverview, UnitType } from '../api/types'
+import { unitTypeName } from '../lib/callSign'
 import { logisticSiteShort } from '../lib/logisticSite'
 import { type OrderMeta, OrderFuelMask } from './OrderFuelMask'
 
@@ -17,6 +18,8 @@ export interface RecommendationView {
 export interface SupplyPanelProps {
   overview: SupplyOverview | null
   depots: FuelDepot[]
+  /** Unit-type catalog, to show the unit type behind fleet call signs (v2 W13). */
+  unitTypes?: UnitType[]
   refuelTargets: { id: string; name: string }[]
   recommendation: RecommendationView | null
   busy?: boolean
@@ -51,6 +54,7 @@ const fmt = (n: number): string => Math.round(n).toLocaleString()
 export function SupplyPanel({
   overview,
   depots,
+  unitTypes = [],
   refuelTargets,
   recommendation,
   busy = false,
@@ -269,6 +273,11 @@ export function SupplyPanel({
                   title="Mark + locate on map"
                 >
                   {t.name}
+                  {unitTypeName(t.unit_type_id, unitTypes) && (
+                    <span className="truck-fleet-type" data-testid={`truck-type-${t.instance_id}`}>
+                      {' '}· {unitTypeName(t.unit_type_id, unitTypes)}
+                    </span>
+                  )}
                 </button>
                 <span
                   className={`truck-status ${t.assigned_unit_id ? 'tasked' : 'standby'}`}
