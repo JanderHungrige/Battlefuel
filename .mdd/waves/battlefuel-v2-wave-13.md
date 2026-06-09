@@ -36,7 +36,7 @@ Mark `complete` only after ALL three gates pass (never on a localhost demo):
 | 3 | plan-rendezvous-ui | docs/87-plan-rendezvous-ui.md | active | rendezvous-routing |
 | 4 | rendezvous-archive-and-reminder-ui | docs/88-rendezvous-archive-and-reminder-ui.md | active | scheduled-rendezvous-orders, plan-rendezvous-ui |
 | 5 | threat-halt-popup-fix | docs/89-threat-halt-popup-fix.md | active | — |
-| 6 | plan-move-with-refueling | — | planned | rendezvous-routing |
+| 6 | plan-move-with-refueling | docs/90-plan-move-with-refueling.md | active | rendezvous-routing |
 | 7 | force-protection-fuel-run | — | planned | — |
 
 Build order: 1 → 2 → 3 → 4 (rendezvous core); **5** (threat-halt UX, independent — has a real bug);

@@ -237,6 +237,24 @@ export default function App() {
     planning.resetPlanning()
     setSelectedUnitId(halted.instanceId)
   }, [halted, planning])
+  // Plan the current move with a refuel stop on the way (nearest tanker) (v2 W13 F6).
+  const addRefuelStop = useCallback(() => {
+    const dest = planning.destination
+    if (!selectedUnitId || !dest || !planning.selectedMetric) return
+    api
+      .moveWithRefuel({
+        instance_id: selectedUnitId,
+        dest_lat: dest.lat,
+        dest_lon: dest.lon,
+        metric: planning.selectedMetric,
+        mode: planning.mode,
+      })
+      .then(() => {
+        pushChatter(`Move with refuel stop planned: ${selectedUnit?.name ?? selectedUnitId}`, 'order')
+        clear()
+      })
+      .catch((e: unknown) => pushChatter(errorMessage(e), 'status'))
+  }, [selectedUnitId, planning.destination, planning.selectedMetric, planning.mode, selectedUnit, pushChatter, clear])
 
   // Manually place a fuel depot — or a typed stocked logistic site (v2 Wave 10 F6 / W11 F5).
   const placeDepot = useCallback(
@@ -548,6 +566,7 @@ export default function App() {
                 confirming={planning.confirming}
                 onSelectOption={planning.setSelectedMetric}
                 onConfirm={() => planning.confirmMove(clear)}
+                onAddRefuelStop={addRefuelStop}
                 onCancel={clear}
               />
             )}

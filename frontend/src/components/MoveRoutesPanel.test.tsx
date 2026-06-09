@@ -105,3 +105,22 @@ describe('MoveRoutesPanel', () => {
     expect(screen.getByText('Click a destination on the map.')).toBeInTheDocument()
   })
 })
+
+describe('MoveRoutesPanel — add refuel stop (v2 W13 F6)', () => {
+  it('fires onAddRefuelStop when the button is clicked', () => {
+    const onAddRefuelStop = vi.fn()
+    setup({ onAddRefuelStop })
+    fireEvent.click(screen.getByTestId('add-refuel-stop'))
+    expect(onAddRefuelStop).toHaveBeenCalledOnce()
+  })
+
+  it('hides the refuel-stop button when no handler is given', () => {
+    setup()
+    expect(screen.queryByTestId('add-refuel-stop')).toBeNull()
+  })
+
+  it('disables the refuel-stop button when no metric is selected', () => {
+    setup({ onAddRefuelStop: vi.fn(), selectedMetric: null })
+    expect(screen.getByTestId('add-refuel-stop')).toBeDisabled()
+  })
+})

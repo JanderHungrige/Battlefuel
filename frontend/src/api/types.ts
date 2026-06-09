@@ -403,6 +403,22 @@ export interface RendezvousResponse {
   refuel_order: RefuelOrder
 }
 
+/** Plan a move with a refuel stop on the way (v2 Wave 13 F6). */
+export interface MoveWithRefuelRequest {
+  instance_id: string
+  dest_lat: number
+  dest_lon: number
+  metric: RouteMetric
+  mode?: RouteMode
+}
+
+export interface MoveWithRefuelResponse {
+  rendezvous: SectorPoint
+  unit_move_order: MoveOrder
+  tanker_move_order: MoveOrder
+  refuel_order: RefuelOrder
+}
+
 export type RendezvousOrderStatus = 'planned' | 'due' | 'launched' | 'cancelled'
 
 /** A rendezvous fuel run planned against the sim clock (F2), filed in the order archive. */

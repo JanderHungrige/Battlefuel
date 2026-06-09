@@ -10,12 +10,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
 from app.domain.move_order import MoveOrder, MoveOrderStatus
+from app.domain.refuel import RefuelOrder
 from app.domain.route import RouteMetric, RouteMode
+from app.providers.base import UnitDataProvider
 from app.providers.factory import build_unit_provider
 from app.providers.move_orders import MoveOrderProvider, build_move_order_provider
+from app.providers.refuel_orders import RefuelOrderProvider, build_refuel_order_provider
 from app.providers.routing import RoutingProvider, build_routing_provider
+from app.providers.tiles import TileDataProvider, build_tile_provider
 from app.providers.unit_instances import UnitInstanceProvider, build_unit_instance_provider
 from app.services.move_order_service import create_move_order, create_move_order_waypoints
+from app.services.move_refuel_service import plan_move_with_refuel
 
 router = APIRouter(tags=["move-orders"])
 
@@ -30,6 +35,18 @@ def get_instance_provider() -> UnitInstanceProvider:
 
 def get_order_provider() -> MoveOrderProvider:
     return build_move_order_provider()
+
+
+def get_refuel_order_provider() -> RefuelOrderProvider:
+    return build_refuel_order_provider()
+
+
+def get_unit_data_provider() -> UnitDataProvider:
+    return build_unit_provider()
+
+
+def get_tile_provider() -> TileDataProvider:
+    return build_tile_provider()
 
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
@@ -179,6 +196,70 @@ async def continue_order(order_id: str, session: SessionDep, orders: OrderDep) -
     updated = await orders.set_status(session, order_id, MoveOrderStatus.CONTINUING)
     assert updated is not None
     return updated
+
+
+class MoveWithRefuelRequest(BaseModel):
+    instance_id: str
+    dest_lat: float
+    dest_lon: float
+    metric: RouteMetric = RouteMetric.SAFE
+    mode: RouteMode = RouteMode.ROAD
+
+
+class _RefuelSector(BaseModel):
+    lat: float
+    lon: float
+    h3: str
+
+
+class MoveWithRefuelResponse(BaseModel):
+    rendezvous: _RefuelSector
+    unit_move_order: MoveOrder
+    tanker_move_order: MoveOrder
+    refuel_order: RefuelOrder
+
+
+@router.post("/move-orders/with-refuel", status_code=201)
+async def move_with_refuel(
+    req: MoveWithRefuelRequest,
+    session: SessionDep,
+    routing: RoutingDep,
+    orders: OrderDep,
+    instances: InstanceDep,
+    refuel_orders: Annotated[RefuelOrderProvider, Depends(get_refuel_order_provider)],
+    units: Annotated[UnitDataProvider, Depends(get_unit_data_provider)],
+    tiles: Annotated[TileDataProvider, Depends(get_tile_provider)],
+) -> MoveWithRefuelResponse:
+    """Plan a move with a refuel stop on the way: nearest tanker, rendezvous nudged out of threat,
+    stitched into the unit's route (unit → rendezvous → dest) + tanker dispatched (v2 W13 F6)."""
+    try:
+        result = await plan_move_with_refuel(
+            session,
+            routing,
+            orders,
+            refuel_orders,
+            instances,
+            units,
+            tiles,
+            instance_id=req.instance_id,
+            dest_lat=req.dest_lat,
+            dest_lon=req.dest_lon,
+            metric=req.metric,
+            mode=req.mode,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    if result is None:
+        raise HTTPException(
+            status_code=422,
+            detail="no compatible tanker available, or the route is not possible",
+        )
+    return MoveWithRefuelResponse(
+        rendezvous=_RefuelSector(lat=result.sector_lat, lon=result.sector_lon, h3=result.sector_h3),
+        unit_move_order=result.unit_move_order,
+        tanker_move_order=result.tanker_move_order,
+        refuel_order=result.refuel_order,
+    )
 
 
 @router.get("/move-orders")

@@ -19,6 +19,8 @@ interface MoveRoutesPanelProps {
   confirming: boolean
   onSelectOption: (metric: RouteMetric) => void
   onConfirm: () => void
+  /** Plan this move with a refuel stop on the way (nearest tanker) (v2 W13 F6). */
+  onAddRefuelStop?: () => void
   onCancel: () => void
 }
 
@@ -98,6 +100,7 @@ export function MoveRoutesPanel({
   confirming,
   onSelectOption,
   onConfirm,
+  onAddRefuelStop,
   onCancel,
 }: MoveRoutesPanelProps) {
   return (
@@ -187,6 +190,19 @@ export function MoveRoutesPanel({
           onClick={onConfirm}
         >
           {confirming ? 'Confirming…' : 'Confirm move order'}
+        </button>
+      )}
+
+      {options.length > 0 && onAddRefuelStop && (
+        <button
+          type="button"
+          className="move-add-refuel"
+          data-testid="add-refuel-stop"
+          disabled={selectedMetric === null || confirming}
+          onClick={onAddRefuelStop}
+          title="Insert the nearest tanker as a refuel stop on the way"
+        >
+          + Add refuel stop
         </button>
       )}
     </aside>
