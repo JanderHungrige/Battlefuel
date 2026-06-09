@@ -32,7 +32,7 @@ Mark `complete` only after ALL three gates pass (never on a localhost demo):
 | # | Feature | Doc | Status | Depends on |
 |---|---------|-----|--------|------------|
 | 1 | rendezvous-routing | docs/85-rendezvous-routing.md | active | — |
-| 2 | scheduled-rendezvous-orders | — | planned | rendezvous-routing |
+| 2 | scheduled-rendezvous-orders | docs/86-scheduled-rendezvous-orders.md | active | rendezvous-routing |
 | 3 | plan-rendezvous-ui | — | planned | rendezvous-routing |
 | 4 | rendezvous-archive-and-reminder-ui | — | planned | scheduled-rendezvous-orders, plan-rendezvous-ui |
 | 5 | threat-halt-popup-fix | — | planned | — |

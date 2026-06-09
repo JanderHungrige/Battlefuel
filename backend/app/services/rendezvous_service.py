@@ -77,7 +77,7 @@ class RendezvousResult:
         self.refuel_order = refuel_order
 
 
-def _valid_refuel_pair(truck_id: str, unit_id: str, truck_type: object, fuel_type: object) -> bool:
+def valid_refuel_pair(truck_id: str, unit_id: str, truck_type: object, fuel_type: object) -> bool:
     """The truck must be a FUEL_SUPPLY of the unit's fuel type, and not the unit itself."""
     return (
         truck_id != unit_id
@@ -154,7 +154,7 @@ async def start_rendezvous(
         raise LookupError("unit type missing from catalog")
 
     fuel_type = unit_type.fuel.fuel_type
-    if not _valid_refuel_pair(truck_id, unit_id, truck_type, fuel_type):
+    if not valid_refuel_pair(truck_id, unit_id, truck_type, fuel_type):
         return None
 
     s_lat, s_lon, s_h3 = resolve_sector(sector_lat, sector_lon)

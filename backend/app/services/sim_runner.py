@@ -31,6 +31,7 @@ from app.providers.combat_events import (
 from app.providers.factory import build_unit_provider
 from app.providers.move_orders import MoveOrderProvider, build_move_order_provider
 from app.providers.refuel_orders import build_refuel_order_provider
+from app.providers.rendezvous import build_rendezvous_order_provider
 from app.providers.strategic_feed import (
     StrategicFeedProvider,
     build_strategic_feed_provider,
@@ -44,6 +45,7 @@ from app.services.buy_service import progress_buy_order_stages
 from app.services.cost_model import TileFactors, tile_factors
 from app.services.event_engine import EventEngine
 from app.services.refuel_service import try_complete_depot_refuel, try_complete_refuel
+from app.services.rendezvous_schedule_service import decrement_and_collect_due
 from app.services.sim import SimStep, advance, advance_with_terrain, substep_dt
 from app.services.tile_grid import DEFAULT_RESOLUTION
 from app.services.tile_mutation import apply_tile_mutation, tile_update_frame
@@ -96,6 +98,7 @@ class SimEngine:
                     await self.tick(session, dt_game)
                     await self.complete_refuels(session)
                     await self.advance_buy_orders(session, dt_game)
+                    await self.check_rendezvous_reminders(session, dt_game)
                     await self.apply_feed(session, feed, prev_game_s, self._game_s)
                     await self.apply_strategic_feed(strategic, prev_game_s, self._game_s)
                     await self.apply_combat_feed(combat, prev_game_s, self._game_s)
@@ -206,6 +209,38 @@ class SimEngine:
                 }
             )
         return len(changed)
+
+    async def check_rendezvous_reminders(self, session: AsyncSession, dt_game_s: float) -> int:
+        """Count down planned rendezvous orders; on a due order broadcast a reminder (no
+        auto-dispatch) + a chatter line and flip it to ``due``. Public for testing. Returns the
+        number of reminders fired this step (v2 Wave 13 F2)."""
+        orders = build_rendezvous_order_provider()
+        due = await decrement_and_collect_due(session, orders, dt_game_s)
+        for order in due:
+            await self._manager.broadcast(
+                {
+                    "type": "rendezvous_reminder",
+                    "order_id": order.id,
+                    "truck_id": order.truck_id,
+                    "unit_id": order.unit_id,
+                    "sector_lat": order.sector_lat,
+                    "sector_lon": order.sector_lon,
+                    "sector_h3": order.sector_h3,
+                    "metric": order.metric.value,
+                    "status": order.status.value,
+                }
+            )
+            await self._manager.broadcast(
+                {
+                    "type": "strategic_message",
+                    "text": (
+                        f"Scheduled rendezvous due — tanker {order.truck_id} ↔ unit "
+                        f"{order.unit_id} at sector {order.sector_h3}. Confirm to launch."
+                    ),
+                    "category": "logistics",
+                }
+            )
+        return len(due)
 
     async def tick(self, session: AsyncSession, dt_game_s: float) -> None:
         """Advance every active order by one game-time step. Public for testing."""
