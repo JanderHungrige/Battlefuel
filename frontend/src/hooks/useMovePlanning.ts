@@ -140,11 +140,20 @@ export function useMovePlanning(
   const setMode = useCallback(
     (m: RouteMode) => {
       setModeState(m)
-      // During waypoint routing the mode applies to the NEXT point only — existing legs keep
-      // their own mode (v2 W16 F3), so we don't re-plan them. Otherwise re-plan the destination.
-      if (waypoints.length === 0 && destination) planFor(destination.lat, destination.lon, m)
+      // During waypoint routing the mode applies to the CURRENT (last) leg — the operator clicks a
+      // waypoint, then picks that section's type (v2 W16 F3) — and that leg re-plans. Otherwise
+      // re-plan the destination route.
+      if (waypoints.length > 0) {
+        const next = waypoints.map((w, i) =>
+          i === waypoints.length - 1 ? { ...w, mode: m } : w,
+        )
+        setWaypoints(next)
+        planWaypointPreview(next, m)
+      } else if (destination) {
+        planFor(destination.lat, destination.lon, m)
+      }
     },
-    [destination, planFor, waypoints],
+    [destination, planFor, waypoints, planWaypointPreview],
   )
 
   // Waypoint routing (v2 Wave 10 F5): Start → drop waypoints (route extends to each new point
@@ -162,8 +171,8 @@ export function useMovePlanning(
   const addWaypoint = useCallback(
     (lat: number, lon: number) => {
       if (!selectedUnitId) return
-      // Each waypoint captures the currently-selected mode (v2 W16 F3): set mode → click point →
-      // that leg uses that mode. Changing the mode later only affects the next point placed.
+      // A new waypoint's leg defaults to the current mode; the operator then picks that section's
+      // type via the selector, which updates this (now current) leg — click point, then select.
       const next = [...waypoints, { lat, lon, mode }]
       setWaypoints(next)
       planWaypointPreview(next, mode)
