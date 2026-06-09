@@ -76,3 +76,17 @@ describe('PlanRendezvousPanel', () => {
     expect(onSelectMetric).toHaveBeenCalledWith('fast')
   })
 })
+
+describe('PlanRendezvousPanel — force protection (v2 W13 F7)', () => {
+  it('warns + relabels Order now when the tanker route crosses threat', () => {
+    render(<PlanRendezvousPanel {...base} metric="fast" />)
+    expect(screen.getByTestId('rdv-force-protection')).toBeInTheDocument()
+    expect(screen.getByTestId('rdv-order-now')).toHaveTextContent('force protection')
+  })
+
+  it('no force-protection prompt on a safe tanker route', () => {
+    render(<PlanRendezvousPanel {...base} metric="safe" />)
+    expect(screen.queryByTestId('rdv-force-protection')).toBeNull()
+    expect(screen.getByTestId('rdv-order-now')).toHaveTextContent('Order now')
+  })
+})

@@ -2,6 +2,7 @@
 // choose from, and Confirm/Cancel. Driven by useFuelRun.
 
 import type { RouteMetric, RouteOption } from '../api/types'
+import { needsForceProtection } from '../lib/forceProtection'
 
 export interface FuelRunPanelProps {
   phase: 'idle' | 'pick-target' | 'review'
@@ -45,6 +46,9 @@ export function FuelRunPanel({
   if (phase === 'idle') return null
   // Offer the source choice whenever a unit-first run has both a tanker and a depot available.
   const showSourceToggle = phase === 'review' && truckSourceName !== '' && depotSourceName !== ''
+  // Force protection (v2 W13 F7): the chosen route routes a tanker through threat tiles.
+  const selected = options.find((o) => o.metric === metric)
+  const forceProtection = phase === 'review' && needsForceProtection(selected?.threat_max)
   return (
     <aside className="fuel-run-panel" data-testid="fuel-run-panel">
       <div className="fuel-run-head">
@@ -107,6 +111,12 @@ export function FuelRunPanel({
         </ul>
       )}
 
+      {forceProtection && (
+        <p className="fuel-run-force-protection" data-testid="fuel-run-force-protection">
+          ⚠ Route crosses a threat sector — force protection should be considered.
+        </p>
+      )}
+
       {phase === 'review' && (
         <button
           type="button"
@@ -115,7 +125,7 @@ export function FuelRunPanel({
           disabled={busy || !metric || options.length === 0}
           onClick={onConfirm}
         >
-          Confirm fuel run
+          {forceProtection ? 'Confirm fuel run with force protection' : 'Confirm fuel run'}
         </button>
       )}
 

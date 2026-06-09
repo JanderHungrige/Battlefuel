@@ -4,6 +4,7 @@
 
 import { useState } from 'react'
 import type { RouteMetric, RouteOption } from '../api/types'
+import { needsForceProtection } from '../lib/forceProtection'
 
 export interface PlanRendezvousPanelProps {
   phase: 'idle' | 'pick-unit' | 'pick-sector' | 'review'
@@ -62,6 +63,8 @@ export function PlanRendezvousPanel({
 
   const scheduledGameS = hours * 3600 + minutes * 60
   const metrics: RouteMetric[] = ['safe', 'fast']
+  // Force protection (v2 W13 F7): the tanker's chosen route crosses threat tiles.
+  const forceProtection = phase === 'review' && needsForceProtection(optFor(truckRoutes, metric)?.threat_max)
 
   return (
     <aside className="fuel-run-panel rendezvous-panel" data-testid="plan-rendezvous-panel">
@@ -109,6 +112,12 @@ export function PlanRendezvousPanel({
             <MoverRow label="Unit" opt={optFor(unitRoutes, metric)} />
           </ul>
 
+          {forceProtection && (
+            <p className="fuel-run-force-protection" data-testid="rdv-force-protection">
+              ⚠ Tanker route crosses a threat sector — force protection should be considered.
+            </p>
+          )}
+
           <button
             type="button"
             className="fuel-run-confirm"
@@ -116,7 +125,7 @@ export function PlanRendezvousPanel({
             disabled={busy || !metric}
             onClick={onOrderNow}
           >
-            Order now
+            {forceProtection ? 'Order now with force protection' : 'Order now'}
           </button>
 
           {!scheduling ? (
@@ -157,7 +166,7 @@ export function PlanRendezvousPanel({
                 disabled={busy || !metric || scheduledGameS <= 0}
                 onClick={() => onSchedule(scheduledGameS)}
               >
-                Send order
+                {forceProtection ? 'Send order (force protection)' : 'Send order'}
               </button>
             </div>
           )}
