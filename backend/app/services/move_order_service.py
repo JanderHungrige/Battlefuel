@@ -13,10 +13,11 @@ from app.domain.unit_instance import UnitInstance
 from app.providers.move_orders import MoveOrderProvider
 from app.providers.routing import RoutingProvider, build_routing_provider_for_mode
 from app.services.route_planner import (
+    aggregate_leg_options,
     build_option,
-    plan_legs,
+    leg_modes_for,
+    plan_legs_per_mode,
     stitch_paths,
-    waypoint_provider_and_speed,
 )
 
 
@@ -84,30 +85,36 @@ async def create_move_order_waypoints(
     metric: RouteMetric,
     *,
     mode: RouteMode = RouteMode.ROAD,
+    modes: list[RouteMode] | None = None,
 ) -> MoveOrder | None:
-    """Plan the legs through ``waypoints``, stitch them, and persist a pending move order whose
-    geometry is the full multi-leg path (v2 Wave 10, waypoint-routing). None if unroutable."""
+    """Plan the legs through ``waypoints`` (each leg with its own ``modes`` entry, or ``mode`` for
+    all), stitch them, and persist a pending move order whose geometry is the full multi-leg path
+    (v2 Wave 10; per-leg modes v2 W16 F3). None if unroutable."""
     if not waypoints:
         return None
-    provider, speed_kph = waypoint_provider_and_speed(routing, unit_type, mode)
+    leg_modes = leg_modes_for(modes, mode, len(waypoints))
     start_fuel = (
         instance.current_fuel_liters
         if instance.current_fuel_liters is not None
         else unit_type.fuel.capacity_liters
     )
-    legs = await plan_legs(session, provider, instance.lat, instance.lon, waypoints, metric)
+    legs = await plan_legs_per_mode(
+        session, routing, unit_type, instance.lat, instance.lon, waypoints, leg_modes, metric
+    )
     if legs is None:
         return None
-    path = stitch_paths(legs)
+    path = stitch_paths([p for p, _ in legs])
     if path is None:
         return None
-    option = build_option(
-        path,
+    option = aggregate_leg_options(
+        legs,
         label=metric.value,
-        speed_road_kph=speed_kph,
+        metric=metric,
         consumption_normal_lph=unit_type.fuel.consumption_normal_lph,
         start_fuel_l=start_fuel,
     )
+    if option is None:
+        return None
     order = MoveOrder(
         id=uuid.uuid4().hex,
         instance_id=instance.id,

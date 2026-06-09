@@ -17,6 +17,17 @@ cd "$ROOT"
 ENV_FILE="${1:?usage: auto-deploy.sh <env-file> (e.g. deploy/.env.prod)}"
 [ -f "$ENV_FILE" ] || { echo "✖ no such env-file: $ENV_FILE" >&2; exit 1; }
 
+# Serialize across ALL invocations (the cron fires this every minute for both prod AND dev). Two
+# overlapping runs corrupt the containerd content store — one run's `docker image prune` (or a
+# second concurrent pull) deletes layers another run is still pulling, giving
+# "failed commit … rename … no such file or directory" / "lease does not exist". A single global
+# lock makes a slow pull simply skip the next tick instead of racing it.
+exec 9>/tmp/battlefuel-auto-deploy.lock
+if ! flock -n 9; then
+  echo "auto-deploy: another run holds the lock — skipping this tick"
+  exit 0
+fi
+
 COMPOSE=(docker compose --env-file "$ENV_FILE" -f deploy/compose.app.yml)
 
 # Pull only the app images. db is stateful and rarely changes — update it deliberately, not

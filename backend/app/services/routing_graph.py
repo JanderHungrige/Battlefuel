@@ -10,12 +10,17 @@ road_condition), a terrain-aware `time_cost` (the FAST metric), and a threat-wei
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import h3
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domain.enemy_unit import EnemyUnit
 from app.domain.tile import RoadCondition, TerrainType
+from app.providers.enemy_units import build_enemy_unit_provider
 from app.services.cost_model import edge_time_cost, safe_edge_cost, tile_factors
+from app.services.enemy_danger import enemy_threat_at
 from app.services.tile_grid import DEFAULT_RESOLUTION
 
 _NEW_COLUMNS = (
@@ -51,8 +56,17 @@ def _edge_params(
     }
 
 
-async def annotate_ways(session: AsyncSession) -> int:
-    """Add/refresh per-edge factors + time/safe costs. Returns the edge count."""
+async def annotate_ways(
+    session: AsyncSession, enemies: Sequence[EnemyUnit] | None = None
+) -> int:
+    """Add/refresh per-edge factors + time/safe costs. Returns the edge count.
+
+    ``safe_cost`` uses the *effective* threat = max(tile threat, enemy-proximity threat), so SAFE
+    routes around OPFOR danger circles (v2 Wave 16); FAST (``time_cost``) is unaffected. Enemy
+    positions default to the configured provider; pass an explicit list in tests.
+    """
+    if enemies is None:
+        enemies = list(build_enemy_unit_provider().units())
     for col in _NEW_COLUMNS:
         await session.execute(text(f"ALTER TABLE ways ADD COLUMN IF NOT EXISTS {col}"))
 
@@ -79,7 +93,8 @@ async def annotate_ways(session: AsyncSession) -> int:
     for gid, lat, lon, length_m in edges:
         cell = h3.latlng_to_cell(lat, lon, DEFAULT_RESOLUTION)
         terrain, road, threat = tiles.get(cell, (TerrainType.UNKNOWN, RoadCondition.CLEAR, 0))
-        p = _edge_params(gid, terrain, road, threat, length_m)
+        eff_threat = max(threat, enemy_threat_at(lat, lon, enemies))
+        p = _edge_params(gid, terrain, road, eff_threat, length_m)
         p["cell"] = cell
         params.append(p)
     if params:
@@ -95,12 +110,17 @@ async def annotate_ways(session: AsyncSession) -> int:
     return len(params)
 
 
-async def annotate_cell(session: AsyncSession, h3_index: str) -> int:
+async def annotate_cell(
+    session: AsyncSession, h3_index: str, enemies: Sequence[EnemyUnit] | None = None
+) -> int:
     """Re-cost just the edges in one H3 cell after its tile changed. Returns the edge count.
 
     Targeted via the stored ``cell_h3`` column (populated by ``annotate_ways``); falls back to
-    a no-op if the cell has no edges. Uses the same cost model as the bulk annotation.
+    a no-op if the cell has no edges. Uses the same cost model as the bulk annotation, including
+    the enemy-proximity danger boost (so an event re-cost near an enemy keeps avoiding it).
     """
+    if enemies is None:
+        enemies = list(build_enemy_unit_provider().units())
     tile = (
         await session.execute(
             text("SELECT terrain, road_condition, threat_level FROM tiles WHERE h3_index = :h"),
@@ -112,11 +132,19 @@ async def annotate_cell(session: AsyncSession, h3_index: str) -> int:
     terrain, road, threat = tile
     edges = (
         await session.execute(
-            text("SELECT gid, COALESCE(length_m, 0) AS length_m FROM ways WHERE cell_h3 = :h"),
+            text(
+                "SELECT gid, "
+                "ST_Y(ST_LineInterpolatePoint(the_geom, 0.5)) AS lat, "
+                "ST_X(ST_LineInterpolatePoint(the_geom, 0.5)) AS lon, "
+                "COALESCE(length_m, 0) AS length_m FROM ways WHERE cell_h3 = :h"
+            ),
             {"h": h3_index},
         )
     ).all()
-    params = [_edge_params(gid, terrain, road, int(threat), length_m) for gid, length_m in edges]
+    params = []
+    for gid, lat, lon, length_m in edges:
+        eff_threat = max(int(threat), enemy_threat_at(lat, lon, enemies))
+        params.append(_edge_params(gid, terrain, road, eff_threat, length_m))
     if params:
         await session.execute(text(_UPDATE_SQL), params)
     await session.commit()

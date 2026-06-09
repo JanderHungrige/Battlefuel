@@ -124,6 +124,13 @@ def _as_crossing(step: SimStep) -> SimStep:
     return SimStep(step.progress_m, step.lon, step.lat, step.fuel_l, MoveOrderStatus.CROSSING)
 
 
+def _as_continuing(step: SimStep) -> SimStep:
+    """Tag a step CONTINUING (normal-speed cross) unless it already arrived (COMPLETE wins)."""
+    if step.status is MoveOrderStatus.COMPLETE:
+        return step
+    return SimStep(step.progress_m, step.lon, step.lat, step.fuel_l, MoveOrderStatus.CONTINUING)
+
+
 def advance_with_terrain(
     order: MoveOrder,
     fuel_l: float,
@@ -132,30 +139,59 @@ def advance_with_terrain(
     *,
     factors: TileFactors,
     threat_level: int,
+    currently_in_threat: bool = False,
+    entering_new_cell: bool = True,
 ) -> SimStep:
     """Posture- and tile-aware traversal (v2 Wave 10, never-stall-traversal-threat-crossing).
 
     Decides whether the unit moves, crosses at a penalty, or halts cleanly — so it is *never*
     frozen (0 progress while burning fuel). ``factors``/``threat_level`` describe the tile the
-    unit is entering this step; posture is ``order.metric`` and ``order.status == CROSSING``
-    means the operator already chose "proceed slowly". Pure — delegates kinematics to ``advance``.
+    unit is *entering* this step; ``entering_new_cell`` is whether that is a different H3 cell than
+    the unit's current one, and ``currently_in_threat`` whether the current cell is itself a
+    threat-L5 sector. Posture is ``order.metric``; ``CROSSING`` = "proceed slowly", ``CONTINUING``
+    = "Continue" (normal speed). Pure.
 
-    - **crossing** order: crawl across a block (heavy penalty) or threat (lighter); on a clear,
-      sub-L5 tile it reverts to normal ACTIVE movement.
-    - **active** order: a physically blocked tile HALTS (either posture); a threat-L5 tile HALTS
-      in SAFE posture but is crossed at a penalty in FAST; otherwise it advances normally.
+    - **active** order: a blocked tile HALTS. A threat-L5 tile HALTS in SAFE posture on each
+      **transition into a (new) threat cell** — so two threat tiles in a row each prompt, and a
+      unit that *started* inside threat (no cell change yet) does not pop. FAST crosses at a
+      penalty; clear tiles advance normally.
+    - **crossing / continuing** order: a Continue/Proceed authorization covers exactly ONE threat
+      tile — the unit crawls (CROSSING) or runs (CONTINUING) across it, then on leaving that cell
+      it reverts to ACTIVE so the *next* threat tile re-prompts.
     """
     blocked = not factors.passable
     in_threat = threat_level >= THREAT_L5
 
-    if order.status is MoveOrderStatus.CROSSING:
+    # The authorization to cross applies to one tile: once the unit leaves it (a new cell while it
+    # was in threat), drop back to ACTIVE handling so the next threat tile raises a fresh halt.
+    authorized = order.status in (MoveOrderStatus.CONTINUING, MoveOrderStatus.CROSSING) and not (
+        entering_new_cell and currently_in_threat
+    )
+
+    if authorized and order.status is MoveOrderStatus.CONTINUING:
+        if blocked:
+            # A physical block cannot be taken at normal speed — crawl it like CROSSING.
+            return _as_continuing(
+                advance(
+                    order, fuel_l, unit_type, dt_game_s,
+                    speed_factor=BLOCK_CROSS_SPEED_FACTOR,
+                    fuel_factor=factors.fuel_factor * BLOCK_CROSS_FUEL_FACTOR,
+                )
+            )
+        if in_threat:
+            return _as_continuing(
+                advance(order, fuel_l, unit_type, dt_game_s,
+                        speed_factor=factors.speed_factor, fuel_factor=factors.fuel_factor)
+            )
+        # cleared the threat → resume normal movement
+        return advance(order, fuel_l, unit_type, dt_game_s,
+                       speed_factor=factors.speed_factor, fuel_factor=factors.fuel_factor)
+
+    if authorized and order.status is MoveOrderStatus.CROSSING:
         if blocked:
             return _as_crossing(
                 advance(
-                    order,
-                    fuel_l,
-                    unit_type,
-                    dt_game_s,
+                    order, fuel_l, unit_type, dt_game_s,
                     speed_factor=BLOCK_CROSS_SPEED_FACTOR,
                     fuel_factor=factors.fuel_factor * BLOCK_CROSS_FUEL_FACTOR,
                 )
@@ -163,44 +199,28 @@ def advance_with_terrain(
         if in_threat:
             return _as_crossing(
                 advance(
-                    order,
-                    fuel_l,
-                    unit_type,
-                    dt_game_s,
+                    order, fuel_l, unit_type, dt_game_s,
                     speed_factor=factors.speed_factor * THREAT_CROSS_SPEED_FACTOR,
                     fuel_factor=factors.fuel_factor * THREAT_CROSS_FUEL_FACTOR,
                 )
             )
         # cleared the obstruction → resume normal movement
-        return advance(
-            order,
-            fuel_l,
-            unit_type,
-            dt_game_s,
-            speed_factor=factors.speed_factor,
-            fuel_factor=factors.fuel_factor,
-        )
+        return advance(order, fuel_l, unit_type, dt_game_s,
+                       speed_factor=factors.speed_factor, fuel_factor=factors.fuel_factor)
 
-    # ACTIVE order entering this tile.
+    # ACTIVE order (or an authorized cross that just left its tile) entering this tile.
     if blocked:
         return _halted(order, fuel_l)
     if in_threat:
-        if order.metric is RouteMetric.SAFE:
+        # SAFE halts on each transition INTO a (new) threat cell — but not while still inside the
+        # cell it is already in (e.g. a unit that started in threat), which makes no cell change.
+        if order.metric is RouteMetric.SAFE and entering_new_cell:
             return _halted(order, fuel_l)
-        # FAST accepted the fast route → cross the threat sector at a penalty, never halt.
+        # FAST took the fast route, or the unit is moving within a threat cell → cross at penalty.
         return advance(
-            order,
-            fuel_l,
-            unit_type,
-            dt_game_s,
+            order, fuel_l, unit_type, dt_game_s,
             speed_factor=factors.speed_factor * THREAT_CROSS_SPEED_FACTOR,
             fuel_factor=factors.fuel_factor * THREAT_CROSS_FUEL_FACTOR,
         )
-    return advance(
-        order,
-        fuel_l,
-        unit_type,
-        dt_game_s,
-        speed_factor=factors.speed_factor,
-        fuel_factor=factors.fuel_factor,
-    )
+    return advance(order, fuel_l, unit_type, dt_game_s,
+                   speed_factor=factors.speed_factor, fuel_factor=factors.fuel_factor)

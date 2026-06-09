@@ -7,10 +7,12 @@ import {
   combatEventMgrs,
   describeBuyOrderUpdate,
   describeRefuelOrderUpdate,
+  describeRendezvousReminder,
   describeTileUpdate,
   parseBuyOrderUpdate,
   parseCombatEvent,
   parseRefuelOrderUpdate,
+  parseRendezvousReminder,
   parseStrategicMessage,
   parseTileUpdate,
   parseUnitUpdate,
@@ -244,5 +246,36 @@ describe('combatEventMgrs', () => {
   it('formats the event location as a spaced zone-32U MGRS string (to 1 m)', () => {
     const mgrs = combatEventMgrs(combatFrame)
     expect(mgrs).toMatch(/^32U [A-Z]{2} \d{5} \d{5}$/)
+  })
+})
+
+describe('parseRendezvousReminder', () => {
+  const raw = JSON.stringify({
+    type: 'rendezvous_reminder',
+    order_id: 'rdv-1',
+    truck_id: 'inst-fuel-1',
+    unit_id: 'inst-armor-1',
+    sector_lat: 49.2,
+    sector_lon: 11.8,
+    sector_h3: '8abc',
+    metric: 'safe',
+    status: 'due',
+  })
+
+  it('parses a valid rendezvous_reminder frame', () => {
+    const r = parseRendezvousReminder(raw)
+    expect(r?.order_id).toBe('rdv-1')
+    expect(r?.unit_id).toBe('inst-armor-1')
+    expect(r?.status).toBe('due')
+  })
+
+  it('rejects other frame types and malformed input', () => {
+    expect(parseRendezvousReminder(JSON.stringify({ type: 'unit_update' }))).toBeNull()
+    expect(parseRendezvousReminder('not json')).toBeNull()
+  })
+
+  it('describes a due rendezvous for the strategic feed', () => {
+    const r = parseRendezvousReminder(raw)
+    expect(r && describeRendezvousReminder(r)).toContain('Rendezvous due')
   })
 })

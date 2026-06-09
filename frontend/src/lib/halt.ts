@@ -9,6 +9,8 @@ export interface HaltedUnit {
   reason: 'blocked' | 'threat'
   lat: number
   lon: number
+  /** Adjusted fuel to crawl the remaining threat tiles slowly, when the backend estimated it. */
+  slowModeFuelL?: number
 }
 
 /** The first unit currently halted at an obstruction (status 'halted'), or null. */
@@ -21,6 +23,7 @@ export function firstHaltedUnit(live: Record<string, UnitUpdate>): HaltedUnit | 
         reason: u.reason ?? 'blocked',
         lat: u.lat,
         lon: u.lon,
+        slowModeFuelL: u.slow_mode_fuel_l,
       }
     }
   }

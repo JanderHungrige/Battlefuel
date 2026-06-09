@@ -20,6 +20,7 @@ from app.config import get_settings
 from app.db import get_session_maker
 from app.domain.combat_event import combat_event_frame
 from app.domain.move_order import MoveOrder, MoveOrderStatus
+from app.domain.unit import UnitType
 from app.models.unit_instance import UnitInstanceRow
 from app.providers.base import UnitDataProvider
 from app.providers.buy_orders import build_buy_order_provider
@@ -31,6 +32,7 @@ from app.providers.combat_events import (
 from app.providers.factory import build_unit_provider
 from app.providers.move_orders import MoveOrderProvider, build_move_order_provider
 from app.providers.refuel_orders import build_refuel_order_provider
+from app.providers.rendezvous import build_rendezvous_order_provider
 from app.providers.strategic_feed import (
     StrategicFeedProvider,
     build_strategic_feed_provider,
@@ -44,7 +46,17 @@ from app.services.buy_service import progress_buy_order_stages
 from app.services.cost_model import TileFactors, tile_factors
 from app.services.event_engine import EventEngine
 from app.services.refuel_service import try_complete_depot_refuel, try_complete_refuel
-from app.services.sim import SimStep, advance, advance_with_terrain, substep_dt
+from app.services.rendezvous_schedule_service import decrement_and_collect_due
+from app.services.sim import (
+    THREAT_CROSS_FUEL_FACTOR,
+    THREAT_L5,
+    SimStep,
+    advance,
+    advance_with_terrain,
+    point_at,
+    polyline_length_m,
+    substep_dt,
+)
 from app.services.tile_grid import DEFAULT_RESOLUTION
 from app.services.tile_mutation import apply_tile_mutation, tile_update_frame
 
@@ -96,6 +108,7 @@ class SimEngine:
                     await self.tick(session, dt_game)
                     await self.complete_refuels(session)
                     await self.advance_buy_orders(session, dt_game)
+                    await self.check_rendezvous_reminders(session, dt_game)
                     await self.apply_feed(session, feed, prev_game_s, self._game_s)
                     await self.apply_strategic_feed(strategic, prev_game_s, self._game_s)
                     await self.apply_combat_feed(combat, prev_game_s, self._game_s)
@@ -207,6 +220,38 @@ class SimEngine:
             )
         return len(changed)
 
+    async def check_rendezvous_reminders(self, session: AsyncSession, dt_game_s: float) -> int:
+        """Count down planned rendezvous orders; on a due order broadcast a reminder (no
+        auto-dispatch) + a chatter line and flip it to ``due``. Public for testing. Returns the
+        number of reminders fired this step (v2 Wave 13 F2)."""
+        orders = build_rendezvous_order_provider()
+        due = await decrement_and_collect_due(session, orders, dt_game_s)
+        for order in due:
+            await self._manager.broadcast(
+                {
+                    "type": "rendezvous_reminder",
+                    "order_id": order.id,
+                    "truck_id": order.truck_id,
+                    "unit_id": order.unit_id,
+                    "sector_lat": order.sector_lat,
+                    "sector_lon": order.sector_lon,
+                    "sector_h3": order.sector_h3,
+                    "metric": order.metric.value,
+                    "status": order.status.value,
+                }
+            )
+            await self._manager.broadcast(
+                {
+                    "type": "strategic_message",
+                    "text": (
+                        f"Scheduled rendezvous due — tanker {order.truck_id} ↔ unit "
+                        f"{order.unit_id} at sector {order.sector_h3}. Confirm to launch."
+                    ),
+                    "category": "logistics",
+                }
+            )
+        return len(due)
+
     async def tick(self, session: AsyncSession, dt_game_s: float) -> None:
         """Advance every active order by one game-time step. Public for testing."""
         orders = build_move_order_provider()
@@ -271,10 +316,26 @@ class SimEngine:
                 else _NEUTRAL_FACTORS
             )
             enter_threat = enter_tile.threat_level if enter_tile else 0
+            cur_threat = cur_tile.threat_level if cur_tile else 0
             step = advance_with_terrain(
-                working, fuel, unit_type, sub_dt, factors=enter_factors, threat_level=enter_threat
+                working,
+                fuel,
+                unit_type,
+                sub_dt,
+                factors=enter_factors,
+                threat_level=enter_threat,
+                currently_in_threat=cur_threat >= THREAT_L5,
+                entering_new_cell=enter_cell != row.h3_index,
             )
-            await self._persist_and_broadcast(session, orders, working, step, enter_factors)
+            # On a halt, estimate the adjusted fuel to crawl the remaining threat tiles (v2 W13 F5).
+            slow_fuel = (
+                await self._estimate_slow_mode_fuel(session, tiles, working, unit_type)
+                if step.status is MoveOrderStatus.HALTED
+                else None
+            )
+            await self._persist_and_broadcast(
+                session, orders, working, step, enter_factors, slow_mode_fuel_l=slow_fuel
+            )
             fuel = step.fuel_l
             remaining -= sub_dt
             working = working.model_copy(
@@ -286,6 +347,35 @@ class SimEngine:
             if row is None:
                 break
 
+    async def _estimate_slow_mode_fuel(
+        self,
+        session: AsyncSession,
+        tiles: TileDataProvider,
+        order: MoveOrder,
+        unit_type: UnitType,
+    ) -> float:
+        """Estimate the fuel to crawl every remaining threat-L5 tile on the route at the slow
+        (proceed-slowly) penalty. Samples the remaining geometry at a coarse step (v2 W13 F5)."""
+        geom = order.geometry
+        total = polyline_length_m(geom)
+        speed_kph = unit_type.movement.speed_road_kph
+        if total <= 0 or speed_kph <= 0:
+            return 0.0
+        step_m = 300.0  # ~half a hex at resolution 8
+        threat_m = 0.0
+        dist = order.progress_m
+        guard = 0
+        while dist < total and guard < _MAX_SUBSTEPS:
+            guard += 1
+            pt = point_at(geom, dist)
+            cell = h3.latlng_to_cell(pt[1], pt[0], DEFAULT_RESOLUTION)
+            tile = await tiles.get_tile(session, cell)
+            if tile is not None and tile.threat_level >= THREAT_L5:
+                threat_m += step_m
+            dist += step_m
+        lph = unit_type.fuel.consumption_normal_lph
+        return lph * (threat_m / 1000.0) / speed_kph * THREAT_CROSS_FUEL_FACTOR
+
     async def _persist_and_broadcast(
         self,
         session: AsyncSession,
@@ -293,6 +383,7 @@ class SimEngine:
         order: MoveOrder,
         step: SimStep,
         enter_factors: TileFactors,
+        slow_mode_fuel_l: float | None = None,
     ) -> None:
         """Persist a sub-step's progress/position/fuel and broadcast the unit_update (plus a
         chatter line on a halt)."""
@@ -322,6 +413,8 @@ class SimEngine:
         if step.status is MoveOrderStatus.HALTED:
             reason = "blocked" if not enter_factors.passable else "threat"
             frame["reason"] = reason
+            if slow_mode_fuel_l is not None:
+                frame["slow_mode_fuel_l"] = round(slow_mode_fuel_l, 1)
             await self._manager.broadcast(frame)
             await self._manager.broadcast(
                 {

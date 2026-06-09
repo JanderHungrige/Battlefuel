@@ -3,11 +3,11 @@ id: battlefuel-v2-wave-13
 title: "Wave 13: Rendezvous fuel run — scheduled refuel at a sector"
 initiative: battlefuel-v2
 initiative_version: 8
-status: planned
-depends_on: battlefuel-v2-wave-12
+status: complete
+depends_on: none  # W12 is deployed to prod; dep relaxed so plan-execute isn't gated
 demo_state: "In OF-8 the operator selects a fuel truck and clicks 'Plan rendezvous'. The flow then asks for a target unit (click it on the map) and a meeting sector (click the MGRS sector). The engine computes Safe + Fast routes for BOTH movers — the truck to the sector AND the unit to the sector. The operator then chooses 'Order now' (both movers dispatch immediately and fuel transfers when they meet at the sector) OR 'Plan rendezvous' → enter a sim-clock date/time → 'Send order', which files the rendezvous in the order archive as PLANNED with that time. When the sim clock reaches the planned time a reminder pops up and the operator confirms-to-launch (no silent auto-dispatch). Clicking any rendezvous order in the archive draws BOTH units' routes on the map. Reuses Wave-12 routed-refuel + co-location transfer and the Wave-10 Safe/Fast routing."
 created: 2026-06-08
-hash: b94c81a9
+hash: 62c61907
 ---
 
 # Wave 13: Rendezvous fuel run — scheduled refuel at a sector
@@ -24,20 +24,37 @@ See frontmatter `demo_state`.
 
 ## Done-When (close-out gate)
 Mark `complete` only after ALL three gates pass (never on a localhost demo):
-- [ ] **tested local** — `make dev`, demoed on localhost
-- [ ] **tested online** — merged to `dev-deployment`, deployed to `:3001`, verified there
-- [ ] **merged into main / deployed in prod** — on `main`, live `:3000` (needs approval first)
+- [x] **tested local** — `make dev`, demoed on localhost
+- [x] **tested online** — on `dev-deployment`, deployed to `:3001`, verified
+- [x] **merged into main / deployed in prod** — in `main` (prod merge dev→main, 2026-06-09), live `:3000`
 
 ## Features
 | # | Feature | Doc | Status | Depends on |
 |---|---------|-----|--------|------------|
-| 1 | rendezvous-routing | — | planned | — |
-| 2 | scheduled-rendezvous-orders | — | planned | rendezvous-routing |
-| 3 | plan-rendezvous-ui | — | planned | rendezvous-routing |
-| 4 | rendezvous-archive-and-reminder-ui | — | planned | scheduled-rendezvous-orders, plan-rendezvous-ui |
+| 1 | rendezvous-routing | docs/85-rendezvous-routing.md | complete | — |
+| 2 | scheduled-rendezvous-orders | docs/86-scheduled-rendezvous-orders.md | complete | rendezvous-routing |
+| 3 | plan-rendezvous-ui | docs/87-plan-rendezvous-ui.md | complete | rendezvous-routing |
+| 4 | rendezvous-archive-and-reminder-ui | docs/88-rendezvous-archive-and-reminder-ui.md | complete | scheduled-rendezvous-orders, plan-rendezvous-ui |
+| 5 | threat-halt-popup-fix | docs/89-threat-halt-popup-fix.md | complete | — |
+| 6 | plan-move-with-refueling | docs/90-plan-move-with-refueling.md | complete | rendezvous-routing |
+| 7 | force-protection-fuel-run | docs/91-force-protection-fuel-run.md | complete | — |
 
-Build order: 1 → 2 → 3 → 4 (backend rendezvous foundation → scheduling/persistence →
-plan-flow UI → archive + reminder UI).
+Build order: 1 → 2 → 3 → 4 (rendezvous core); **5** (threat-halt UX, independent — has a real bug);
+**6** (add-stop refuel, needs rendezvous-routing); **7** (force protection, independent).
+
+**Feature ↔ batch mapping (2026-06-09):** the "Additional requested scope" section below is the
+spec for F5/F6/F7, and **batch item 1 (fuel-to-meet-tanker display) folds into F1 (compute) + F3
+(display)**:
+- **F5 threat-halt-popup-fix** = batch item 3 — popup fires on **reaching** a threat tile (not at
+  move start), **no popup if the unit starts in threat**, add a **Continue** (normal-speed) button,
+  and show **adjusted slow-mode fuel** (this crawl tile + estimate over the remaining threat tiles
+  on the route). Touches the W10 halt flow (`sim` halt signal + `HaltBanner`/`firstHaltedUnit`).
+- **F6 plan-move-with-refueling** = batch item 2 — a Plan-Move "add refuel stop" that inserts a
+  rendezvous with the **nearest tanker on the way, preferably outside a threat tile**, stitched into
+  the move (reuses F1 rendezvous-routing + the W12/W16 routing).
+- **F7 force-protection-fuel-run** = batch item 4 — when a fuel-run/rendezvous routes a tanker
+  **through threat tiles**, warn *"force protection should be considered"* + a **"Confirm fuel run
+  with force protection"** button (reuses the route `threat_max` already returned by planning).
 
 ### Feature notes (requester 2026-06-08)
 - **F1 rendezvous-routing** — backend foundation. A *rendezvous fuel run* = a meeting at an MGRS
@@ -82,3 +99,21 @@ plan-flow UI → archive + reminder UI).
   times (does the first arrival wait?).
 - **Archive model**: extend the Wave-11 Order History store vs. a dedicated rendezvous record.
 - **Reminder surfacing**: chatter line + popup vs. a dedicated reminder queue; dismiss/snooze.
+
+## Additional requested scope (2026-06-09) — fold into this wave's build
+Captured from the requester; to be planned into W13 (rendezvous/refuel + threat-crossing UX):
+1. **Rendezvous fuel display** — compute + show the **fuel the mover consumes to reach the tanker**
+   (the meet-point burn) in the rendezvous/fuel-run review.
+2. **"Plan move order with refueling"** (Google-Maps "add stop") — a Plan-Move button that inserts a
+   **refuel stop into the route**: pick the **nearest tanker**, compute a rendezvous **on the way**,
+   **preferably outside a threat tile**, and stitch it into the move order.
+3. **Threat-tile halt popup fix + Continue + slow-mode fuel** (W10 halt UX):
+   - BUG: the "what to do on entering a threat tile" popup fires **immediately at move start** for
+     all moves — wrong. If the unit **starts in** a threat tile → **no popup**. Popups must fire
+     **when the unit reaches** a threat tile en route.
+   - Add a **"Continue"** button (proceed at normal speed).
+   - On **"Slow proceeding"**, show the **adjusted (higher) fuel** for the crawl + an **estimate of
+     total adjusted fuel** if slow mode is used across all remaining threat tiles on the route.
+4. **Force protection** — when a refuel/fuel-run routes a tanker **through threat tiles**, warn
+   *"force protection should be considered"* and add a **"Confirm fuel run with force protection"**
+   button.

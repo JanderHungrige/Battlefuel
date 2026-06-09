@@ -37,6 +37,7 @@ services:
       BATTLEFUEL_REFUEL_RECOMMENDER: ${BATTLEFUEL_REFUEL_RECOMMENDER:-ortools}
     command: >
       sh -c "alembic upgrade head &&
+             python scripts/startup_data.py &&
              exec uvicorn app.main:app --host 0.0.0.0 --port 8000"
 
   frontend:

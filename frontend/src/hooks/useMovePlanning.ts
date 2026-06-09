@@ -5,6 +5,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { api } from '../api/client'
 import { errorMessage } from '../api/errors'
+import { keepSelectedMetric } from '../lib/routeSelection'
 import type {
   ChatterMessage,
   MoveOrder,
@@ -23,7 +24,7 @@ export interface MovePlanningState {
   setSelectedMetric: (m: RouteMetric) => void
   mode: RouteMode
   setMode: (m: RouteMode) => void
-  waypoints: { lat: number; lon: number }[]
+  waypoints: { lat: number; lon: number; mode: RouteMode }[]
   waypointMode: boolean
   startRouting: () => void
   addWaypoint: (lat: number, lon: number) => void
@@ -49,7 +50,7 @@ export function useMovePlanning(
   const [routeOptions, setRouteOptions] = useState<RouteOption[]>([])
   const [selectedMetric, setSelectedMetric] = useState<RouteMetric | null>(null)
   const [mode, setModeState] = useState<RouteMode>('road')
-  const [waypoints, setWaypoints] = useState<{ lat: number; lon: number }[]>([])
+  const [waypoints, setWaypoints] = useState<{ lat: number; lon: number; mode: RouteMode }[]>([])
   const [waypointMode, setWaypointMode] = useState(false)
   const [planLoading, setPlanLoading] = useState(false)
   const [planError, setPlanError] = useState<string | null>(null)
@@ -86,14 +87,14 @@ export function useMovePlanning(
     (lat: number, lon: number, m: RouteMode) => {
       if (!selectedUnitId) return
       setRouteOptions([])
-      setSelectedMetric(null)
       setPlanError(null)
       setPlanLoading(true)
       api
         .planRoute({ instance_id: selectedUnitId, dest_lat: lat, dest_lon: lon, mode: m })
         .then((opts) => {
           setRouteOptions(opts)
-          setSelectedMetric(opts[0]?.metric ?? null)
+          // Keep the operator's fastest/safest choice across a re-plan (e.g. a mode switch).
+          setSelectedMetric((prev) => keepSelectedMetric(prev, opts))
         })
         .catch((e: unknown) => setPlanError(errorMessage(e)))
         .finally(() => setPlanLoading(false))
@@ -114,7 +115,7 @@ export function useMovePlanning(
   // each point is dropped (unit → wp1, then unit → wp1 → wp2, …). Keeps the operator's
   // fastest/safest choice across re-plans.
   const planWaypointPreview = useCallback(
-    (wps: { lat: number; lon: number }[], m: RouteMode) => {
+    (wps: { lat: number; lon: number; mode: RouteMode }[], m: RouteMode) => {
       if (!selectedUnitId || wps.length === 0) {
         setRouteOptions([])
         setSelectedMetric(null)
@@ -126,7 +127,7 @@ export function useMovePlanning(
         .planWaypoints({ instance_id: selectedUnitId, waypoints: wps, mode: m })
         .then((opts) => {
           setRouteOptions(opts)
-          setSelectedMetric((prev) => prev ?? opts[0]?.metric ?? null)
+          setSelectedMetric((prev) => keepSelectedMetric(prev, opts))
         })
         .catch((e: unknown) => setPlanError(errorMessage(e)))
         .finally(() => setPlanLoading(false))
@@ -139,8 +140,18 @@ export function useMovePlanning(
   const setMode = useCallback(
     (m: RouteMode) => {
       setModeState(m)
-      if (waypoints.length > 0) planWaypointPreview(waypoints, m)
-      else if (destination) planFor(destination.lat, destination.lon, m)
+      // During waypoint routing the mode applies to the CURRENT (last) leg — the operator clicks a
+      // waypoint, then picks that section's type (v2 W16 F3) — and that leg re-plans. Otherwise
+      // re-plan the destination route.
+      if (waypoints.length > 0) {
+        const next = waypoints.map((w, i) =>
+          i === waypoints.length - 1 ? { ...w, mode: m } : w,
+        )
+        setWaypoints(next)
+        planWaypointPreview(next, m)
+      } else if (destination) {
+        planFor(destination.lat, destination.lon, m)
+      }
     },
     [destination, planFor, waypoints, planWaypointPreview],
   )
@@ -160,7 +171,9 @@ export function useMovePlanning(
   const addWaypoint = useCallback(
     (lat: number, lon: number) => {
       if (!selectedUnitId) return
-      const next = [...waypoints, { lat, lon }]
+      // A new waypoint's leg defaults to the current mode; the operator then picks that section's
+      // type via the selector, which updates this (now current) leg — click point, then select.
+      const next = [...waypoints, { lat, lon, mode }]
       setWaypoints(next)
       planWaypointPreview(next, mode)
     },

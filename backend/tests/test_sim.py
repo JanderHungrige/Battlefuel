@@ -462,3 +462,135 @@ class TestNeverStallTraversal:
         )
         assert step.status == "active"  # cleared the obstruction → normal movement resumes
         assert step.progress_m > 0
+
+
+class TestThreatHaltPopupFix:
+    """v2 Wave 13 F5: halt only on the transition INTO threat; Continue crosses at normal speed."""
+
+    @staticmethod
+    def _order(
+        progress_m: float = 0.0,
+        *,
+        metric: RouteMetric = RouteMetric.SAFE,
+        status: MoveOrderStatus = MoveOrderStatus.ACTIVE,
+    ) -> MoveOrder:
+        return MoveOrder(
+            id="o1",
+            instance_id="i1",
+            status=status,
+            metric=metric,
+            distance_m=polyline_length_m(_LINE),
+            duration_s=100.0,
+            fuel_consumed_l=10.0,
+            progress_m=progress_m,
+            geometry=_LINE,
+        )
+
+    def test_starting_in_threat_does_not_halt(self) -> None:
+        from app.services.cost_model import TileFactors
+        from app.services.sim import advance_with_terrain
+
+        # SAFE unit moving WITHIN the threat tile it started in (no cell change) → moves, no halt.
+        step = advance_with_terrain(
+            self._order(metric=RouteMetric.SAFE),
+            fuel_l=18000,
+            unit_type=_ARMOR,
+            dt_game_s=30,
+            factors=TileFactors(speed_factor=1.0, fuel_factor=1.0),
+            threat_level=5,
+            currently_in_threat=True,
+            entering_new_cell=False,
+        )
+        assert step.status != "halted"
+        assert step.progress_m > 0.0  # it moved instead of freezing at move start
+
+    def test_second_adjacent_threat_tile_re_halts(self) -> None:
+        from app.services.cost_model import TileFactors
+        from app.services.sim import advance_with_terrain
+
+        # SAFE unit crossing from one threat tile INTO a different threat tile → fresh halt
+        # (each threat tile prompts, not just the first — the "second threat" bug fix).
+        step = advance_with_terrain(
+            self._order(metric=RouteMetric.SAFE),
+            fuel_l=18000,
+            unit_type=_ARMOR,
+            dt_game_s=30,
+            factors=TileFactors(speed_factor=1.0, fuel_factor=1.0),
+            threat_level=5,
+            currently_in_threat=True,
+            entering_new_cell=True,
+        )
+        assert step.status == "halted"
+
+    def test_continue_authorization_covers_one_tile_then_re_halts(self) -> None:
+        from app.services.cost_model import TileFactors
+        from app.services.sim import advance_with_terrain
+
+        # A CONTINUING unit leaving its authorized threat tile INTO a new threat tile re-halts.
+        step = advance_with_terrain(
+            self._order(metric=RouteMetric.SAFE, status=MoveOrderStatus.CONTINUING),
+            fuel_l=18000,
+            unit_type=_ARMOR,
+            dt_game_s=30,
+            factors=TileFactors(speed_factor=1.0, fuel_factor=1.0),
+            threat_level=5,
+            currently_in_threat=True,
+            entering_new_cell=True,
+        )
+        assert step.status == "halted"
+
+    def test_transition_into_threat_halts_in_safe(self) -> None:
+        from app.services.cost_model import TileFactors
+        from app.services.sim import advance_with_terrain
+
+        # SAFE unit in a clear tile entering a threat tile → halts (the decision point).
+        step = advance_with_terrain(
+            self._order(metric=RouteMetric.SAFE),
+            fuel_l=18000,
+            unit_type=_ARMOR,
+            dt_game_s=30,
+            factors=TileFactors(speed_factor=1.0, fuel_factor=1.0),
+            threat_level=5,
+            currently_in_threat=False,
+        )
+        assert step.status == "halted"
+
+    def test_continue_crosses_threat_at_normal_speed(self) -> None:
+        from app.services.cost_model import TileFactors
+        from app.services.sim import advance_with_terrain
+
+        clear = TileFactors(speed_factor=1.0, fuel_factor=1.0)
+        normal = advance_with_terrain(
+            self._order(status=MoveOrderStatus.ACTIVE),
+            fuel_l=18000,
+            unit_type=_ARMOR,
+            dt_game_s=30,
+            factors=clear,
+            threat_level=0,
+        )
+        cont = advance_with_terrain(
+            self._order(status=MoveOrderStatus.CONTINUING),
+            fuel_l=18000,
+            unit_type=_ARMOR,
+            dt_game_s=30,
+            factors=clear,
+            threat_level=5,  # crossing a threat tile
+        )
+        assert cont.status == "continuing"
+        # Normal speed + normal fuel (no crawl penalty), unlike "proceed slowly".
+        assert cont.progress_m == normal.progress_m
+        assert cont.fuel_l == normal.fuel_l
+
+    def test_continuing_reverts_to_active_on_clear_tile(self) -> None:
+        from app.services.cost_model import TileFactors
+        from app.services.sim import advance_with_terrain
+
+        step = advance_with_terrain(
+            self._order(status=MoveOrderStatus.CONTINUING),
+            fuel_l=18000,
+            unit_type=_ARMOR,
+            dt_game_s=30,
+            factors=TileFactors(speed_factor=1.0, fuel_factor=1.0),
+            threat_level=0,  # cleared the threat
+        )
+        assert step.status == "active"  # next threat tile will re-prompt

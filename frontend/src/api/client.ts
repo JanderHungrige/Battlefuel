@@ -10,18 +10,29 @@ import type {
   CreateFuelRunRequest,
   CreateMoveOrderRequest,
   CreateRefuelOrderRequest,
+  CreateRendezvousRequest,
   CreateWaypointMoveOrderRequest,
+  ConfirmLaunchResponse,
   FuelRunResponse,
+  MoveRefuelOption,
+  MoveRefuelOptionsRequest,
+  MoveWithRefuelRequest,
+  MoveWithRefuelResponse,
   EnemyUnit,
   FuelDepot,
   FuelPlatform,
   FuelStock,
   MoveOrder,
   Obstacle,
+  PlanRendezvousRequest,
   PlanRouteRequest,
   PlanWaypointsRequest,
   RefuelOrder,
+  RendezvousOrder,
+  RendezvousPlanResponse,
+  RendezvousResponse,
   RouteOption,
+  ScheduleRendezvousRequest,
   SupplyOverview,
   Theater,
   Tile,
@@ -86,6 +97,12 @@ export const api = {
     postJson<MoveOrder>('/move-orders', req),
   createWaypointMoveOrder: (req: CreateWaypointMoveOrderRequest): Promise<MoveOrder> =>
     postJson<MoveOrder>('/move-orders/waypoints', req),
+  // Preview refuel-stop options (per tanker) for a planned move — no dispatch (v2 W13).
+  moveRefuelOptions: (req: MoveRefuelOptionsRequest): Promise<MoveRefuelOption[]> =>
+    postJson<MoveRefuelOption[]>('/move-orders/refuel-options', req),
+  // Execute a move with a refuel stop on the way (the chosen tanker) (v2 W13 F6).
+  moveWithRefuel: (req: MoveWithRefuelRequest): Promise<MoveWithRefuelResponse> =>
+    postJson<MoveWithRefuelResponse>('/move-orders/with-refuel', req),
   confirmMoveOrder: (id: string): Promise<MoveOrder> =>
     postJson<MoveOrder>(`/move-orders/${id}/confirm`),
   cancelMoveOrder: (id: string): Promise<MoveOrder> =>
@@ -93,6 +110,9 @@ export const api = {
   // "Proceed slowly" across an obstruction a unit halted at: halted → crossing (v2 Wave 10 F1).
   proceedMoveOrder: (id: string): Promise<MoveOrder> =>
     postJson<MoveOrder>(`/move-orders/${id}/proceed`),
+  // "Continue" across a threat tile at normal speed: halted → continuing (v2 W13 F5).
+  continueMoveOrder: (id: string): Promise<MoveOrder> =>
+    postJson<MoveOrder>(`/move-orders/${id}/continue`),
   listMoveOrders: (): Promise<MoveOrder[]> => getJson<MoveOrder[]>('/move-orders'),
 
   // Operator ops (Wave 4).
@@ -124,6 +144,21 @@ export const api = {
     postJson<RefuelOrder>('/refuel-orders', req),
   createFuelRun: (req: CreateFuelRunRequest): Promise<FuelRunResponse> =>
     postJson<FuelRunResponse>('/fuel-runs', req),
+
+  // Rendezvous fuel runs (v2 Wave 13): both movers route to a sector.
+  planRendezvous: (req: PlanRendezvousRequest): Promise<RendezvousPlanResponse> =>
+    postJson<RendezvousPlanResponse>('/rendezvous/plan', req),
+  createRendezvous: (req: CreateRendezvousRequest): Promise<RendezvousResponse> =>
+    postJson<RendezvousResponse>('/rendezvous', req),
+  scheduleRendezvous: (req: ScheduleRendezvousRequest): Promise<RendezvousOrder> =>
+    postJson<RendezvousOrder>('/rendezvous/schedule', req),
+  listRendezvous: (): Promise<RendezvousOrder[]> => getJson<RendezvousOrder[]>('/rendezvous'),
+  getRendezvous: (id: string): Promise<RendezvousOrder> =>
+    getJson<RendezvousOrder>(`/rendezvous/${id}`),
+  confirmLaunchRendezvous: (id: string): Promise<ConfirmLaunchResponse> =>
+    postJson<ConfirmLaunchResponse>(`/rendezvous/${id}/confirm-launch`),
+  cancelRendezvous: (id: string): Promise<RendezvousOrder> =>
+    postJson<RendezvousOrder>(`/rendezvous/${id}/cancel`),
   confirmRefuelOrder: (id: string): Promise<RefuelOrder> =>
     postJson<RefuelOrder>(`/refuel-orders/${id}/confirm`),
   cancelRefuelOrder: (id: string): Promise<RefuelOrder> =>

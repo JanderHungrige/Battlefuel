@@ -2,7 +2,13 @@
 // per-instance position map, builds a chatter log from tile_update frames, and auto-reconnects.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ChatterMessage, CombatEvent, TileUpdate, UnitUpdate } from '../api/types'
+import type {
+  ChatterMessage,
+  CombatEvent,
+  RendezvousReminder,
+  TileUpdate,
+  UnitUpdate,
+} from '../api/types'
 import { WS_BASE } from '../config'
 import {
   applyCombatEvent,
@@ -11,10 +17,12 @@ import {
   combatEventMgrs,
   describeBuyOrderUpdate,
   describeRefuelOrderUpdate,
+  describeRendezvousReminder,
   describeTileUpdate,
   parseBuyOrderUpdate,
   parseCombatEvent,
   parseRefuelOrderUpdate,
+  parseRendezvousReminder,
   parseStrategicMessage,
   parseTileUpdate,
   parseUnitUpdate,
@@ -33,8 +41,10 @@ export interface SimSocketState {
   strategic: ChatterMessage[]
   pushChatter: (text: string, kind?: ChatterMessage['kind'], h3Index?: string) => void
   connected: boolean
-  /** Bumped whenever a supply order (buy/refuel) frame arrives — consumers refetch on change. */
+  /** Bumped whenever a supply order (buy/refuel/rendezvous) frame arrives — refetch on change. */
   supplyTick: number
+  /** The latest scheduled rendezvous that came due (v2 Wave 13 F4); drives the reminder banner. */
+  rendezvousReminder: RendezvousReminder | null
 }
 
 export function useSimSocket(enabled = true): SimSocketState {
@@ -45,6 +55,7 @@ export function useSimSocket(enabled = true): SimSocketState {
   const [strategic, setStrategic] = useState<ChatterMessage[]>([])
   const [connected, setConnected] = useState(false)
   const [supplyTick, setSupplyTick] = useState(0)
+  const [rendezvousReminder, setRendezvousReminder] = useState<RendezvousReminder | null>(null)
   const seq = useRef(0)
   // Combat-event ids already logged to chatter — so the on-connect snapshot + the timed feed
   // don't produce duplicate radio lines for the same event.
@@ -98,6 +109,13 @@ export function useSimSocket(enabled = true): SimSocketState {
           pushStrategic(describeRefuelOrderUpdate(refuel), 'order')
           return
         }
+        const reminder = parseRendezvousReminder(raw)
+        if (reminder) {
+          setSupplyTick((n) => n + 1) // refetch the archive (the order is now `due`)
+          setRendezvousReminder(reminder)
+          pushStrategic(describeRendezvousReminder(reminder), 'order')
+          return
+        }
         const combat = parseCombatEvent(raw)
         if (combat) {
           setCombatEvents((prev) => applyCombatEvent(prev, combat))
@@ -146,5 +164,6 @@ export function useSimSocket(enabled = true): SimSocketState {
     pushChatter,
     connected,
     supplyTick,
+    rendezvousReminder,
   }
 }

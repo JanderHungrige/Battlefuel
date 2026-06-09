@@ -200,11 +200,22 @@ class TerrainRoutingProvider(RoutingProvider):
         metric: RouteMetric,
     ) -> RoutePath | None:
         # Imported lazily to avoid a provider/service import cycle at module load.
+        from app.providers.enemy_units import build_enemy_unit_provider
         from app.providers.tiles import build_tile_provider
+        from app.services.enemy_danger import enemy_threat_at
         from app.services.terrain_router import terrain_path
 
+        # Off-road SAFE must dodge enemies too (v2 Wave 16): fold the enemy-proximity threat into
+        # each tile's threat for routing only (not persisted — display + decay are unaffected).
+        enemies = list(build_enemy_unit_provider().units())
         tiles = await build_tile_provider().list_tiles(session)
-        tile_map = {t.h3_index: (t.terrain, t.threat_level) for t in tiles}
+        tile_map = {
+            t.h3_index: (
+                t.terrain,
+                max(t.threat_level, enemy_threat_at(t.center_lat, t.center_lon, enemies)),
+            )
+            for t in tiles
+        }
         return terrain_path(tile_map, start_lat, start_lon, dest_lat, dest_lon, metric)
 
 
