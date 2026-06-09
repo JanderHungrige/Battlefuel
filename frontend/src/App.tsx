@@ -484,6 +484,8 @@ export default function App() {
               rendezvousMetric={rdvMetric}
               rendezvousPickUnit={planRdv.phase === 'pick-unit'}
               onPickRendezvousUnit={planRdv.pickUnit}
+              rendezvousPickTruck={planRdv.phase === 'pick-truck'}
+              onPickRendezvousTruck={planRdv.pickTruck}
               rendezvousPickSector={planRdv.phase === 'pick-sector'}
               onPickRendezvousSector={planRdv.pickSector}
               fleetUnitIds={fleetUnitIds}
@@ -563,7 +565,7 @@ export default function App() {
                 onCancel={fuelRun.cancel}
               />
             )}
-            {canShow(role, 'supplyPanel') && (
+            {(canShow(role, 'supplyPanel') || planRdv.phase !== 'idle') && (
               <PlanRendezvousPanel
                 phase={planRdv.phase}
                 truckName={planRdv.truckName}
@@ -600,6 +602,9 @@ export default function App() {
                 onSelectOption={planning.setSelectedMetric}
                 onConfirm={() => planning.confirmMove(clear)}
                 onAddRefuelStop={startRefuelStop}
+                onPlanRendezvous={() =>
+                  selectedUnitId && planRdv.startUnitFirst(selectedUnitId, selectedUnit.name)
+                }
                 refuelActive={refuelStop.active}
                 refuelOptions={refuelStop.options}
                 refuelIndex={refuelStop.index}

@@ -7,7 +7,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { ApiError, api } from '../api/client'
 import type { ChatterMessage, RouteMetric, RouteOption, UnitInstance } from '../api/types'
 
-type Phase = 'idle' | 'pick-unit' | 'pick-sector' | 'review'
+type Phase = 'idle' | 'pick-truck' | 'pick-unit' | 'pick-sector' | 'review'
 type PushChatter = (text: string, kind?: ChatterMessage['kind']) => void
 
 export interface PlanRendezvousState {
@@ -24,6 +24,9 @@ export interface PlanRendezvousState {
   /** Both movers' routes for the map preview ([{metric, geometry}]). */
   previewRoutes: { metric: string; geometry: number[][] }[]
   start: (truckId: string, truckName: string) => void
+  /** Unit-first entry (from a unit's move panel): pick the tanker, then the sector (v2 W13). */
+  startUnitFirst: (unitId: string, unitName: string) => void
+  pickTruck: (truckId: string) => void
   pickUnit: (unitId: string) => void
   pickSector: (lat: number, lon: number) => void
   selectMetric: (m: RouteMetric) => void
@@ -79,6 +82,28 @@ export function usePlanRendezvous(
       if (!unit) return
       setUnitId(unit.id)
       setUnitName(unit.name)
+      setPhase('pick-sector')
+      setMessage('Click the meeting sector on the map.')
+    },
+    [units],
+  )
+
+  const startUnitFirst = useCallback(
+    (id: string, name: string) => {
+      reset()
+      setUnitId(id)
+      setUnitName(name)
+      setPhase('pick-truck')
+      setMessage('Click the tanker to refuel from on the map.')
+    },
+    [reset],
+  )
+
+  const pickTruck = useCallback(
+    (id: string) => {
+      const truck = units.find((u) => u.id === id)
+      setTruckId(id)
+      setTruckName(truck?.name ?? id)
       setPhase('pick-sector')
       setMessage('Click the meeting sector on the map.')
     },
@@ -184,6 +209,8 @@ export function usePlanRendezvous(
     message,
     previewRoutes,
     start,
+    startUnitFirst,
+    pickTruck,
     pickUnit,
     pickSector,
     selectMetric: setMetric,

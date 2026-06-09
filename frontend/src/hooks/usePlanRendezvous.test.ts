@@ -76,6 +76,26 @@ describe('usePlanRendezvous', () => {
     expect(result.current.metric).toBe('safe')
   })
 
+  it('unit-first: startUnitFirst → pick-truck → pick-sector with roles set (v2 W13)', async () => {
+    planRendezvous.mockResolvedValue({
+      sector: { lat: 49.21, lon: 11.81, h3: '8abc' },
+      truck_routes: [route('safe')],
+      unit_routes: [route('safe')],
+    })
+    const { result } = renderHook(() => usePlanRendezvous(units, vi.fn(), vi.fn()))
+    act(() => result.current.startUnitFirst('inst-armor-1', 'LION'))
+    expect(result.current.phase).toBe('pick-truck')
+    expect(result.current.unitId).toBe('inst-armor-1')
+    act(() => result.current.pickTruck('inst-fuel-1'))
+    expect(result.current.phase).toBe('pick-sector')
+    expect(result.current.truckId).toBe('inst-fuel-1')
+    act(() => result.current.pickSector(49.21, 11.81))
+    await waitFor(() => expect(result.current.phase).toBe('review'))
+    expect(planRendezvous).toHaveBeenCalledWith(
+      expect.objectContaining({ truck_id: 'inst-fuel-1', unit_id: 'inst-armor-1' }),
+    )
+  })
+
   it('orderNow posts an immediate rendezvous with the selected metric', async () => {
     planRendezvous.mockResolvedValue({
       sector: { lat: 49.21, lon: 11.81, h3: '8abc' },

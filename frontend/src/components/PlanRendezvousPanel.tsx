@@ -7,7 +7,7 @@ import type { RouteMetric, RouteOption } from '../api/types'
 import { needsForceProtection } from '../lib/forceProtection'
 
 export interface PlanRendezvousPanelProps {
-  phase: 'idle' | 'pick-unit' | 'pick-sector' | 'review'
+  phase: 'idle' | 'pick-truck' | 'pick-unit' | 'pick-sector' | 'review'
   truckName: string
   unitName: string
   truckRoutes: RouteOption[]
@@ -76,9 +76,14 @@ export function PlanRendezvousPanel({
       </div>
 
       <p className="fuel-run-route">
-        <strong>{truckName || '—'}</strong> ↔ <strong>{unitName || '(pick a unit)'}</strong>
+        <strong>{truckName || '(tanker)'}</strong> ↔ <strong>{unitName || '(unit)'}</strong>
       </p>
 
+      {phase === 'pick-truck' && (
+        <p className="fuel-run-hint" data-testid="rdv-hint">
+          Click the tanker to refuel from on the map.
+        </p>
+      )}
       {phase === 'pick-unit' && (
         <p className="fuel-run-hint" data-testid="rdv-hint">
           Click the unit to refuel on the map.

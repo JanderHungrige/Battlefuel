@@ -103,6 +103,9 @@ export interface MapViewProps {
   /** Rendezvous unit-pick mode: clicking a unit picks the unit to refuel. */
   rendezvousPickUnit?: boolean
   onPickRendezvousUnit?: (unitId: string) => void
+  /** Rendezvous truck-pick mode (unit-first): clicking a unit picks the tanker. */
+  rendezvousPickTruck?: boolean
+  onPickRendezvousTruck?: (unitId: string) => void
   /** Rendezvous sector-pick mode: any map click picks the meeting sector point. */
   rendezvousPickSector?: boolean
   onPickRendezvousSector?: (lat: number, lon: number) => void
@@ -796,6 +799,11 @@ function wireInteraction(map: maplibregl.Map, propsRef: { current: MapViewProps 
       // Rendezvous unit pick (v2 Wave 13): clicking a unit picks the unit to refuel.
       if (p.rendezvousPickUnit && p.onPickRendezvousUnit) {
         p.onPickRendezvousUnit(unitId)
+        return
+      }
+      // Rendezvous truck pick (unit-first, v2 W13): clicking a unit picks the tanker.
+      if (p.rendezvousPickTruck && p.onPickRendezvousTruck) {
+        p.onPickRendezvousTruck(unitId)
         return
       }
       p.onSelectUnit(unitId)
