@@ -109,8 +109,6 @@ export interface MapViewProps {
   /** Rendezvous sector-pick mode: any map click picks the meeting sector point. */
   rendezvousPickSector?: boolean
   onPickRendezvousSector?: (lat: number, lon: number) => void
-  /** Fuel-truck instance ids to mark with a purple fleet halo (OF-8 supply view) (v2 W13). */
-  fleetUnitIds?: string[]
   /** Friendly unit instance ids to dim on the map (OF-8 per-tab focus) (v2 W13). */
   dimmedUnitIds?: string[]
   /** Dim the depots layer (OF-8 supply-fleet tab focus) (v2 W13). */
@@ -330,21 +328,6 @@ function initLayers(map: maplibregl.Map): void {
       'circle-stroke-color': SELECTED_UNIT_RING,
     },
   })
-  // Fuel-fleet halo (purple), behind every fuel truck in the OF-8 supply view (v2 W13). Drawn over
-  // the yellow selection halo but under the icon; filter from fleetUnitIds.
-  map.addLayer({
-    id: 'units-fleet',
-    type: 'circle',
-    source: 'units',
-    filter: ['in', ['get', 'id'], ['literal', []]],
-    paint: {
-      'circle-radius': 16,
-      'circle-color': '#a855f7',
-      'circle-opacity': 0.55,
-      'circle-stroke-width': 2.5,
-      'circle-stroke-color': '#7c3aed',
-    },
-  })
   map.addLayer({
     id: 'units',
     type: 'symbol',
@@ -469,11 +452,12 @@ function initLayers(map: maplibregl.Map): void {
     id: 'locate-marker',
     type: 'circle',
     source: 'locate-marker',
+    // Purple indicator for a located/selected fuel unit (depot or tanker) (v2 W13 correction).
     paint: {
       'circle-radius': 14,
-      'circle-color': 'rgba(63,208,255,0.18)',
+      'circle-color': 'rgba(168,85,247,0.25)',
       'circle-stroke-width': 3,
-      'circle-stroke-color': '#3fd0ff',
+      'circle-stroke-color': '#a855f7',
     },
   })
 
@@ -1057,12 +1041,6 @@ export function MapView(props: MapViewProps) {
     mapRef.current.setFilter('unit-fuel-bars', ['!=', ['get', 'id'], sel || ' '])
     mapRef.current.setFilter('unit-fuel-bars-selected', ['==', ['get', 'id'], sel])
   }, [props.selectedUnitId])
-  // Fuel-fleet purple halo (OF-8) (v2 W13).
-  useEffect(() => {
-    if (!readyRef.current || !mapRef.current) return
-    const ids = props.fleetUnitIds ?? []
-    mapRef.current.setFilter('units-fleet', ['in', ['get', 'id'], ['literal', ids]])
-  }, [props.fleetUnitIds])
   // OF-8 per-tab focus: dim irrelevant units + (on the fleet tab) depots (v2 W13).
   useEffect(() => {
     if (!readyRef.current || !mapRef.current) return

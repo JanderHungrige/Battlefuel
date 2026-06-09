@@ -75,9 +75,9 @@ Mirrors the Wave-12 `useFuelRun` + `FuelRunPanel` + map-preview pattern:
 
 ## Map indications (2026-06-09 correction)
 
-- **Chosen-supply highlight (orange).** The chosen tanker and the picked unit get an orange map
-  halo (`units-chosen-supply` circle layer, mirroring the yellow `units-selected`), driven by a new
-  `chosenSupplyUnitIds` MapView prop fed from `planRdv.{truckId,unitId}` while a plan flow is active.
+- **Selected fuel-unit marker (purple).** Locating a fuel unit (depot or tanker) from the supply
+  panel marks it with a **purple** `locate-marker` circle (recoloured from the old blue). It is the
+  selection indicator for fuel units — not a permanent fleet overlay.
 - **OF-8 per-tab focus** (`lib/supplyFocus.ts`, pure). The SupplyPanel reports its active tab
   (`onTabChange`); the map dims units irrelevant to that tab: Overview → only fuel fleet + depots
   bright; Supply fleet → only the fleet bright (depots dimmed); Order Fuel → only depots bright
