@@ -97,6 +97,15 @@ export interface MapViewProps {
   /** Fuel-run target-pick mode (v2 Wave 12): clicking a unit picks it as the refuel target. */
   fuelRunPickMode?: boolean
   onPickFuelTarget?: (unitId: string) => void
+  /** Rendezvous route preview (v2 Wave 13): both movers' Safe/Fast routes; selected drawn bold. */
+  rendezvousRoutes?: { metric: string; geometry: number[][] }[]
+  rendezvousMetric?: string | null
+  /** Rendezvous unit-pick mode: clicking a unit picks the unit to refuel. */
+  rendezvousPickUnit?: boolean
+  onPickRendezvousUnit?: (unitId: string) => void
+  /** Rendezvous sector-pick mode: any map click picks the meeting sector point. */
+  rendezvousPickSector?: boolean
+  onPickRendezvousSector?: (lat: number, lon: number) => void
   onClearSelection: () => void
 }
 
@@ -455,10 +464,25 @@ function initLayers(map: maplibregl.Map): void {
       'line-opacity': ['case', ['get', 'selected'], 0.95, 0.4],
     },
   })
+
+  // Rendezvous route preview (v2 Wave 13): both movers' routes, amber, selected metric bold.
+  map.addSource('rendezvous-routes', { type: 'geojson', data: EMPTY })
+  map.addLayer({
+    id: 'rendezvous-routes',
+    type: 'line',
+    source: 'rendezvous-routes',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: {
+      'line-color': '#ffb000',
+      'line-width': ['case', ['get', 'selected'], 5, 2],
+      'line-opacity': ['case', ['get', 'selected'], 0.95, 0.35],
+    },
+  })
 }
 
-function syncFuelRunRoutes(
+function syncRouteLines(
   map: maplibregl.Map,
+  sourceId: string,
   options: { metric: string; geometry: number[][] }[] | undefined,
   metric: string | null | undefined,
 ): void {
@@ -469,7 +493,15 @@ function syncFuelRunRoutes(
       geometry: { type: 'LineString', coordinates: o.geometry },
       properties: { selected: o.metric === metric },
     }))
-  setData(map, 'fuel-run-routes', { type: 'FeatureCollection', features })
+  setData(map, sourceId, { type: 'FeatureCollection', features })
+}
+
+function syncFuelRunRoutes(
+  map: maplibregl.Map,
+  options: { metric: string; geometry: number[][] }[] | undefined,
+  metric: string | null | undefined,
+): void {
+  syncRouteLines(map, 'fuel-run-routes', options, metric)
 }
 
 function syncUnits(
@@ -725,12 +757,22 @@ function wireInteraction(map: maplibregl.Map, propsRef: { current: MapViewProps 
       p.onPlaceObstacle(e.lngLat.lat, e.lngLat.lng)
       return
     }
+    // Rendezvous sector pick (v2 Wave 13): any map click sets the meeting sector point.
+    if (p.rendezvousPickSector && p.onPickRendezvousSector) {
+      p.onPickRendezvousSector(e.lngLat.lat, e.lngLat.lng)
+      return
+    }
     const hitUnits = map.queryRenderedFeatures(e.point, { layers: ['units'] })
     if (hitUnits.length > 0) {
       const unitId = String(hitUnits[0].properties?.id)
       // Fuel-run target pick (v2 Wave 12): clicking a unit picks it as the refuel target.
       if (p.fuelRunPickMode && p.onPickFuelTarget) {
         p.onPickFuelTarget(unitId)
+        return
+      }
+      // Rendezvous unit pick (v2 Wave 13): clicking a unit picks the unit to refuel.
+      if (p.rendezvousPickUnit && p.onPickRendezvousUnit) {
+        p.onPickRendezvousUnit(unitId)
         return
       }
       p.onSelectUnit(unitId)
@@ -903,6 +945,15 @@ export function MapView(props: MapViewProps) {
     if (readyRef.current && mapRef.current)
       syncFuelRunRoutes(mapRef.current, props.fuelRunOptions, props.fuelRunMetric)
   }, [props.fuelRunOptions, props.fuelRunMetric])
+  useEffect(() => {
+    if (readyRef.current && mapRef.current)
+      syncRouteLines(
+        mapRef.current,
+        'rendezvous-routes',
+        props.rendezvousRoutes,
+        props.rendezvousMetric,
+      )
+  }, [props.rendezvousRoutes, props.rendezvousMetric])
   useEffect(() => {
     if (readyRef.current && mapRef.current)
       setData(mapRef.current, 'combat-events', combatEventsToGeoJSON(props.combatEvents))

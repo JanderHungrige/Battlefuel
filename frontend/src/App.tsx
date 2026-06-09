@@ -14,6 +14,7 @@ import type { ObstacleKind } from './components/obstacleKinds'
 import { RoleToggle } from './components/RoleToggle'
 import { InfoDocsPanel } from './components/InfoDocsPanel'
 import { FuelRunPanel } from './components/FuelRunPanel'
+import { PlanRendezvousPanel } from './components/PlanRendezvousPanel'
 import { LandingPage } from './components/LandingPage'
 import { OrderHistoryPanel } from './components/OrderHistoryPanel'
 import { SupplyPanel } from './components/SupplyPanel'
@@ -30,6 +31,7 @@ import { useMovePlanning } from './hooks/useMovePlanning'
 import { useFuelPlatforms } from './hooks/useFuelPlatforms'
 import { useInfoDocs } from './hooks/useInfoDocs'
 import { useFuelRun } from './hooks/useFuelRun'
+import { usePlanRendezvous } from './hooks/usePlanRendezvous'
 import { useOrderHistory } from './hooks/useOrderHistory'
 import { useSupply } from './hooks/useSupply'
 import { useSupplyOrders } from './hooks/useSupplyOrders'
@@ -148,6 +150,8 @@ export default function App() {
   }, [live])
   const selectedLive = selectedUnitId ? live[selectedUnitId] : undefined
   const fuelRun = useFuelRun(units, unitTypes, supply.overview, livePositions, pushChatter, supply.refetch)
+  // Plan rendezvous (v2 Wave 13 F3): truck → pick unit → pick sector → dual routes → order/schedule.
+  const planRdv = usePlanRendezvous(units, pushChatter, supply.refetch)
 
   // A clicked advisor recommendation marked on the map: highlight + a movement arrow.
   const [selectedAdvice, setSelectedAdvice] = useState<Recommendation | null>(null)
@@ -160,7 +164,8 @@ export default function App() {
     setHighlightEventId(null)
     setLocatePoint(null)
     planning.resetPlanning()
-  }, [planning])
+    planRdv.cancel()
+  }, [planning, planRdv])
 
   // Click a tagged combat chatter line: focus its MGRS square (clearing any other selection), and
   // clicking the same line again toggles the highlight off. Clearing also happens via `clear`
@@ -395,6 +400,12 @@ export default function App() {
               }}
               fuelRunPickMode={fuelRun.phase === 'pick-target'}
               onPickFuelTarget={fuelRun.pickTarget}
+              rendezvousRoutes={planRdv.previewRoutes}
+              rendezvousMetric={planRdv.metric}
+              rendezvousPickUnit={planRdv.phase === 'pick-unit'}
+              onPickRendezvousUnit={planRdv.pickUnit}
+              rendezvousPickSector={planRdv.phase === 'pick-sector'}
+              onPickRendezvousSector={planRdv.pickSector}
               onPickDestination={(lat, lon) =>
                 planning.waypointMode
                   ? planning.addWaypoint(lat, lon)
@@ -429,6 +440,7 @@ export default function App() {
                 onLocate={locate}
                 onProposeRefuel={proposeSiteRefuel}
                 onCreateFuelRun={(truckId, truckName) => fuelRun.startTruckFirst(truckId, truckName)}
+                onPlanRendezvous={(truckId, truckName) => planRdv.start(truckId, truckName)}
                 onBuy={supplyOrders.placeBuy}
                 onRefuel={supplyOrders.placeRefuel}
                 onConfirmRefuel={supplyOrders.confirmRefuel}
@@ -460,6 +472,22 @@ export default function App() {
                 onSelectSource={fuelRun.selectSource}
                 onConfirm={fuelRun.confirm}
                 onCancel={fuelRun.cancel}
+              />
+            )}
+            {canShow(role, 'supplyPanel') && (
+              <PlanRendezvousPanel
+                phase={planRdv.phase}
+                truckName={planRdv.truckName}
+                unitName={planRdv.unitName}
+                truckRoutes={planRdv.truckRoutes}
+                unitRoutes={planRdv.unitRoutes}
+                metric={planRdv.metric}
+                busy={planRdv.busy}
+                message={planRdv.message}
+                onSelectMetric={planRdv.selectMetric}
+                onOrderNow={planRdv.orderNow}
+                onSchedule={planRdv.schedule}
+                onCancel={planRdv.cancel}
               />
             )}
             {obstacleActive && (

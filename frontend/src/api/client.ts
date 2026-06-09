@@ -10,7 +10,9 @@ import type {
   CreateFuelRunRequest,
   CreateMoveOrderRequest,
   CreateRefuelOrderRequest,
+  CreateRendezvousRequest,
   CreateWaypointMoveOrderRequest,
+  ConfirmLaunchResponse,
   FuelRunResponse,
   EnemyUnit,
   FuelDepot,
@@ -18,10 +20,15 @@ import type {
   FuelStock,
   MoveOrder,
   Obstacle,
+  PlanRendezvousRequest,
   PlanRouteRequest,
   PlanWaypointsRequest,
   RefuelOrder,
+  RendezvousOrder,
+  RendezvousPlanResponse,
+  RendezvousResponse,
   RouteOption,
+  ScheduleRendezvousRequest,
   SupplyOverview,
   Theater,
   Tile,
@@ -124,6 +131,21 @@ export const api = {
     postJson<RefuelOrder>('/refuel-orders', req),
   createFuelRun: (req: CreateFuelRunRequest): Promise<FuelRunResponse> =>
     postJson<FuelRunResponse>('/fuel-runs', req),
+
+  // Rendezvous fuel runs (v2 Wave 13): both movers route to a sector.
+  planRendezvous: (req: PlanRendezvousRequest): Promise<RendezvousPlanResponse> =>
+    postJson<RendezvousPlanResponse>('/rendezvous/plan', req),
+  createRendezvous: (req: CreateRendezvousRequest): Promise<RendezvousResponse> =>
+    postJson<RendezvousResponse>('/rendezvous', req),
+  scheduleRendezvous: (req: ScheduleRendezvousRequest): Promise<RendezvousOrder> =>
+    postJson<RendezvousOrder>('/rendezvous/schedule', req),
+  listRendezvous: (): Promise<RendezvousOrder[]> => getJson<RendezvousOrder[]>('/rendezvous'),
+  getRendezvous: (id: string): Promise<RendezvousOrder> =>
+    getJson<RendezvousOrder>(`/rendezvous/${id}`),
+  confirmLaunchRendezvous: (id: string): Promise<ConfirmLaunchResponse> =>
+    postJson<ConfirmLaunchResponse>(`/rendezvous/${id}/confirm-launch`),
+  cancelRendezvous: (id: string): Promise<RendezvousOrder> =>
+    postJson<RendezvousOrder>(`/rendezvous/${id}/cancel`),
   confirmRefuelOrder: (id: string): Promise<RefuelOrder> =>
     postJson<RefuelOrder>(`/refuel-orders/${id}/confirm`),
   cancelRefuelOrder: (id: string): Promise<RefuelOrder> =>

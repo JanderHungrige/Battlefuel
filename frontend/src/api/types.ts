@@ -360,6 +360,97 @@ export interface FuelRunResponse {
   refuel_order: RefuelOrder
 }
 
+// --- Rendezvous fuel runs (v2 Wave 13) ---
+
+/** The meeting sector: an H3 cell centre both movers route to. */
+export interface SectorPoint {
+  lat: number
+  lon: number
+  h3: string
+}
+
+export interface PlanRendezvousRequest {
+  truck_id: string
+  unit_id: string
+  sector_lat: number
+  sector_lon: number
+  mode?: RouteMode
+}
+
+/** Both movers' Safe/Fast options to the sector; each option's fuel_consumed_l = fuel-to-meet. */
+export interface RendezvousPlanResponse {
+  sector: SectorPoint
+  truck_routes: RouteOption[]
+  unit_routes: RouteOption[]
+}
+
+export interface CreateRendezvousRequest {
+  truck_id: string
+  unit_id: string
+  sector_lat: number
+  sector_lon: number
+  metric: RouteMetric
+  mode?: RouteMode
+}
+
+export interface RendezvousResponse {
+  sector: SectorPoint
+  truck_move_order: MoveOrder
+  unit_move_order: MoveOrder
+  refuel_order: RefuelOrder
+}
+
+export type RendezvousOrderStatus = 'planned' | 'due' | 'launched' | 'cancelled'
+
+/** A rendezvous fuel run planned against the sim clock (F2), filed in the order archive. */
+export interface RendezvousOrder {
+  id: string
+  truck_id: string
+  unit_id: string
+  sector_lat: number
+  sector_lon: number
+  sector_h3: string
+  metric: RouteMetric
+  mode: RouteMode
+  scheduled_game_s: number
+  remaining_game_s: number
+  truck_geometry: number[][]
+  unit_geometry: number[][]
+  truck_fuel_to_meet: number
+  unit_fuel_to_meet: number
+  status: RendezvousOrderStatus
+}
+
+export interface ScheduleRendezvousRequest {
+  truck_id: string
+  unit_id: string
+  sector_lat: number
+  sector_lon: number
+  metric: RouteMetric
+  mode?: RouteMode
+  scheduled_game_s: number
+}
+
+export interface ConfirmLaunchResponse {
+  rendezvous_order: RendezvousOrder
+  truck_move_order: MoveOrder
+  unit_move_order: MoveOrder
+  refuel_order: RefuelOrder
+}
+
+/** Live frame broadcast when a scheduled rendezvous comes due (F2). */
+export interface RendezvousReminder {
+  type: 'rendezvous_reminder'
+  order_id: string
+  truck_id: string
+  unit_id: string
+  sector_lat: number
+  sector_lon: number
+  sector_h3: string
+  metric: RouteMetric
+  status: RendezvousOrderStatus
+}
+
 /** Live frame broadcast when a buy order's NATO stage changes / it is delivered (Wave 5 + W11 F4). */
 export interface BuyOrderUpdate {
   type: 'buy_order_update'

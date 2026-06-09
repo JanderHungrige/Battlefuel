@@ -34,6 +34,8 @@ export interface SupplyPanelProps {
   onLocate?: (lat: number, lon: number) => void
   /** Start a routed fuel run from a truck (v2 Wave 12): pick a target unit next. */
   onCreateFuelRun?: (truckId: string, truckName: string) => void
+  /** Start a rendezvous plan from a truck (v2 Wave 13): pick a unit + a sector next. */
+  onPlanRendezvous?: (truckId: string, truckName: string) => void
   /** Ask the advisor to propose a refuel for a low site (v2 Wave 11 F5). */
   onProposeRefuel?: (depotId: string) => void
   onBuy: (depotId: string, fuelType: string, quantityLiters: number, meta?: OrderMeta) => void
@@ -59,6 +61,7 @@ export function SupplyPanel({
   onShowDocs,
   onLocate,
   onCreateFuelRun,
+  onPlanRendezvous,
   onProposeRefuel,
   onBuy,
   onRefuel,
@@ -276,6 +279,16 @@ export function SupplyPanel({
                   onClick={() => onCreateFuelRun(t.instance_id, t.name)}
                 >
                   Create fuel run
+                </button>
+              )}
+              {onPlanRendezvous && (
+                <button
+                  type="button"
+                  className="ghost rdv-start"
+                  data-testid={`rdv-start-${t.instance_id}`}
+                  onClick={() => onPlanRendezvous(t.instance_id, t.name)}
+                >
+                  Plan rendezvous
                 </button>
               )}
               <div className="stock-row">
