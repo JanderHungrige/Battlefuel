@@ -5,6 +5,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { api } from '../api/client'
 import { errorMessage } from '../api/errors'
+import { keepSelectedMetric } from '../lib/routeSelection'
 import type {
   ChatterMessage,
   MoveOrder,
@@ -86,14 +87,14 @@ export function useMovePlanning(
     (lat: number, lon: number, m: RouteMode) => {
       if (!selectedUnitId) return
       setRouteOptions([])
-      setSelectedMetric(null)
       setPlanError(null)
       setPlanLoading(true)
       api
         .planRoute({ instance_id: selectedUnitId, dest_lat: lat, dest_lon: lon, mode: m })
         .then((opts) => {
           setRouteOptions(opts)
-          setSelectedMetric(opts[0]?.metric ?? null)
+          // Keep the operator's fastest/safest choice across a re-plan (e.g. a mode switch).
+          setSelectedMetric((prev) => keepSelectedMetric(prev, opts))
         })
         .catch((e: unknown) => setPlanError(errorMessage(e)))
         .finally(() => setPlanLoading(false))
@@ -126,7 +127,7 @@ export function useMovePlanning(
         .planWaypoints({ instance_id: selectedUnitId, waypoints: wps, mode: m })
         .then((opts) => {
           setRouteOptions(opts)
-          setSelectedMetric((prev) => prev ?? opts[0]?.metric ?? null)
+          setSelectedMetric((prev) => keepSelectedMetric(prev, opts))
         })
         .catch((e: unknown) => setPlanError(errorMessage(e)))
         .finally(() => setPlanLoading(false))
