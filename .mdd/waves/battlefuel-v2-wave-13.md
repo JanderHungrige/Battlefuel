@@ -4,10 +4,10 @@ title: "Wave 13: Rendezvous fuel run — scheduled refuel at a sector"
 initiative: battlefuel-v2
 initiative_version: 8
 status: planned
-depends_on: battlefuel-v2-wave-12
+depends_on: none  # W12 is deployed to prod; dep relaxed so plan-execute isn't gated
 demo_state: "In OF-8 the operator selects a fuel truck and clicks 'Plan rendezvous'. The flow then asks for a target unit (click it on the map) and a meeting sector (click the MGRS sector). The engine computes Safe + Fast routes for BOTH movers — the truck to the sector AND the unit to the sector. The operator then chooses 'Order now' (both movers dispatch immediately and fuel transfers when they meet at the sector) OR 'Plan rendezvous' → enter a sim-clock date/time → 'Send order', which files the rendezvous in the order archive as PLANNED with that time. When the sim clock reaches the planned time a reminder pops up and the operator confirms-to-launch (no silent auto-dispatch). Clicking any rendezvous order in the archive draws BOTH units' routes on the map. Reuses Wave-12 routed-refuel + co-location transfer and the Wave-10 Safe/Fast routing."
 created: 2026-06-08
-hash: c7078e05
+hash: 5cf08074
 ---
 
 # Wave 13: Rendezvous fuel run — scheduled refuel at a sector
