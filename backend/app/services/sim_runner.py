@@ -325,6 +325,7 @@ class SimEngine:
                 factors=enter_factors,
                 threat_level=enter_threat,
                 currently_in_threat=cur_threat >= THREAT_L5,
+                entering_new_cell=enter_cell != row.h3_index,
             )
             # On a halt, estimate the adjusted fuel to crawl the remaining threat tiles (v2 W13 F5).
             slow_fuel = (
