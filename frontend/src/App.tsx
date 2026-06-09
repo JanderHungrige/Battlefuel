@@ -15,6 +15,7 @@ import { RoleToggle } from './components/RoleToggle'
 import { InfoDocsPanel } from './components/InfoDocsPanel'
 import { FuelRunPanel } from './components/FuelRunPanel'
 import { PlanRendezvousPanel } from './components/PlanRendezvousPanel'
+import { RendezvousReminderBanner } from './components/RendezvousReminderBanner'
 import { LandingPage } from './components/LandingPage'
 import { OrderHistoryPanel } from './components/OrderHistoryPanel'
 import { SupplyPanel } from './components/SupplyPanel'
@@ -32,6 +33,7 @@ import { useFuelPlatforms } from './hooks/useFuelPlatforms'
 import { useInfoDocs } from './hooks/useInfoDocs'
 import { useFuelRun } from './hooks/useFuelRun'
 import { usePlanRendezvous } from './hooks/usePlanRendezvous'
+import { useRendezvousArchive } from './hooks/useRendezvousArchive'
 import { useOrderHistory } from './hooks/useOrderHistory'
 import { useSupply } from './hooks/useSupply'
 import { useSupplyOrders } from './hooks/useSupplyOrders'
@@ -62,8 +64,16 @@ export default function App() {
     localStorage.setItem('bf.gridPrecisionM', String(gridPrecisionM))
   }, [gridPrecisionM])
 
-  const { positions: live, tileUpdates, combatEvents, chatter, strategic, pushChatter, supplyTick } =
-    useSimSocket()
+  const {
+    positions: live,
+    tileUpdates,
+    combatEvents,
+    chatter,
+    strategic,
+    pushChatter,
+    supplyTick,
+    rendezvousReminder,
+  } = useSimSocket()
 
   // Operator ops: obstacles + tile edits + the obstacle-placement mode and chosen kind.
   const { obstacles, placeObstacle, removeObstacle, mutateTile } = useObstacleOps()
@@ -133,6 +143,17 @@ export default function App() {
   const fuelPlatforms = useFuelPlatforms(role === 'OF8')
   const orderHistory = useOrderHistory(role === 'OF8', supplyTick)
   const [orderHistoryOpen, setOrderHistoryOpen] = useState(false)
+  // Rendezvous archive + reminder (v2 Wave 13 F4).
+  const rdvArchive = useRendezvousArchive(role === 'OF8', supplyTick, pushChatter)
+  const [dismissedReminders, setDismissedReminders] = useState<Set<string>>(new Set())
+  const activeReminder =
+    rendezvousReminder && !dismissedReminders.has(rendezvousReminder.order_id)
+      ? rendezvousReminder
+      : null
+  const reminderName = useCallback(
+    (id: string) => units.find((u) => u.id === id)?.name ?? id,
+    [units],
+  )
   const infoDocs = useInfoDocs(role === 'OF8')
   const [infoDocsOpen, setInfoDocsOpen] = useState(false)
   const roster = useUnitOverview(setUnits)
@@ -165,7 +186,8 @@ export default function App() {
     setLocatePoint(null)
     planning.resetPlanning()
     planRdv.cancel()
-  }, [planning, planRdv])
+    rdvArchive.clearSelection()
+  }, [planning, planRdv, rdvArchive])
 
   // Click a tagged combat chatter line: focus its MGRS square (clearing any other selection), and
   // clicking the same line again toggles the highlight off. Clearing also happens via `clear`
@@ -400,8 +422,10 @@ export default function App() {
               }}
               fuelRunPickMode={fuelRun.phase === 'pick-target'}
               onPickFuelTarget={fuelRun.pickTarget}
-              rendezvousRoutes={planRdv.previewRoutes}
-              rendezvousMetric={planRdv.metric}
+              rendezvousRoutes={
+                planRdv.phase !== 'idle' ? planRdv.previewRoutes : rdvArchive.previewRoutes
+              }
+              rendezvousMetric={planRdv.phase !== 'idle' ? planRdv.metric : rdvArchive.previewMetric}
               rendezvousPickUnit={planRdv.phase === 'pick-unit'}
               onPickRendezvousUnit={planRdv.pickUnit}
               rendezvousPickSector={planRdv.phase === 'pick-sector'}
@@ -451,6 +475,10 @@ export default function App() {
               <OrderHistoryPanel
                 orders={orderHistory.orders}
                 onClose={() => setOrderHistoryOpen(false)}
+                rendezvousOrders={rdvArchive.orders}
+                selectedRendezvousId={rdvArchive.selectedId}
+                onSelectRendezvous={rdvArchive.select}
+                onCancelRendezvous={rdvArchive.cancel}
               />
             )}
             {canShow(role, 'supplyPanel') && infoDocsOpen && (
@@ -521,6 +549,21 @@ export default function App() {
                 onProceed={proceedHalted}
                 onReroute={rerouteHalted}
                 onDismiss={() => setDismissedHalt(halted.orderId)}
+              />
+            )}
+            {canShow(role, 'supplyPanel') && activeReminder && (
+              <RendezvousReminderBanner
+                reminder={activeReminder}
+                truckName={reminderName(activeReminder.truck_id)}
+                unitName={reminderName(activeReminder.unit_id)}
+                busy={rdvArchive.busy}
+                onConfirm={() => {
+                  rdvArchive.confirmLaunch(activeReminder.order_id)
+                  setDismissedReminders((s) => new Set(s).add(activeReminder.order_id))
+                }}
+                onDismiss={() =>
+                  setDismissedReminders((s) => new Set(s).add(activeReminder.order_id))
+                }
               />
             )}
             {canShow(role, 'advisor') && advisor.open && (
