@@ -3,18 +3,21 @@
 // Wraps driver.js for popover/arrow/spotlight positioning and layers the two run modes on top:
 //   • guided — manual Next/Previous/Close buttons.
 //   • auto   — advances on its own after a length-scaled delay (tourTiming); Space toggles pause.
-// Only steps whose target is mounted are shown, so the tour matches the current role view. All the
-// pure logic (timing, step selection) lives in ../lib so it is unit-tested without the DOM; this
-// hook owns the DOM-bound orchestration and is exercised at the live `make dev` gate.
+//
+// Some steps reveal their successor's target via a `before` action run as the step is shown — a
+// sub-tab click (DOM) or a named app action like selecting a demo unit (via the actions map). The
+// pure logic (timing, step selection) lives in ../lib and is unit-tested; this hook owns the
+// DOM-bound orchestration and is exercised at the live `make dev` gate.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { driver, type Driver } from 'driver.js'
 import 'driver.js/dist/driver.css'
 import type { Role } from '../roles'
-import { stepsForRole, type TourStep } from '../lib/tourSteps'
+import { stepsForRole, type TourActionKey, type TourStep } from '../lib/tourSteps'
 import { autoAdvanceDelayMs } from '../lib/tourTiming'
 
 export type TourMode = 'guided' | 'auto'
+export type TourActions = Partial<Record<TourActionKey, () => void>>
 
 export interface TourController {
   /** Start (or restart) the tour in the given mode. */
@@ -25,7 +28,18 @@ export interface TourController {
   paused: boolean
 }
 
-export function useTour(role: Role): TourController {
+/** Run a step's `before`: click a selector (e.g. switch a sub-tab) and/or fire an app action. */
+function runBefore(step: TourStep | undefined, actions: TourActions): void {
+  if (!step?.before) return
+  const { click, action } = step.before
+  if (click) {
+    const el = document.querySelector<HTMLElement>(click)
+    el?.click()
+  }
+  if (action) actions[action]?.()
+}
+
+export function useTour(role: Role, actions: TourActions = {}, onEnd?: () => void): TourController {
   const [active, setActive] = useState(false)
   const [paused, setPaused] = useState(false)
 
@@ -34,6 +48,14 @@ export function useTour(role: Role): TourController {
   const stepsRef = useRef<TourStep[]>([])
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pausedRef = useRef(false)
+  const actionsRef = useRef<TourActions>(actions)
+  const onEndRef = useRef<typeof onEnd>(onEnd)
+  useEffect(() => {
+    actionsRef.current = actions
+  }, [actions])
+  useEffect(() => {
+    onEndRef.current = onEnd
+  }, [onEnd])
 
   const clearTimer = useCallback(() => {
     if (timerRef.current !== null) {
@@ -64,6 +86,7 @@ export function useTour(role: Role): TourController {
     setPaused(false)
     setActive(false)
     driverRef.current = null
+    onEndRef.current?.()
   }, [clearTimer])
 
   const start = useCallback(
@@ -79,8 +102,13 @@ export function useTour(role: Role): TourController {
       setPaused(false)
       modeRef.current = mode
 
-      // Current-view tour: keep only steps whose target is actually on screen.
-      const steps = stepsForRole(role).filter((s) => document.querySelector(s.selector))
+      // Keep steps whose target is present now, plus every step from the first gated step onward
+      // (a `before` action mounts later targets) so tab-/selection-gated steps aren't dropped.
+      let armed = false
+      const steps = stepsForRole(role).filter((s) => {
+        if (s.before) armed = true
+        return armed || Boolean(document.querySelector(s.selector))
+      })
       stepsRef.current = steps
       if (steps.length === 0) return
 
@@ -95,6 +123,13 @@ export function useTour(role: Role): TourController {
           element: s.selector,
           popover: { title: s.title, description: s.text, side: s.side, align: s.align },
         })),
+        // Run the step's `before` as it is shown — it enables the *next* step's target. Reposition
+        // after, since switching a sub-tab can shift layout under a stable anchor.
+        onHighlightStarted: (_el, _step, opts) => {
+          const idx = opts.state.activeIndex ?? 0
+          runBefore(stepsRef.current[idx], actionsRef.current)
+          setTimeout(() => driverRef.current?.refresh(), 60)
+        },
         onHighlighted: () => scheduleAdvance(),
         onDestroyed: () => reset(),
       })

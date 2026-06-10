@@ -2,13 +2,26 @@
 //
 // Each step binds to a real on-screen element by CSS selector (existing classes / data-testids —
 // no markup churn) and carries the caption shown in the popover. The tour covers the *current*
-// role view: shared controls plus the role-specific tools (OF-4 tactical vs OF-8 supply). The
-// hook filters to steps whose target is actually mounted, so a missing panel is skipped cleanly.
+// role view: shared controls plus the role-specific tools (OF-4 tactical vs OF-8 supply).
+//
+// Some controls only exist after an interaction (the Plan-move panel needs a unit selected; the
+// supply sub-tabs swap their content). A step's optional `before` runs as that step is shown and
+// enables the *next* step's target — so every popover anchors to an element that is already on
+// screen (no render race). `select-unit` is an app action (the hook calls it via an actions map);
+// `click` is a plain selector the hook clicks (e.g. to switch a sub-tab).
 
 import type { Role } from '../roles'
 
 export type TourSide = 'top' | 'bottom' | 'left' | 'right'
 export type TourAlign = 'start' | 'center' | 'end'
+export type TourActionKey = 'select-unit'
+
+export interface TourBefore {
+  /** Selector the hook clicks before showing this step (e.g. switch a sub-tab). */
+  click?: string
+  /** A named app action the hook runs via its actions map (e.g. select a demo unit). */
+  action?: TourActionKey
+}
 
 export interface TourStep {
   /** CSS selector for the highlighted element. */
@@ -17,19 +30,22 @@ export interface TourStep {
   text: string
   side?: TourSide
   align?: TourAlign
+  before?: TourBefore
 }
+
+// ---- shared (both roles) ----------------------------------------------------------------------
 
 const INTRO: TourStep = {
   selector: '.topbar .brand',
   title: 'Welcome to BattleFuel',
-  text: 'A fuel-logistics and decision-support tool on a live map of the theater. This quick tour points out the main controls.',
+  text: 'A fuel-logistics and decision-support tool on a live map of the theater. This quick tour points out the main controls — use Next, or pick Auto-play and press Space to pause.',
   side: 'bottom',
   align: 'start',
 }
 const ROLE: TourStep = {
   selector: '[data-testid="role-toggle"]',
   title: 'Switch command roles',
-  text: 'OF-4 is the tactical battalion view — move and route units. OF-8 is the joint-force supply view — fuel ordering, depots and distribution.',
+  text: 'OF-4 is the tactical battalion view — move and route units. OF-8 is the joint-force supply view — fuel ordering, depots and distribution. The tour adapts to whichever you’re in.',
   side: 'bottom',
 }
 const GRID: TourStep = {
@@ -50,35 +66,6 @@ const ADVISOR: TourStep = {
   text: 'The advisor proposes refuel assignments, stock redistribution and route choices with rationale. You stay in control and approve.',
   side: 'bottom',
 }
-
-// OF-4 tactical
-const OBSTACLE: TourStep = {
-  selector: '[data-testid="obstacle-mode-toggle"]',
-  title: 'Obstacle mode',
-  text: 'Mark blocked or mined ground the router must avoid — place obstacles directly on the map.',
-  side: 'bottom',
-}
-
-// OF-8 supply
-const DEPOT: TourStep = {
-  selector: '[data-testid="depot-mode-toggle"]',
-  title: 'Add logistic sites',
-  text: 'Place fuel depots and typed NATO logistic sites (BSA, CSSBN, DOB, FLS, TLB) that carry stock and can be refueled.',
-  side: 'bottom',
-}
-const FUELBARS: TourStep = {
-  selector: '[data-testid="info-bars-toggle"]',
-  title: 'On-map fuel bars',
-  text: 'Toggle a colour-coded fuel bar beside each unit; the selected unit’s bar sits on top.',
-  side: 'bottom',
-}
-const SUPPLY: TourStep = {
-  selector: '[data-testid="supply-panel"]',
-  title: 'Supply & ordering',
-  text: 'Order fuel through a branded platform, track each order through the NATO supply stages, and run routed fuel runs and rendezvous.',
-  side: 'left',
-}
-
 const MAP: TourStep = {
   selector: '.map-area',
   title: 'The operational map',
@@ -99,11 +86,135 @@ const REPLAY: TourStep = {
   side: 'left',
 }
 
-const COMMON_HEAD: readonly TourStep[] = [INTRO, ROLE, GRID, UNITS, ADVISOR]
-const COMMON_TAIL: readonly TourStep[] = [MAP, CHATTER, REPLAY]
+// ---- OF-4 tactical: routing depth -------------------------------------------------------------
+
+const OBSTACLE: TourStep = {
+  selector: '[data-testid="obstacle-mode-toggle"]',
+  title: 'Obstacle mode',
+  text: 'Mark blocked or mined ground the router must avoid — place obstacles directly on the map.',
+  side: 'bottom',
+}
+// Selecting a unit (the `before`) opens the Plan-move panel so the next steps can point at it.
+const ROUTING_INTRO: TourStep = {
+  selector: '.map-area',
+  title: 'Plan a unit’s move',
+  text: 'Routing starts by selecting a unit, then clicking a destination. I’ve opened the Plan-move panel on the right for a unit — the next steps walk through it.',
+  side: 'top',
+  align: 'center',
+  before: { action: 'select-unit' },
+}
+const TRAVEL_MODES: TourStep = {
+  selector: '.move-mode',
+  title: 'Travel mode',
+  text: 'Choose how the unit travels: Road (fast on roads), Off-road (cross-country — slower and more fuel), Hybrid (stitches road + off-road), or Direct (a straight line). In waypoint routing each leg can use its own mode.',
+  side: 'left',
+}
+const ROUTE_SAFE_FAST: TourStep = {
+  selector: '.move-panel',
+  title: 'Safe vs Fast routes',
+  text: 'After you click a destination the planner offers two routes: SAFE avoids enemy troops and high-threat sectors, even detouring off-road around danger; FAST takes the shortest path, crossing threats at a penalty (with a warning over a combat sector). Pick one and Confirm move order.',
+  side: 'left',
+}
+const WAYPOINTS: TourStep = {
+  selector: '[data-testid="wp-start"]',
+  title: 'Waypoint routing',
+  text: 'Start waypoint routing, click the map to drop ordered waypoints, Remove last to undo, End routing to plan the stitched legs, then Confirm. Each leg keeps its own travel mode.',
+  side: 'left',
+}
+const REFUEL_RDV: TourStep = {
+  selector: '.move-panel',
+  title: 'Refuel stop & rendezvous',
+  text: 'On a planned route you can “+ Add refuel stop” — insert a meet with the nearest tanker on the way, kept out of threat where possible — or “Plan rendezvous” to send the unit and a tanker to meet at a sector. A tanker routed through threat raises a force-protection prompt.',
+  side: 'left',
+}
+
+// ---- OF-8 supply: Joint-Force Supply tab + sub-tabs -------------------------------------------
+
+const SUPPLY_HEADER: TourStep = {
+  selector: '[data-testid="supply-panel"]',
+  title: 'Joint-Force Supply',
+  text: 'The OF-8 hub: monitor depots, manage the tanker fleet, order fuel and run fuel missions. It has three tabs — Overview, Supply fleet and Order fuel — plus Order history and Info docs up top.',
+  side: 'left',
+  before: { click: '[data-testid="supply-tab-overview"]' },
+}
+const SUPPLY_OVERVIEW: TourStep = {
+  selector: '[data-testid="fleet-summary"]',
+  title: 'Overview tab',
+  text: 'Each depot’s fuel stocks with fill bars; a low depot shows “Propose refuel”, which asks the advisor for a redistribution order. Below is a fleet summary — total tankers and how many are on standby.',
+  side: 'left',
+}
+const SUPPLY_TAB_FLEET: TourStep = {
+  selector: '[data-testid="supply-tab-fleet"]',
+  title: 'Supply Fleet tab',
+  text: 'Switch here for every tanker — its live fuel level and whether it’s on standby or already tasked to a unit. Click a tanker’s name to locate it on the map.',
+  side: 'left',
+  before: { click: '[data-testid="supply-tab-fleet"]' },
+}
+const SUPPLY_FLEET_ACTIONS: TourStep = {
+  selector: '[data-testid^="fuel-run-start-"]',
+  title: 'Fuel runs from a tanker',
+  text: 'From any tanker: “Create fuel run” sends it straight to a target unit you click; “Plan rendezvous” has the unit and tanker meet at a sector. Fuel transfers automatically when they meet.',
+  side: 'left',
+}
+const SUPPLY_TAB_ORDER: TourStep = {
+  selector: '[data-testid="supply-tab-order"]',
+  title: 'Order Fuel tab',
+  text: 'Switch here to place supply orders.',
+  side: 'left',
+  before: { click: '[data-testid="supply-tab-order"]' },
+}
+const SUPPLY_ORDER_FORM: TourStep = {
+  selector: '[data-testid="buy-submit"]',
+  title: 'Order fuel to a depot',
+  text: 'Pick a fuel-management platform (World Fuel DFMS, Shell FM, or add your own), choose the depot, fuel type and amount, then “Order fuel” opens a branded order mask — placing it logs the order and starts it through the NATO supply stages.',
+  side: 'left',
+}
+const SUPPLY_REFUEL: TourStep = {
+  selector: '[data-testid="refuel-submit"]',
+  title: 'Refuel a unit',
+  text: 'Request a refuel for a chosen unit; the advisor recommends the nearest tanker to send to the rendezvous.',
+  side: 'left',
+}
+const SUPPLY_HISTORY: TourStep = {
+  selector: '[data-testid="order-history-open"]',
+  title: 'Order history',
+  text: 'Tracks every order through the NATO stages — placed → JLSG → JTF → provider → on route → reached JLSG → reached OPCON — and lists scheduled rendezvous; click one to draw both routes on the map.',
+  side: 'bottom',
+  align: 'end',
+}
+const SUPPLY_DOCS: TourStep = {
+  selector: '[data-testid="info-docs-open"]',
+  title: 'Info docs',
+  text: 'Opens the official logistics reference PDFs, served with the app.',
+  side: 'bottom',
+  align: 'end',
+}
+
+const COMMON_HEAD: readonly TourStep[] = [INTRO, ROLE, GRID, UNITS, ADVISOR, MAP]
+const COMMON_TAIL: readonly TourStep[] = [CHATTER, REPLAY]
+
+const OF4_STEPS: readonly TourStep[] = [
+  OBSTACLE,
+  ROUTING_INTRO,
+  TRAVEL_MODES,
+  ROUTE_SAFE_FAST,
+  WAYPOINTS,
+  REFUEL_RDV,
+]
+const OF8_STEPS: readonly TourStep[] = [
+  SUPPLY_HEADER,
+  SUPPLY_OVERVIEW,
+  SUPPLY_TAB_FLEET,
+  SUPPLY_FLEET_ACTIONS,
+  SUPPLY_TAB_ORDER,
+  SUPPLY_ORDER_FORM,
+  SUPPLY_REFUEL,
+  SUPPLY_HISTORY,
+  SUPPLY_DOCS,
+]
 
 /** Ordered steps for the given role's current view. */
 export function stepsForRole(role: Role): TourStep[] {
-  const roleSteps = role === 'OF8' ? [DEPOT, FUELBARS, SUPPLY] : [OBSTACLE]
+  const roleSteps = role === 'OF8' ? OF8_STEPS : OF4_STEPS
   return [...COMMON_HEAD, ...roleSteps, ...COMMON_TAIL]
 }

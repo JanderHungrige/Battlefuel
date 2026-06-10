@@ -411,7 +411,20 @@ export default function App() {
           </label>
         )}
         <span className="spacer" />
-        {theater && <TourButton role={role} />}
+        {theater && (
+          <TourButton
+            role={role}
+            onSelectDemoUnit={() => {
+              const u = units[0]
+              if (!u) return
+              setSelectedCell(null)
+              setHighlightEventId(null)
+              planning.resetPlanning()
+              setSelectedUnitId(u.id)
+            }}
+            onClearSelection={clear}
+          />
+        )}
         <span className="attribution">{OSM_ATTRIBUTION}</span>
       </header>
       <main className="map-area">

@@ -4,13 +4,25 @@
 // Guided (manual Next) or Auto-play (advances on its own, Space pauses). While auto-play is paused
 // a ⏸ indicator shows next to the button.
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Role } from '../roles'
-import { useTour, type TourMode } from '../hooks/useTour'
+import { useTour, type TourActions, type TourMode } from '../hooks/useTour'
 import './TourButton.css'
 
-export function TourButton({ role }: { role: Role }) {
-  const tour = useTour(role)
+interface TourButtonProps {
+  role: Role
+  /** Select a demo unit so the OF-4 Plan-move panel mounts for the routing steps. */
+  onSelectDemoUnit?: () => void
+  /** Clear any selection/mode when the tour ends (restores the normal UI). */
+  onClearSelection?: () => void
+}
+
+export function TourButton({ role, onSelectDemoUnit, onClearSelection }: TourButtonProps) {
+  const actions = useMemo<TourActions>(
+    () => ({ 'select-unit': onSelectDemoUnit ?? (() => {}) }),
+    [onSelectDemoUnit],
+  )
+  const tour = useTour(role, actions, onClearSelection)
   const [menuOpen, setMenuOpen] = useState(false)
   const ref = useRef<HTMLDivElement | null>(null)
 
