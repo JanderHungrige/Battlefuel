@@ -17,6 +17,7 @@ import { FuelRunPanel } from './components/FuelRunPanel'
 import { PlanRendezvousPanel } from './components/PlanRendezvousPanel'
 import { RendezvousReminderBanner } from './components/RendezvousReminderBanner'
 import { LandingPage } from './components/LandingPage'
+import { TourButton } from './components/TourButton'
 import { OrderHistoryPanel } from './components/OrderHistoryPanel'
 import { SupplyPanel } from './components/SupplyPanel'
 import { UnitOverview } from './components/UnitOverview'
@@ -410,6 +411,7 @@ export default function App() {
           </label>
         )}
         <span className="spacer" />
+        {theater && <TourButton role={role} />}
         <span className="attribution">{OSM_ATTRIBUTION}</span>
       </header>
       <main className="map-area">

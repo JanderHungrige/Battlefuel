@@ -1,0 +1,126 @@
+/* "Take a tour" button + chooser, and dark theming for the driver.js popover (v2: take-a-tour). */
+
+.tour {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tour-btn {
+  padding: 4px 10px;
+  background: #1c222b;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tour-btn:hover {
+  background: #232b36;
+}
+
+.tour-paused {
+  color: var(--accent);
+  font-size: 13px;
+  line-height: 1;
+  animation: tour-pulse 1.2s ease-in-out infinite;
+}
+@keyframes tour-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.tour-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  min-width: 240px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+.tour-menu-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text);
+}
+.tour-menu-item:hover {
+  background: #1c222b;
+}
+.tour-menu-item strong {
+  font-size: 13px;
+  color: var(--accent);
+}
+.tour-menu-item span {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* --- dark theming for the driver.js popover (popoverClass: 'bf-tour') --- */
+.driver-popover.bf-tour {
+  background: #161b22;
+  color: #e6edf3;
+  border: 1px solid #2a313c;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+  max-width: 320px;
+}
+.driver-popover.bf-tour .driver-popover-title {
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 700;
+}
+.driver-popover.bf-tour .driver-popover-description {
+  color: #cdd6e0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.driver-popover.bf-tour .driver-popover-progress-text {
+  color: #97a3b3;
+  font-size: 11px;
+}
+.driver-popover.bf-tour .driver-popover-close-btn {
+  color: #97a3b3;
+}
+.driver-popover.bf-tour button {
+  background: #1c222b;
+  color: #e6edf3;
+  border: 1px solid #2a313c;
+  border-radius: 6px;
+  font-size: 12px;
+  text-shadow: none;
+}
+.driver-popover.bf-tour button:hover {
+  background: #232b36;
+}
+/* tint the popover arrow to match the dark box on each side */
+.driver-popover.bf-tour .driver-popover-arrow-side-bottom {
+  border-bottom-color: #161b22;
+}
+.driver-popover.bf-tour .driver-popover-arrow-side-top {
+  border-top-color: #161b22;
+}
+.driver-popover.bf-tour .driver-popover-arrow-side-left {
+  border-left-color: #161b22;
+}
+.driver-popover.bf-tour .driver-popover-arrow-side-right {
+  border-right-color: #161b22;
+}
