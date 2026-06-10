@@ -30,7 +30,9 @@ describe('stepsForRole', () => {
     const sel = of8.map((s) => s.selector)
     expect(sel).toContain('[data-testid="supply-panel"]')
     expect(sel).toContain('[data-testid="fleet-summary"]') // Overview content
-    expect(sel).toContain('[data-testid^="fuel-run-start-"]') // Supply fleet content
+    expect(sel).toContain('[data-testid^="fuel-run-start-"]') // Supply fleet: Create fuel run
+    expect(sel).toContain('[data-testid^="rdv-start-"]') // Supply fleet: Plan rendezvous
+    expect(sel).toContain('[data-testid="plan-rendezvous-panel"]') // demo'd rendezvous planner
     expect(sel).toContain('[data-testid="buy-submit"]') // Order fuel content
     expect(sel).toContain('[data-testid="refuel-submit"]')
     expect(sel).toContain('[data-testid="order-history-open"]')
@@ -45,6 +47,14 @@ describe('stepsForRole', () => {
     expect(clicks).toContain('[data-testid="supply-tab-overview"]')
     expect(clicks).toContain('[data-testid="supply-tab-fleet"]')
     expect(clicks).toContain('[data-testid="supply-tab-order"]')
+  })
+
+  it('opens then closes the rendezvous planner around its demo step', () => {
+    const actions = stepsForRole('OF8')
+      .map((s) => s.before?.action)
+      .filter((a): a is NonNullable<typeof a> => Boolean(a))
+    expect(actions).toContain('plan-rendezvous')
+    expect(actions).toContain('cancel-rendezvous')
   })
 
   it('every step has a non-empty title and caption', () => {

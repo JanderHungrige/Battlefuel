@@ -14,7 +14,7 @@ import type { Role } from '../roles'
 
 export type TourSide = 'top' | 'bottom' | 'left' | 'right'
 export type TourAlign = 'start' | 'center' | 'end'
-export type TourActionKey = 'select-unit'
+export type TourActionKey = 'select-unit' | 'plan-rendezvous' | 'cancel-rendezvous'
 
 export interface TourBefore {
   /** Selector the hook clicks before showing this step (e.g. switch a sub-tab). */
@@ -150,18 +150,34 @@ const SUPPLY_TAB_FLEET: TourStep = {
   side: 'left',
   before: { click: '[data-testid="supply-tab-fleet"]' },
 }
-const SUPPLY_FLEET_ACTIONS: TourStep = {
+const SUPPLY_FLEET_FUELRUN: TourStep = {
   selector: '[data-testid^="fuel-run-start-"]',
-  title: 'Fuel runs from a tanker',
-  text: 'From any tanker: “Create fuel run” sends it straight to a target unit you click; “Plan rendezvous” has the unit and tanker meet at a sector. Fuel transfers automatically when they meet.',
+  title: 'Create fuel run',
+  text: 'Send this tanker straight to a target unit you click on the map — fuel transfers automatically when it arrives.',
   side: 'left',
+}
+// The `before` starts the rendezvous flow so the Plan Rendezvous panel mounts for the next step.
+const SUPPLY_FLEET_RDV: TourStep = {
+  selector: '[data-testid^="rdv-start-"]',
+  title: 'Plan rendezvous',
+  text: 'Instead of driving all the way to the unit, have the tanker and the unit meet at a sector you choose. Watch — I’ll open the rendezvous planner.',
+  side: 'left',
+  before: { action: 'plan-rendezvous' },
+}
+const SUPPLY_RDV_PANEL: TourStep = {
+  selector: '[data-testid="plan-rendezvous-panel"]',
+  title: 'Rendezvous planner',
+  text: 'Pick the target unit, then the meeting sector — the planner shows Safe/Fast routes for BOTH the tanker and the unit. “Order now” dispatches them to meet, or schedule it for a sim-clock time with a confirm-to-launch reminder.',
+  side: 'top',
+  align: 'start',
 }
 const SUPPLY_TAB_ORDER: TourStep = {
   selector: '[data-testid="supply-tab-order"]',
   title: 'Order Fuel tab',
   text: 'Switch here to place supply orders.',
   side: 'left',
-  before: { click: '[data-testid="supply-tab-order"]' },
+  // Close the rendezvous planner opened above, then switch to the Order fuel tab.
+  before: { action: 'cancel-rendezvous', click: '[data-testid="supply-tab-order"]' },
 }
 const SUPPLY_ORDER_FORM: TourStep = {
   selector: '[data-testid="buy-submit"]',
@@ -205,7 +221,9 @@ const OF8_STEPS: readonly TourStep[] = [
   SUPPLY_HEADER,
   SUPPLY_OVERVIEW,
   SUPPLY_TAB_FLEET,
-  SUPPLY_FLEET_ACTIONS,
+  SUPPLY_FLEET_FUELRUN,
+  SUPPLY_FLEET_RDV,
+  SUPPLY_RDV_PANEL,
   SUPPLY_TAB_ORDER,
   SUPPLY_ORDER_FORM,
   SUPPLY_REFUEL,
