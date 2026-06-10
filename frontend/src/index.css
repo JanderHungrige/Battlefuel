@@ -192,7 +192,12 @@ body {
   color: #f0c878;
 }
 
-.fuel-run-start {
+/* Shared "Create fuel run" button look — also used by the fleet "Plan rendezvous" and the
+   Plan-move panel's "+ Add refuel stop" / "Plan rendezvous" buttons (v2: take-a-tour follow-up). */
+.fuel-run-start,
+.rdv-start,
+.move-add-refuel,
+.move-plan-rdv {
   margin-top: 4px;
   background: transparent;
   color: var(--accent);
@@ -201,6 +206,18 @@ body {
   padding: 2px 8px;
   font-size: 11px;
   cursor: pointer;
+}
+.fuel-run-start:disabled,
+.rdv-start:disabled,
+.move-add-refuel:disabled,
+.move-plan-rdv:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.move-refuel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 /* Fuel run panel (v2 Wave 12). */
