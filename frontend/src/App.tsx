@@ -17,6 +17,8 @@ import { FuelRunPanel } from './components/FuelRunPanel'
 import { PlanRendezvousPanel } from './components/PlanRendezvousPanel'
 import { RendezvousReminderBanner } from './components/RendezvousReminderBanner'
 import { LandingPage } from './components/LandingPage'
+import { TourButton } from './components/TourButton'
+import type { TourActions } from './hooks/useTour'
 import { OrderHistoryPanel } from './components/OrderHistoryPanel'
 import { SupplyPanel } from './components/SupplyPanel'
 import { UnitOverview } from './components/UnitOverview'
@@ -199,6 +201,27 @@ export default function App() {
     rdvArchive.clearSelection()
     refuelStop.cancel()
   }, [planning, planRdv, rdvArchive, refuelStop])
+
+  // Actions the "Take a tour" walkthrough drives so it can show gated controls: open the OF-4
+  // Plan-move panel (select a demo unit), and open/close the OF-8 rendezvous planner.
+  const tourActions = useMemo<TourActions>(
+    () => ({
+      'select-unit': () => {
+        const u = units[0]
+        if (!u) return
+        setSelectedCell(null)
+        setHighlightEventId(null)
+        planning.resetPlanning()
+        setSelectedUnitId(u.id)
+      },
+      'plan-rendezvous': () => {
+        const t = supply.overview?.trucks?.[0]
+        if (t) planRdv.start(t.instance_id, t.name)
+      },
+      'cancel-rendezvous': () => planRdv.cancel(),
+    }),
+    [units, planning, supply.overview, planRdv],
+  )
 
   // Click a tagged combat chatter line: focus its MGRS square (clearing any other selection), and
   // clicking the same line again toggles the highlight off. Clearing also happens via `clear`
@@ -410,6 +433,7 @@ export default function App() {
           </label>
         )}
         <span className="spacer" />
+        {theater && <TourButton role={role} actions={tourActions} onEnd={clear} />}
         <span className="attribution">{OSM_ATTRIBUTION}</span>
       </header>
       <main className="map-area">
