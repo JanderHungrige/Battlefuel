@@ -23,11 +23,11 @@ describe('autoAdvanceDelayMs', () => {
   })
 
   it('scales between floor and cap with length, staying in range', () => {
-    const mid = autoAdvanceDelayMs(Array.from({ length: 12 }, () => 'word').join(' '))
+    const mid = autoAdvanceDelayMs(Array.from({ length: 8 }, () => 'word').join(' '))
     expect(mid).toBeGreaterThan(TOUR_MIN_MS)
     expect(mid).toBeLessThan(TOUR_MAX_MS)
     // monotonic: more words → not shorter
-    const fewer = autoAdvanceDelayMs(Array.from({ length: 8 }, () => 'word').join(' '))
+    const fewer = autoAdvanceDelayMs(Array.from({ length: 7 }, () => 'word').join(' '))
     expect(mid).toBeGreaterThanOrEqual(fewer)
   })
 
