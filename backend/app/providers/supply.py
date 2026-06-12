@@ -13,7 +13,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 
 import h3
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings, get_settings
@@ -74,6 +74,15 @@ class SupplyProvider(ABC):
 
         A typed logistic site (``site_type`` set, v2 Wave 11 F5) is additionally seeded with
         default diesel/JP8 stock so it is stocked and refuelable.
+        """
+
+    @abstractmethod
+    async def delete_depot(self, session: AsyncSession, depot_id: str) -> bool:
+        """Delete a depot and its stock. Returns ``True`` if removed, ``False`` if absent. Commits.
+
+        Lets the operator prune hand-added depots / logistic sites (there is otherwise no way to
+        remove one once placed). Historical order rows reference depot ids loosely (no FK), so a
+        removed depot leaves only harmless dangling references.
         """
 
     @abstractmethod
@@ -142,6 +151,15 @@ class DbSupplyProvider(SupplyProvider):
                 )
         await session.commit()
         return _to_depot(row)
+
+    async def delete_depot(self, session: AsyncSession, depot_id: str) -> bool:
+        row = await session.get(FuelDepotRow, depot_id)
+        if row is None:
+            return False
+        await session.execute(delete(FuelStockRow).where(FuelStockRow.depot_id == depot_id))
+        await session.delete(row)
+        await session.commit()
+        return True
 
     async def list_stocks(
         self, session: AsyncSession, depot_id: str | None = None

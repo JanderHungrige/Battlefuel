@@ -77,6 +77,17 @@ async def get_depot(depot_id: str, session: SessionDep, supply: SupplyDep) -> Fu
     return depot
 
 
+@router.delete("/depots/{depot_id}")
+async def delete_depot(
+    depot_id: str, session: SessionDep, supply: SupplyDep
+) -> dict[str, str]:
+    """Remove a depot / logistic site and its stock (lets the operator prune hand-added sites)."""
+    removed = await supply.delete_depot(session, depot_id)
+    if not removed:
+        raise HTTPException(status_code=404, detail=f"depot {depot_id!r} not found")
+    return {"id": depot_id, "status": "deleted"}
+
+
 @router.get("/fuel-stocks")
 async def list_fuel_stocks(
     session: SessionDep,

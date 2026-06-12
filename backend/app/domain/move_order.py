@@ -16,7 +16,7 @@ class MoveOrderStatus(StrEnum):
     CANCELLED = "cancelled"
     HALTED = "halted"  # stopped at an obstruction (block, or threat-L5 in Safe); awaiting operator
     CROSSING = "crossing"  # operator chose "proceed slowly": crawling across the obstruction
-    CONTINUING = "continuing"  # operator chose "Continue": crossing the threat at normal speed (v2 W13 F5)
+    CONTINUING = "continuing"  # "Continue": cross the threat at normal speed (v2 W13 F5)
 
 
 class MoveOrder(BaseModel):

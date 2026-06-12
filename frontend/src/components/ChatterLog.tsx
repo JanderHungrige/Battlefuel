@@ -8,6 +8,7 @@ export function ChatterLog({
   messages,
   onSelect,
   onSelectEvent,
+  onClose,
   title = 'Chatter',
   className = 'chatter',
   testId = 'chatter',
@@ -17,6 +18,8 @@ export function ChatterLog({
   onSelect?: (h3Index: string) => void
   /** Click-to-locate a combat event (v2 Wave 3): highlights its MGRS threat square. */
   onSelectEvent?: (eventId: string) => void
+  /** When set, render a close (×) button that dismisses this feed (e.g. Strategic Support). */
+  onClose?: () => void
   title?: string
   className?: string
   testId?: string
@@ -24,6 +27,17 @@ export function ChatterLog({
 }) {
   return (
     <aside className={className} data-testid={testId}>
+      {onClose && (
+        <button
+          type="button"
+          className="chatter-close"
+          data-testid={`${testId}-close`}
+          onClick={onClose}
+          aria-label={`Close ${title}`}
+        >
+          ×
+        </button>
+      )}
       <h2>{title}</h2>
       {messages.length === 0 && <div className="chatter-empty">{emptyText}</div>}
       {[...messages].reverse().map((m) => {

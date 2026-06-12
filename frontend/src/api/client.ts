@@ -128,6 +128,8 @@ export const api = {
   getDepots: (): Promise<FuelDepot[]> => getJson<FuelDepot[]>('/depots'),
   createDepot: (req: CreateDepotRequest): Promise<FuelDepot> =>
     postJson<FuelDepot>('/depots', req),
+  deleteDepot: (id: string): Promise<{ id: string; status: string }> =>
+    deleteJson<{ id: string; status: string }>(`/depots/${id}`),
   getFuelStocks: (): Promise<FuelStock[]> => getJson<FuelStock[]>('/fuel-stocks'),
   getSupplyOverview: (): Promise<SupplyOverview> => getJson<SupplyOverview>('/supply/overview'),
   createBuyOrder: (req: CreateBuyOrderRequest): Promise<BuyOrder> =>

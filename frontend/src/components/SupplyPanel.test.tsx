@@ -247,6 +247,18 @@ describe('SupplyPanel', () => {
     expect(screen.queryByTestId('depot-propose-depot-main')).not.toBeInTheDocument()
   })
 
+  it('removes a depot via the Remove button when onRemoveDepot is given', () => {
+    const onRemoveDepot = vi.fn()
+    render(<SupplyPanel {...baseProps} onRemoveDepot={onRemoveDepot} />)
+    fireEvent.click(screen.getByTestId('depot-remove-depot-main'))
+    expect(onRemoveDepot).toHaveBeenCalledWith('depot-main')
+  })
+
+  it('hides the Remove button when onRemoveDepot is not provided', () => {
+    render(<SupplyPanel {...baseProps} />)
+    expect(screen.queryByTestId('depot-remove-depot-main')).not.toBeInTheDocument()
+  })
+
   it('requests a refuel for the chosen unit', () => {
     const onRefuel = vi.fn()
     render(<SupplyPanel {...baseProps} onRefuel={onRefuel} />)
