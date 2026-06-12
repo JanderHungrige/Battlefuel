@@ -43,6 +43,8 @@ export interface SupplyPanelProps {
   onTabChange?: (tab: 'overview' | 'fleet' | 'order') => void
   /** Ask the advisor to propose a refuel for a low site (v2 Wave 11 F5). */
   onProposeRefuel?: (depotId: string) => void
+  /** Remove a depot / logistic site (prune hand-added sites). */
+  onRemoveDepot?: (depotId: string) => void
   onBuy: (depotId: string, fuelType: string, quantityLiters: number, meta?: OrderMeta) => void
   onRefuel: (unitId: string) => void
   onConfirmRefuel: () => void
@@ -70,6 +72,7 @@ export function SupplyPanel({
   onPlanRendezvous,
   onTabChange,
   onProposeRefuel,
+  onRemoveDepot,
   onBuy,
   onRefuel,
   onConfirmRefuel,
@@ -209,6 +212,17 @@ export function SupplyPanel({
                   title="Propose a refuel/redistribution order"
                 >
                   Propose refuel
+                </button>
+              )}
+              {onRemoveDepot && (
+                <button
+                  type="button"
+                  className="ghost depot-remove"
+                  data-testid={`depot-remove-${d.depot.id}`}
+                  onClick={() => onRemoveDepot(d.depot.id)}
+                  title="Remove this depot / logistic site"
+                >
+                  Remove
                 </button>
               )}
             </div>

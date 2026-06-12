@@ -25,6 +25,16 @@ describe('ChatterLog', () => {
     expect(onSelect).toHaveBeenCalledWith('h1')
   })
 
+  it('shows a close button only when onClose is given, and fires it', () => {
+    const { rerender } = render(<ChatterLog messages={[]} testId="strategic-feed" />)
+    expect(screen.queryByTestId('strategic-feed-close')).not.toBeInTheDocument()
+
+    const onClose = vi.fn()
+    rerender(<ChatterLog messages={[]} testId="strategic-feed" onClose={onClose} />)
+    fireEvent.click(screen.getByTestId('strategic-feed-close'))
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
   it('renders a combat line with its MGRS tag + sender and locates by event id', () => {
     const onSelectEvent = vi.fn()
     render(

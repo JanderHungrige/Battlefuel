@@ -147,6 +147,8 @@ export default function App() {
   const fuelPlatforms = useFuelPlatforms(role === 'OF8')
   const orderHistory = useOrderHistory(role === 'OF8', supplyTick)
   const [orderHistoryOpen, setOrderHistoryOpen] = useState(false)
+  // Strategic Support feed (OF-8): closeable + reopenable from the topbar (default open).
+  const [strategicOpen, setStrategicOpen] = useState(true)
   // OF-8 active supply tab — drives per-tab map focus (dim irrelevant units) (v2 W13).
   const [supplyTab, setSupplyTab] = useState<SupplyTab>('overview')
   // Refuel-stop option picker (v2 W13): preview tanker options, confirm one to execute.
@@ -221,6 +223,18 @@ export default function App() {
       'cancel-rendezvous': () => planRdv.cancel(),
     }),
     [units, planning, supply.overview, planRdv],
+  )
+
+  // Remove a hand-added depot / logistic site (prune the OF-8 supply list).
+  const removeDepot = useCallback(
+    (depotId: string) => {
+      if (!window.confirm('Remove this depot / logistic site?')) return
+      api
+        .deleteDepot(depotId)
+        .then(() => supply.refetch())
+        .catch((e) => pushChatter(`Could not remove depot: ${errorMessage(e)}`, 'status'))
+    },
+    [supply, pushChatter],
   )
 
   // Click a tagged combat chatter line: focus its MGRS square (clearing any other selection), and
@@ -388,6 +402,15 @@ export default function App() {
             Advisor
           </button>
         )}
+        {theater && canShow(role, 'strategicFeed') && (
+          <button
+            className={`mode-toggle${strategicOpen ? ' active' : ''}`}
+            data-testid="strategic-toggle"
+            onClick={() => setStrategicOpen((o) => !o)}
+          >
+            Strategic
+          </button>
+        )}
         {theater && canShow(role, 'obstacleMode') && (
           <button
             className={`mode-toggle${obstacleMode ? ' active' : ''}`}
@@ -516,13 +539,14 @@ export default function App() {
               onClearSelection={clear}
             />
             <ChatterLog messages={chatter} onSelect={setHighlightH3} onSelectEvent={locateEvent} />
-            {canShow(role, 'strategicFeed') && (
+            {canShow(role, 'strategicFeed') && strategicOpen && (
               <ChatterLog
                 messages={strategic}
                 title="Strategic Support"
                 className="chatter strategic-feed"
                 testId="strategic-feed"
                 emptyText="Awaiting strategic traffic…"
+                onClose={() => setStrategicOpen(false)}
               />
             )}
             {canShow(role, 'supplyPanel') && (
@@ -542,6 +566,7 @@ export default function App() {
                 onShowDocs={() => setInfoDocsOpen(true)}
                 onLocate={locate}
                 onProposeRefuel={proposeSiteRefuel}
+                onRemoveDepot={removeDepot}
                 onCreateFuelRun={(truckId, truckName) => fuelRun.startTruckFirst(truckId, truckName)}
                 onPlanRendezvous={(truckId, truckName) => planRdv.start(truckId, truckName)}
                 onTabChange={setSupplyTab}
