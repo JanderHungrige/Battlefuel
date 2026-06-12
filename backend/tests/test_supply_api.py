@@ -132,6 +132,39 @@ class TestSupplyApi:
             await client.aclose()
             await engine.dispose()
 
+    async def test_create_then_delete_depot(self) -> None:
+        """A hand-placed site can be removed via DELETE; a missing id is 404."""
+        try:
+            client, engine = await _client()
+        except SQLAlchemyError as exc:
+            pytest.skip(f"database unavailable: {exc}")
+        try:
+            created = await client.post(
+                "/api/v1/depots",
+                json={"name": "Temp FLS", "lat": 49.21, "lon": 11.84, "site_type": "fls"},
+            )
+            assert created.status_code == 201
+            depot_id = created.json()["id"]
+
+            deleted = await client.delete(f"/api/v1/depots/{depot_id}")
+            assert deleted.status_code == 200
+            assert deleted.json()["status"] == "deleted"
+
+            # Gone from the list, and its stock rows are gone too.
+            listed = await client.get("/api/v1/depots")
+            assert all(d["id"] != depot_id for d in listed.json())
+            stocks = (await client.get(f"/api/v1/fuel-stocks?depot_id={depot_id}")).json()
+            assert stocks == []
+
+            # Deleting again 404s.
+            assert (await client.delete(f"/api/v1/depots/{depot_id}")).status_code == 404
+        finally:
+            async with async_sessionmaker(engine)() as s:  # type: ignore[arg-type]
+                await s.execute(text("DELETE FROM fuel_depots WHERE name = 'Temp FLS'"))
+                await s.commit()
+            await client.aclose()
+            await engine.dispose()
+
     async def test_fuel_stocks_filters(self) -> None:
         try:
             client, engine = await _client()

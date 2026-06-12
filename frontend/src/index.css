@@ -1170,6 +1170,24 @@ body {
   color: var(--accent);
 }
 
+/* Close (×) on a dismissable feed, e.g. Strategic Support (the .chatter aside is positioned). */
+.chatter-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  z-index: 1;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+}
+.chatter-close:hover {
+  color: var(--text);
+}
+
 .chatter-empty {
   color: var(--muted);
   font-size: 12px;
@@ -1607,6 +1625,25 @@ body {
   padding: 2px 8px;
   font-size: 11px;
   cursor: pointer;
+}
+
+.depot-remove {
+  margin-left: auto;
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.depot-remove:hover {
+  color: #ff9a9a;
+  border-color: #ff3030;
+}
+/* When a low site shows both Propose refuel + Remove, only the first claims the auto-margin. */
+.depot-propose + .depot-remove {
+  margin-left: 0;
 }
 
 /* On-map info-bars toggle (v2 Wave 11 F7). */

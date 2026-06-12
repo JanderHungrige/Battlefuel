@@ -79,4 +79,26 @@ battlefuel/
 └── .mdd/         MDD docs: initiative, waves, per-feature docs, connections graph
 ```
 
+## For developers
+
+ Manual deploy commands
+```
+  Dev (:3001):
+  cd /opt/battlefuel
+  sudo git pull
+  sudo bash deploy/auto-deploy.sh deploy/.env.dev
+  
+  Prod (:3000):
+  cd /opt/battlefuel
+  sudo git pull
+  sudo bash deploy/auto-deploy.sh deploy/.env.prod
+  
+  Or the explicit frontend-only form for either env (swap .env.dev / .env.prod):
+  cd /opt/battlefuel
+  sudo git pull
+  sudo docker compose --env-file deploy/.env.prod -f deploy/compose.app.yml pull frontend
+  sudo docker compose --env-file deploy/.env.prod -f deploy/compose.app.yml up -d --force-recreate frontend
+```
+
+
 Map data © OpenStreetMap contributors (ODbL).
