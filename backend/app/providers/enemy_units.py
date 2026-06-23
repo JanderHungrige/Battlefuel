@@ -77,9 +77,9 @@ def register_dynamic_enemy_sighting(
     lat: float,
     lon: float,
     echelon: str | None = None,
-) -> None:
-    """Register or update a dynamic enemy unit sighting from a combat event."""
-    _dynamic_units[event_id] = EnemyUnit(
+) -> EnemyUnit:
+    """Register or update a dynamic enemy unit sighting from a combat event. Returns the unit."""
+    unit = EnemyUnit(
         id=event_id,
         name=name,
         sidc=sidc,
@@ -87,6 +87,8 @@ def register_dynamic_enemy_sighting(
         lon=lon,
         echelon=echelon,
     )
+    _dynamic_units[event_id] = unit
+    return unit
 
 
 def clear_dynamic_enemy_sightings() -> None:
@@ -160,15 +162,18 @@ def map_enemy_sighting(category: str, event: str) -> tuple[str, str, str | None]
     return name, sidc, echelon
 
 
-def register_dynamic_enemy_sighting_from_event(ev: CombatEvent) -> None:
-    if is_enemy_sighting(ev.category, ev.event):
-        name, sidc, echelon = map_enemy_sighting(ev.category, ev.event)
-        event_id = ev.catalog_id if ev.catalog_id else ev.id
-        register_dynamic_enemy_sighting(
-            event_id=event_id,
-            name=name,
-            sidc=sidc,
-            lat=ev.lat,
-            lon=ev.lon,
-            echelon=echelon,
-        )
+def register_dynamic_enemy_sighting_from_event(ev: CombatEvent) -> EnemyUnit | None:
+    """Register/update a hostile contact from a sighting event. Returns the unit, or None when
+    the event is not an enemy sighting (so the caller can broadcast only real sightings)."""
+    if not is_enemy_sighting(ev.category, ev.event):
+        return None
+    name, sidc, echelon = map_enemy_sighting(ev.category, ev.event)
+    event_id = ev.catalog_id if ev.catalog_id else ev.id
+    return register_dynamic_enemy_sighting(
+        event_id=event_id,
+        name=name,
+        sidc=sidc,
+        lat=ev.lat,
+        lon=ev.lon,
+        echelon=echelon,
+    )

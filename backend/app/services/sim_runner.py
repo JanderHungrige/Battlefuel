@@ -19,6 +19,7 @@ from app.api.ws import ConnectionManager
 from app.config import get_settings
 from app.db import get_session_maker
 from app.domain.combat_event import combat_event_frame
+from app.domain.enemy_unit import enemy_unit_frame
 from app.domain.move_order import MoveOrder, MoveOrderStatus
 from app.domain.unit import UnitType
 from app.models.unit_instance import UnitInstanceRow
@@ -162,7 +163,9 @@ class SimEngine:
         sent = 0
         for ev in due_combat_events(combat.events(), prev_s, now_s):
             await self._manager.broadcast(combat_event_frame(ev, now_s))
-            register_dynamic_enemy_sighting_from_event(ev)
+            sighting = register_dynamic_enemy_sighting_from_event(ev)
+            if sighting is not None:
+                await self._manager.broadcast(enemy_unit_frame(sighting))
             sent += 1
         return sent
 

@@ -248,6 +248,52 @@ class TestApplyCombatFeed:
         assert sent == 0
         assert ws.messages == []
 
+    async def test_sighting_event_also_broadcasts_enemy_unit_frame(self) -> None:
+        from app.providers.combat_events import CombatEventFeedProvider
+        from app.providers.enemy_units import clear_dynamic_enemy_sightings
+
+        clear_dynamic_enemy_sightings()
+        mgr = ConnectionManager()
+        ws = _FakeWS()
+        await mgr.connect(ws)  # type: ignore[arg-type]
+        engine = SimEngine(mgr)
+
+        class _OneSightingFeed(CombatEventFeedProvider):
+            def events(self) -> list[CombatEvent]:
+                return [
+                    CombatEvent(
+                        id="sight-1",
+                        at_game_s=10.0,
+                        category="Threat Events",
+                        event="Hostile unit spotted / identified",
+                        lat=49.24,
+                        lon=11.85,
+                        estimated_threat=3,
+                        sender="DRONE FEED",
+                    ),
+                    CombatEvent(
+                        id="weather-1",
+                        at_game_s=12.0,
+                        category="Environment & Civil",
+                        event="Weather update",
+                        lat=49.20,
+                        lon=11.80,
+                        estimated_threat=1,
+                        sender="MET",
+                    ),
+                ]
+
+        sent = await engine.apply_combat_feed(_OneSightingFeed(), prev_s=0.0, now_s=20.0)
+
+        assert sent == 2  # both combat events fired
+        kinds = [m["type"] for m in ws.messages]
+        # Two combat_event frames + exactly one enemy_unit frame (only the sighting).
+        assert kinds.count("combat_event") == 2
+        assert kinds.count("enemy_unit") == 1
+        enemy = next(m for m in ws.messages if m["type"] == "enemy_unit")
+        assert enemy["lat"] == 49.24
+        assert enemy["sidc"].startswith("1006")  # hostile affiliation
+
 
 @pytest.fixture
 def client() -> Iterator[TestClient]:
