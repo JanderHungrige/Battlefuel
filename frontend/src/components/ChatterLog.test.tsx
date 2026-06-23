@@ -100,4 +100,40 @@ describe('ChatterLog', () => {
     fireEvent.click(screen.getByTestId('chatter-msg'))
     expect(screen.queryByTestId('chatter-detail')).not.toBeInTheDocument()
   })
+
+  it('shows Ask advisor only for supply-relevant lines when onAskAdvisor is given (Wave 4 F5)', () => {
+    const onAskAdvisor = vi.fn()
+    const supplyLine = {
+      id: 5,
+      kind: 'status' as const,
+      text: 'Fuel depot critically low (<20%)',
+      event_id: 'depot-low-1',
+      category: 'Refueling & Fuel',
+      estimated_threat: 4,
+      supply_relevant: true,
+    }
+    const { rerender } = render(
+      <ChatterLog messages={[supplyLine]} onSelectEvent={() => {}} onAskAdvisor={onAskAdvisor} />,
+    )
+    // Expand, then the action is available; clicking it forwards the message.
+    fireEvent.click(screen.getByTestId('chatter-msg'))
+    fireEvent.click(screen.getByTestId('chatter-ask-advisor'))
+    expect(onAskAdvisor).toHaveBeenCalledWith(supplyLine)
+
+    // A non-supply line never shows the action.
+    rerender(
+      <ChatterLog
+        messages={[{ ...supplyLine, supply_relevant: false }]}
+        onSelectEvent={() => {}}
+        onAskAdvisor={onAskAdvisor}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('chatter-msg'))
+    expect(screen.queryByTestId('chatter-ask-advisor')).not.toBeInTheDocument()
+
+    // Without the callback (e.g. OF-4 role), the action never shows even for supply lines.
+    rerender(<ChatterLog messages={[supplyLine]} onSelectEvent={() => {}} />)
+    fireEvent.click(screen.getByTestId('chatter-msg'))
+    expect(screen.queryByTestId('chatter-ask-advisor')).not.toBeInTheDocument()
+  })
 })

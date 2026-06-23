@@ -18,6 +18,7 @@ export function ChatterLog({
   messages,
   onSelect,
   onSelectEvent,
+  onAskAdvisor,
   onClose,
   title = 'Chatter',
   className = 'chatter',
@@ -29,6 +30,9 @@ export function ChatterLog({
   onSelect?: (h3Index: string) => void
   /** Click-to-locate a combat event (v2 Wave 3): highlights its MGRS threat square. */
   onSelectEvent?: (eventId: string) => void
+  /** Supply-event advisor action (v2 Wave 4 F5): when set, a supply-relevant line's expanded
+   * detail shows an "Ask advisor" button. Provided only when the role can see the advisor. */
+  onAskAdvisor?: (m: ChatterMessage) => void
   /** When set, render a close (×) button that dismisses this feed (e.g. Strategic Support). */
   onClose?: () => void
   title?: string
@@ -119,6 +123,16 @@ export function ChatterLog({
                     <dt>Detail</dt>
                     <dd>{m.detail}</dd>
                   </div>
+                )}
+                {m.supply_relevant && onAskAdvisor && (
+                  <button
+                    type="button"
+                    className="chatter-advisor-btn"
+                    data-testid="chatter-ask-advisor"
+                    onClick={() => onAskAdvisor(m)}
+                  >
+                    Ask advisor
+                  </button>
                 )}
               </dl>
             )}

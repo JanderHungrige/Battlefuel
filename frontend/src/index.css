@@ -1283,6 +1283,22 @@ body {
   margin: 0;
 }
 
+/* Ask-advisor action on a supply-relevant line (v2 Wave 4 F5). */
+.chatter-advisor-btn {
+  margin-top: 4px;
+  padding: 3px 8px;
+  font-size: 11px;
+  color: #0e1116;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.chatter-advisor-btn:hover {
+  filter: brightness(1.08);
+}
+
 /* Chatter + map-square filter controls (v2 Wave 4 F4). Compact strip under the chatter title. */
 .chatter-filters {
   display: flex;

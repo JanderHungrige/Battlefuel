@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api } from './api/client'
 import { errorMessage } from './api/errors'
-import type { Recommendation, TileMutationRequest } from './api/types'
+import type { ChatterMessage, Recommendation, TileMutationRequest } from './api/types'
 import { AdvisorPanel } from './components/AdvisorPanel'
 import { ChatterLog } from './components/ChatterLog'
 import { ChatterFilterControls } from './components/ChatterFilterControls'
@@ -11,6 +11,7 @@ import {
   filterCombatEvents,
   type ChatterFilters,
 } from './lib/chatterFilter'
+import { supplyAdviceKind } from './lib/supplyAdvisorAction'
 import { GridLayoutControl } from './components/GridLayoutControl'
 import { HaltBanner } from './components/HaltBanner'
 import { InspectPanel, type InspectCell } from './components/InspectPanel'
@@ -267,6 +268,18 @@ export default function App() {
       setHighlightEventId((prev) => (prev === id ? null : id))
     },
     [planning],
+  )
+
+  // Ask the advisor about a supply-relevant chatter event (v2 Wave 4 F5): map the event's
+  // category to the right advisor kind, open the panel + request it (advisory only — never
+  // auto-places an order; the operator still applies a recommendation manually).
+  const askAdvisorForEvent = useCallback(
+    (m: ChatterMessage) => {
+      const kind = supplyAdviceKind(m.category ?? '')
+      advisor.ask(kind)
+      pushChatter(`Advisor: requested ${kind} re "${m.text}"`, 'status')
+    },
+    [advisor, pushChatter],
   )
 
   // A halted unit (v2 Wave 10 F1/F4): offer "Proceed slowly" or "Re-route".
@@ -560,6 +573,7 @@ export default function App() {
               messages={filteredChatter}
               onSelect={setHighlightH3}
               onSelectEvent={locateEvent}
+              onAskAdvisor={canShow(role, 'advisor') ? askAdvisorForEvent : undefined}
             >
               <ChatterFilterControls value={chatterFilters} onChange={setChatterFilters} />
             </ChatterLog>

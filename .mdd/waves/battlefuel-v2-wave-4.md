@@ -52,7 +52,7 @@ event/chatter system:
 | 2 | event-arrival-scheduler | docs/93-event-arrival-scheduler.md | built (local) | combat-event-catalog-provider |
 | 3 | expandable-chatter-detail | docs/94-expandable-chatter-detail.md | built (local) | event-arrival-scheduler, 52-chatter-mgrs-tagging |
 | 4 | chatter-filters-highlights | docs/95-chatter-filters-highlights.md | built (local) | expandable-chatter-detail, 50-threat-mgrs-squares |
-| 5 | supply-event-advisor-actions | docs/96-supply-event-advisor-actions.md | planned | expandable-chatter-detail, 36-advisor-ui |
+| 5 | supply-event-advisor-actions | docs/96-supply-event-advisor-actions.md | built (local) | expandable-chatter-detail, 36-advisor-ui |
 | 6 | chatter-driven-enemy-sightings | docs/97-chatter-driven-enemy-sightings.md | built (backend) | event-arrival-scheduler, 53-enemy-red-nato-units |
 | 7 | obstacle-event-catalog-picker | docs/98-obstacle-event-catalog-picker.md | planned | combat-event-catalog-provider, 22-obstacle-tile-ops-ui |
 
