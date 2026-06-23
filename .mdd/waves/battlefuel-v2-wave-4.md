@@ -24,6 +24,15 @@ when placing obstacles or marking sector conditions.
 *(Not complete until demonstrated live: local `make dev`, then `:3001`, then prod `:3000` per the
 v2 wave Definition of Done.)*
 
+> **⚠ Live-demo / deploy setup — the CSV catalog feed is OPT-IN.** The feed defaults to
+> `scripted` (6 demo events). To drive chatter from the full `data/combat_zone_events.csv`
+> catalog, set **`BATTLEFUEL_COMBAT_EVENT_FEED_PROVIDER=catalog`** in the backend environment:
+> - **Local:** `echo 'BATTLEFUEL_COMBAT_EVENT_FEED_PROVIDER=catalog' >> backend/.env`, then restart
+>   the backend so pydantic re-reads `.env` (uvicorn runs with CWD `backend/`).
+> - **Dev/prod (:3001/:3000):** add the same var to the deployed backend's environment
+>   (compose env / host env), then redeploy the `backend` container. Documented in
+>   `backend/.env.example`. F6 enemy sightings broadcast over WS regardless of this flag.
+
 ## Done-When (close-out gate)
 Mark `complete` only after all three gates pass:
 - [ ] **tested local** — `make dev`, CSV-driven event/chatter flow demoed on localhost
