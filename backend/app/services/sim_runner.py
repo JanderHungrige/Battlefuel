@@ -29,6 +29,7 @@ from app.providers.combat_events import (
     build_combat_event_feed_provider,
     due_combat_events,
 )
+from app.providers.enemy_units import register_dynamic_enemy_sighting_from_event
 from app.providers.factory import build_unit_provider
 from app.providers.move_orders import MoveOrderProvider, build_move_order_provider
 from app.providers.refuel_orders import build_refuel_order_provider
@@ -161,6 +162,7 @@ class SimEngine:
         sent = 0
         for ev in due_combat_events(combat.events(), prev_s, now_s):
             await self._manager.broadcast(combat_event_frame(ev, now_s))
+            register_dynamic_enemy_sighting_from_event(ev)
             sent += 1
         return sent
 

@@ -47,6 +47,13 @@ class Settings(BaseSettings):
     # Scripted located-combat-event feed (v2 Wave 3): "scripted" or "none".
     combat_event_feed_provider: str = "scripted"
 
+    # Combat-event CSV catalog (v2 Wave 4): "csv_catalog" or "none".
+    combat_event_catalog_provider: str = "csv_catalog"
+    combat_event_catalog_path: str = "data/combat_zone_events.csv"
+    # Catalog-backed event feed (v2 Wave 4): 900 game-s = 15 real-s at sim_time_scale=60.
+    combat_event_mean_interval_game_s: float = 900.0
+    combat_event_seed: int = 42
+
     # Enemy-unit provider (v2 Wave 3): "seed" (Hohenfels stub) or "none".
     enemy_unit_provider: str = "seed"
 

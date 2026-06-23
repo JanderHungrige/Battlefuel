@@ -9,11 +9,16 @@ load + configurable arrival rate are deferred to Wave 4; this feed is the minima
 
 from __future__ import annotations
 
+import hashlib
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 
 from app.config import Settings, get_settings
 from app.domain.combat_event import CombatEvent
+from app.providers.combat_event_catalog import (
+    CombatEventCatalogItem,
+    build_combat_event_catalog_provider,
+)
 
 
 def due_combat_events(
@@ -106,7 +111,54 @@ class NoneCombatEventFeedProvider(CombatEventFeedProvider):
         return ()
 
 
-CombatEventFeedBuilder = Callable[[], CombatEventFeedProvider]
+_SENDER_BY_CATEGORY: dict[str, str] = {
+    "Intelligence & Information": "INTEL (J2 FUSION)",
+    "Threat Events": "RECON 2-7 (1-4 CAV)",
+    "Movement & Access": "ENGINEER NET (54th BEB)",
+    "Engagements & Fires": "FIRES (1-9 FA)",
+    "Adversary Activity": "DRONE FEED (RQ-7 SHADOW)",
+}
+
+
+def _catalog_location(item: CombatEventCatalogItem, seed: int) -> tuple[float, float]:
+    """Deterministic point inside the Hohenfels theater for a catalog row."""
+    digest = hashlib.sha256(f"{seed}:{item.id}".encode()).digest()
+    lat_unit = int.from_bytes(digest[:2], "big") / 65_535
+    lon_unit = int.from_bytes(digest[2:4], "big") / 65_535
+    return (round(49.18 + lat_unit * 0.08, 6), round(11.80 + lon_unit * 0.10, 6))
+
+
+class CatalogCombatEventFeedProvider(CombatEventFeedProvider):
+    """Generate scheduled located events from the Wave-4 CSV catalog."""
+
+    def __init__(self, settings: Settings | None = None) -> None:
+        self._settings = settings or get_settings()
+
+    def events(self) -> Sequence[CombatEvent]:
+        catalog = build_combat_event_catalog_provider(self._settings).items()
+        interval = max(1.0, self._settings.combat_event_mean_interval_game_s)
+        events: list[CombatEvent] = []
+        for idx, item in enumerate(catalog, start=1):
+            lat, lon = _catalog_location(item, self._settings.combat_event_seed)
+            events.append(
+                CombatEvent(
+                    id=f"catalog-{item.id}",
+                    at_game_s=round(idx * interval, 1),
+                    category=item.category,
+                    event=item.event,
+                    lat=lat,
+                    lon=lon,
+                    estimated_threat=item.threat_level,
+                    sender=_SENDER_BY_CATEGORY.get(item.category, "HQ (3 ID TOC)"),
+                    catalog_id=item.id,
+                    supply_relevant=item.supply_relevant,
+                    detail=f"{item.category}; supply relevant: {item.supply_relevant}",
+                )
+            )
+        return tuple(events)
+
+
+CombatEventFeedBuilder = Callable[[Settings], CombatEventFeedProvider]
 _REGISTRY: dict[str, CombatEventFeedBuilder] = {}
 
 
@@ -129,8 +181,9 @@ def build_combat_event_feed_provider(
             f"unknown combat event feed provider {settings.combat_event_feed_provider!r}; "
             f"available: {sorted(_REGISTRY)}"
         ) from exc
-    return builder()
+    return builder(settings)
 
 
-register_combat_event_feed_provider("scripted", ScriptedCombatEventFeedProvider)
-register_combat_event_feed_provider("none", NoneCombatEventFeedProvider)
+register_combat_event_feed_provider("scripted", lambda _settings: ScriptedCombatEventFeedProvider())
+register_combat_event_feed_provider("none", lambda _settings: NoneCombatEventFeedProvider())
+register_combat_event_feed_provider("catalog", CatalogCombatEventFeedProvider)

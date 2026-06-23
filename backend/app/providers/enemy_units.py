@@ -16,6 +16,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 
 from app.config import Settings, get_settings
+from app.domain.combat_event import CombatEvent
 from app.domain.enemy_unit import EnemyUnit
 
 
@@ -66,6 +67,40 @@ class NoneEnemyUnitProvider(EnemyUnitProvider):
         return ()
 
 
+_dynamic_units: dict[str, EnemyUnit] = {}
+
+
+def register_dynamic_enemy_sighting(
+    event_id: str,
+    name: str,
+    sidc: str,
+    lat: float,
+    lon: float,
+    echelon: str | None = None,
+) -> None:
+    """Register or update a dynamic enemy unit sighting from a combat event."""
+    _dynamic_units[event_id] = EnemyUnit(
+        id=event_id,
+        name=name,
+        sidc=sidc,
+        lat=lat,
+        lon=lon,
+        echelon=echelon,
+    )
+
+
+def clear_dynamic_enemy_sightings() -> None:
+    """Clear all dynamic enemy sightings. Useful for testing/re-init."""
+    _dynamic_units.clear()
+
+
+class ChatterEnemyUnitProvider(EnemyUnitProvider):
+    """Hostile force derived from incoming chatter / combat events (v2 Wave 4)."""
+
+    def units(self) -> Sequence[EnemyUnit]:
+        return tuple(_dynamic_units.values())
+
+
 EnemyUnitBuilder = Callable[[], EnemyUnitProvider]
 _REGISTRY: dict[str, EnemyUnitBuilder] = {}
 
@@ -92,3 +127,48 @@ def build_enemy_unit_provider(settings: Settings | None = None) -> EnemyUnitProv
 
 register_enemy_unit_provider("seed", SeededEnemyUnitProvider)
 register_enemy_unit_provider("none", NoneEnemyUnitProvider)
+register_enemy_unit_provider("chatter", ChatterEnemyUnitProvider)
+
+
+_SIGHTING_KEYWORDS = ("spotted", "contact", "identified", "sniper", "ambush", "adversary", "opfor")
+
+
+def is_enemy_sighting(category: str, event: str) -> bool:
+    e = event.lower()
+    cat = category.lower()
+    return any(k in e for k in _SIGHTING_KEYWORDS) or cat == "adversary activity"
+
+
+def map_enemy_sighting(category: str, event: str) -> tuple[str, str, str | None]:
+    e = event.lower()
+    name = event
+    if "logistics" in e or "supply" in e:
+        sidc = "10061000141214000000"
+        echelon = "platoon"
+    elif "c2" in e or "command" in e:
+        sidc = "10061000141212000000"
+        echelon = "platoon"
+    elif "recon" in e or "spotted" in e:
+        sidc = "10061000131606000000"
+        echelon = "section"
+    elif "sniper" in e:
+        sidc = "10061000111204000000"
+        echelon = "section"
+    else:
+        sidc = "10061000141211020000"
+        echelon = "platoon"
+    return name, sidc, echelon
+
+
+def register_dynamic_enemy_sighting_from_event(ev: CombatEvent) -> None:
+    if is_enemy_sighting(ev.category, ev.event):
+        name, sidc, echelon = map_enemy_sighting(ev.category, ev.event)
+        event_id = ev.catalog_id if ev.catalog_id else ev.id
+        register_dynamic_enemy_sighting(
+            event_id=event_id,
+            name=name,
+            sidc=sidc,
+            lat=ev.lat,
+            lon=ev.lon,
+            echelon=echelon,
+        )

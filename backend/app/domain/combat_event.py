@@ -44,6 +44,9 @@ class CombatEvent:
     estimated_threat: int
     sender: str
     precision_m: int | None = None
+    catalog_id: str | None = None
+    supply_relevant: bool | None = None
+    detail: str | None = None
 
 
 # Category-fallback drawn precision (metres) when no event-substring rule matches.
@@ -97,7 +100,7 @@ def combat_event_frame(ev: CombatEvent, now_s: float) -> dict[str, object]:
     precision_m, zone = classify(ev.category, ev.event, ev.estimated_threat)
     if ev.precision_m is not None:
         precision_m = ev.precision_m
-    return {
+    frame: dict[str, object] = {
         "type": "combat_event",
         "id": ev.id,
         "category": ev.category,
@@ -110,3 +113,10 @@ def combat_event_frame(ev: CombatEvent, now_s: float) -> dict[str, object]:
         "zone": zone.value,
         "game_s": round(now_s, 1),
     }
+    if ev.catalog_id is not None:
+        frame["catalog_id"] = ev.catalog_id
+    if ev.supply_relevant is not None:
+        frame["supply_relevant"] = ev.supply_relevant
+    if ev.detail is not None:
+        frame["detail"] = ev.detail
+    return frame

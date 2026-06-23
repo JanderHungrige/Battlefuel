@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -17,6 +18,12 @@ from app.domain.combat_event import (
     combat_event_frame,
 )
 from app.main import create_app
+from app.providers.combat_event_catalog import (
+    CsvCombatEventCatalogProvider,
+    NoneCombatEventCatalogProvider,
+    UnknownCombatEventCatalogProviderError,
+    build_combat_event_catalog_provider,
+)
 from app.providers.combat_events import (
     NoneCombatEventFeedProvider,
     ScriptedCombatEventFeedProvider,
@@ -120,6 +127,20 @@ class TestCombatEventFrame:
         assert frame["precision_m"] == 500
         assert frame["zone"] == "blocked"
 
+    def test_frame_includes_wave4_additive_catalog_fields(self) -> None:
+        frame = combat_event_frame(
+            _event(
+                catalog_id="threat-events-001",
+                supply_relevant=True,
+                detail="Convoy should avoid the named route.",
+            ),
+            12.0,
+        )
+
+        assert frame["catalog_id"] == "threat-events-001"
+        assert frame["supply_relevant"] is True
+        assert frame["detail"] == "Convoy should avoid the named route."
+
 
 class TestDueCombatEvents:
     def test_fires_in_window_only(self) -> None:
@@ -153,6 +174,49 @@ class TestCombatEventFeedFactory:
     def test_unknown_raises(self) -> None:
         with pytest.raises(UnknownCombatEventFeedProviderError):
             build_combat_event_feed_provider(Settings(combat_event_feed_provider="nope"))
+
+
+class TestCombatEventCatalogProvider:
+    def test_csv_catalog_loads_seed_file(self) -> None:
+        provider = build_combat_event_catalog_provider(
+            Settings(combat_event_catalog_provider="csv_catalog")
+        )
+
+        assert isinstance(provider, CsvCombatEventCatalogProvider)
+        items = provider.items()
+        assert len(items) >= 100
+        first = items[0]
+        assert first.id.startswith("001-intelligence-information-")
+        assert first.category == "Intelligence & Information"
+        assert first.event == "New HUMINT report received"
+        assert first.threat_level == 2
+        assert first.supply_relevant is False
+
+    def test_none_catalog_is_empty(self) -> None:
+        provider = build_combat_event_catalog_provider(
+            Settings(combat_event_catalog_provider="none")
+        )
+
+        assert isinstance(provider, NoneCombatEventCatalogProvider)
+        assert provider.items() == ()
+
+    def test_unknown_catalog_provider_raises(self) -> None:
+        with pytest.raises(UnknownCombatEventCatalogProviderError):
+            build_combat_event_catalog_provider(
+                Settings(combat_event_catalog_provider="nope")
+            )
+
+    def test_malformed_catalog_row_raises_with_context(self, tmp_path: Path) -> None:
+        csv_path = tmp_path / "bad.csv"
+        csv_path.write_text(
+            "Category,Event,Threat Level,Supply Relevant\n"
+            "Threat Events,Missing threat,nope,YES\n",
+            encoding="utf-8",
+        )
+        provider = CsvCombatEventCatalogProvider(csv_path)
+
+        with pytest.raises(ValueError, match="row 2"):
+            provider.items()
 
 
 class TestApplyCombatFeed:
