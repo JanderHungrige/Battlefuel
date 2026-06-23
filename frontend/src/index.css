@@ -1398,6 +1398,55 @@ body {
   color: #ff9a9a;
 }
 
+/* Searchable obstacle catalog picker (v2 Wave 4 F7). */
+.obstacle-catalog {
+  width: 260px;
+}
+
+.obstacle-search {
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--text);
+  background: #1c222b;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.obstacle-catalog-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.catalog-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  text-align: left;
+  padding: 4px 8px;
+  background: #1c222b;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.catalog-item.active {
+  border-color: #ff3030;
+  color: #ff9a9a;
+}
+
+.catalog-event {
+  font-size: 12px;
+}
+
+.catalog-meta {
+  font-size: 10px;
+  color: var(--muted);
+}
+
 .tile-edit-note {
   display: flex;
   gap: 4px;

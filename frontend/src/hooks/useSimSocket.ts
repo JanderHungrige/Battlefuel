@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
   ChatterMessage,
   CombatEvent,
+  EnemyUnit,
   RendezvousReminder,
   TileUpdate,
   UnitUpdate,
@@ -12,6 +13,7 @@ import type {
 import { WS_BASE } from '../config'
 import {
   applyCombatEvent,
+  applyEnemyUnit,
   applyTileUpdate,
   applyUnitUpdate,
   combatEventMgrs,
@@ -21,6 +23,7 @@ import {
   describeTileUpdate,
   parseBuyOrderUpdate,
   parseCombatEvent,
+  parseEnemyUnit,
   parseRefuelOrderUpdate,
   parseRendezvousReminder,
   parseStrategicMessage,
@@ -36,6 +39,8 @@ export interface SimSocketState {
   tileUpdates: Record<string, TileUpdate>
   /** Located combat events keyed by id (latest frame wins) — drives Wave-3 threat squares. */
   combatEvents: Record<string, CombatEvent>
+  /** Chatter-driven enemy sightings keyed by id (v2 Wave 4 F6); merged with the seed force. */
+  enemySightings: Record<string, EnemyUnit>
   chatter: ChatterMessage[]
   /** OF-8 strategic-support feed: scripted strategic messages + supply-order notifications. */
   strategic: ChatterMessage[]
@@ -51,6 +56,7 @@ export function useSimSocket(enabled = true): SimSocketState {
   const [positions, setPositions] = useState<Record<string, UnitUpdate>>({})
   const [tileUpdates, setTileUpdates] = useState<Record<string, TileUpdate>>({})
   const [combatEvents, setCombatEvents] = useState<Record<string, CombatEvent>>({})
+  const [enemySightings, setEnemySightings] = useState<Record<string, EnemyUnit>>({})
   const [chatter, setChatter] = useState<ChatterMessage[]>([])
   const [strategic, setStrategic] = useState<ChatterMessage[]>([])
   const [connected, setConnected] = useState(false)
@@ -141,6 +147,11 @@ export function useSimSocket(enabled = true): SimSocketState {
           }
           return
         }
+        const enemy = parseEnemyUnit(raw)
+        if (enemy) {
+          setEnemySightings((prev) => applyEnemyUnit(prev, enemy))
+          return
+        }
         const strat = parseStrategicMessage(raw)
         if (strat) {
           pushStrategic(strat.text, 'status')
@@ -165,6 +176,7 @@ export function useSimSocket(enabled = true): SimSocketState {
     positions,
     tileUpdates,
     combatEvents,
+    enemySightings,
     chatter,
     strategic,
     pushChatter,

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { latLngToCell } from 'h3-js'
 import { api } from './api/client'
 import { errorMessage } from './api/errors'
 import type { ChatterMessage, Recommendation, TileMutationRequest } from './api/types'
@@ -17,8 +18,12 @@ import { HaltBanner } from './components/HaltBanner'
 import { InspectPanel, type InspectCell } from './components/InspectPanel'
 import { MoveRoutesPanel } from './components/MoveRoutesPanel'
 import { firstHaltedUnit } from './lib/halt'
-import { ObstacleKindPicker } from './components/ObstacleKindPicker'
-import type { ObstacleKind } from './components/obstacleKinds'
+import { ObstacleCatalogPicker } from './components/ObstacleCatalogPicker'
+import {
+  DEFAULT_OBSTACLE_TEMPLATE,
+  type ObstacleTemplate,
+} from './lib/obstacleCatalog'
+import { useCombatEventCatalog } from './hooks/useCombatEventCatalog'
 import { RoleToggle } from './components/RoleToggle'
 import { InfoDocsPanel } from './components/InfoDocsPanel'
 import { FuelRunPanel } from './components/FuelRunPanel'
@@ -80,6 +85,7 @@ export default function App() {
     positions: live,
     tileUpdates,
     combatEvents,
+    enemySightings,
     chatter,
     strategic,
     pushChatter,
@@ -90,7 +96,11 @@ export default function App() {
   // Operator ops: obstacles + tile edits + the obstacle-placement mode and chosen kind.
   const { obstacles, placeObstacle, removeObstacle, mutateTile } = useObstacleOps()
   const [obstacleMode, setObstacleMode] = useState(false)
-  const [obstacleKind, setObstacleKind] = useState<ObstacleKind>('minefield')
+  // Obstacle template chosen from the searchable combat-event catalog (v2 Wave 4 F7).
+  const [obstacleTemplate, setObstacleTemplate] = useState<ObstacleTemplate>(
+    DEFAULT_OBSTACLE_TEMPLATE,
+  )
+  const catalogItems = useCombatEventCatalog(obstacleMode)
   const [depotMode, setDepotMode] = useState(false)
   // Site type for the next placed depot ('' = plain depot/marker); v2 Wave 11 F5.
   const [depotSiteType, setDepotSiteType] = useState('')
@@ -109,6 +119,14 @@ export default function App() {
     () => filterCombatEvents(Object.values(combatEvents), chatterFilters),
     [combatEvents, chatterFilters],
   )
+  // Seed hostile force merged with live chatter-driven sightings (v2 Wave 4 F6); dedup by id,
+  // a dynamic sighting wins over a seed unit with the same id.
+  const allEnemyUnits = useMemo(() => {
+    const byId: Record<string, (typeof enemyUnits)[number]> = {}
+    for (const e of enemyUnits) byId[e.id] = e
+    for (const e of Object.values(enemySightings)) byId[e.id] = e
+    return Object.values(byId)
+  }, [enemyUnits, enemySightings])
 
   // Tiles merged with their latest live tile_update (threat/road/situation/etc.).
   const displayedTiles = useMemo(() => {
@@ -147,6 +165,18 @@ export default function App() {
       for (const h3 of h3Indexes) mutateTile(h3, mutation)
     },
     [mutateTile],
+  )
+
+  // Place an obstacle from the selected catalog template (v2 Wave 4 F7): drop the obstacle, then
+  // apply the template's tile defaults (situation/threat/road) to the containing H3 cell — the
+  // tile_update WS echo refreshes the map. Operator can still edit the cell afterwards.
+  const placeObstacleFromTemplate = useCallback(
+    (lat: number, lon: number) => {
+      placeObstacle(lat, lon, obstacleTemplate.kind)
+      const res = tiles[0]?.resolution
+      if (res !== undefined) mutateTile(latLngToCell(lat, lon, res), obstacleTemplate.mutation)
+    },
+    [placeObstacle, mutateTile, obstacleTemplate, tiles],
   )
   const selectedUnit = useMemo(
     () => units.find((u) => u.id === selectedUnitId),
@@ -511,7 +541,7 @@ export default function App() {
               onPlaceDepot={placeDepot}
               combatEvents={filteredCombatEvents}
               highlightEventId={highlightEventId}
-              enemyUnits={enemyUnits}
+              enemyUnits={allEnemyUnits}
               depots={canShow(role, 'depotOverlay') ? (supply.overview?.depots ?? []) : []}
               locatePoint={locatePoint}
               fuelRunOptions={fuelRun.options}
@@ -524,7 +554,7 @@ export default function App() {
               selectedUnitId={selectedUnitId}
               selectedCell={selectedCell}
               gridPrecisionM={gridPrecisionM}
-              onPlaceObstacle={(lat, lon) => placeObstacle(lat, lon, obstacleKind)}
+              onPlaceObstacle={placeObstacleFromTemplate}
               onRemoveObstacle={removeObstacle}
               onSelectCell={(lat, lon) => {
                 setSelectedUnitId(null)
@@ -662,7 +692,11 @@ export default function App() {
               />
             )}
             {obstacleActive && (
-              <ObstacleKindPicker selected={obstacleKind} onSelect={setObstacleKind} />
+              <ObstacleCatalogPicker
+                items={catalogItems}
+                selectedId={obstacleTemplate.id}
+                onSelect={setObstacleTemplate}
+              />
             )}
             {canShow(role, 'moveRoutes') && selectedUnit && (
               <MoveRoutesPanel

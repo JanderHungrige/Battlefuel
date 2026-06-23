@@ -590,3 +590,12 @@ export interface CombatEvent {
   supply_relevant?: boolean
   detail?: string
 }
+
+/** One normalized row of the combat-event CSV catalog (v2 Wave 4; GET /combat-events/catalog). */
+export interface CombatEventCatalogItem {
+  id: string
+  category: string
+  event: string
+  threat_level: number
+  supply_relevant: boolean
+}

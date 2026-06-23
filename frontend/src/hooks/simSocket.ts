@@ -4,6 +4,7 @@
 import type {
   BuyOrderUpdate,
   CombatEvent,
+  EnemyUnit,
   RefuelOrderUpdate,
   RendezvousReminder,
   StrategicMessage,
@@ -101,6 +102,30 @@ export function applyCombatEvent(
   event: CombatEvent,
 ): Record<string, CombatEvent> {
   return { ...state, [event.id]: event }
+}
+
+/** Parse a raw WS frame into an EnemyUnit sighting, or null if not valid (v2 Wave 4 F6). */
+export function parseEnemyUnit(raw: string): EnemyUnit | null {
+  const msg = parse(raw)
+  if (
+    msg &&
+    msg.type === 'enemy_unit' &&
+    typeof msg.id === 'string' &&
+    typeof msg.sidc === 'string' &&
+    typeof msg.lat === 'number' &&
+    typeof msg.lon === 'number'
+  ) {
+    return msg as unknown as EnemyUnit
+  }
+  return null
+}
+
+/** Latest enemy-unit sighting per id wins (dedup/update a contact). Returns a new map. */
+export function applyEnemyUnit(
+  state: Record<string, EnemyUnit>,
+  unit: EnemyUnit,
+): Record<string, EnemyUnit> {
+  return { ...state, [unit.id]: unit }
 }
 
 /** Parse a raw WS frame into a StrategicMessage, or null if not a valid strategic_message. */

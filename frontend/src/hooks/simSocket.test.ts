@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { CombatEvent, TileUpdate, UnitUpdate } from '../api/types'
 import {
   applyCombatEvent,
+  applyEnemyUnit,
   applyTileUpdate,
   applyUnitUpdate,
   combatEventMgrs,
@@ -11,6 +12,7 @@ import {
   describeTileUpdate,
   parseBuyOrderUpdate,
   parseCombatEvent,
+  parseEnemyUnit,
   parseRefuelOrderUpdate,
   parseRendezvousReminder,
   parseStrategicMessage,
@@ -246,6 +248,44 @@ describe('combatEventMgrs', () => {
   it('formats the event location as a spaced zone-32U MGRS string (to 1 m)', () => {
     const mgrs = combatEventMgrs(combatFrame)
     expect(mgrs).toMatch(/^32U [A-Z]{2} \d{5} \d{5}$/)
+  })
+})
+
+const enemyFrame = {
+  type: 'enemy_unit',
+  id: 'catalog-012',
+  name: 'Hostile unit spotted / identified',
+  sidc: '10061000131606000000',
+  lat: 49.24,
+  lon: 11.85,
+  echelon: 'section',
+}
+
+describe('parseEnemyUnit', () => {
+  it('parses a valid enemy_unit frame', () => {
+    const parsed = parseEnemyUnit(JSON.stringify(enemyFrame))
+    expect(parsed?.id).toBe('catalog-012')
+    expect(parsed?.sidc).toBe('10061000131606000000')
+    expect(parsed?.lat).toBe(49.24)
+  })
+
+  it('rejects wrong-type, missing-id, non-numeric-coord, and malformed frames', () => {
+    expect(parseEnemyUnit(JSON.stringify({ type: 'unit_update' }))).toBeNull()
+    expect(parseEnemyUnit(JSON.stringify({ ...enemyFrame, id: undefined }))).toBeNull()
+    expect(parseEnemyUnit(JSON.stringify({ ...enemyFrame, lat: 'x' }))).toBeNull()
+    expect(parseEnemyUnit('not json')).toBeNull()
+  })
+})
+
+describe('applyEnemyUnit', () => {
+  it('keeps the latest sighting per id (updates a contact) without mutating the input', () => {
+    const prev = {}
+    const s1 = applyEnemyUnit(prev, enemyFrame)
+    expect(s1['catalog-012'].lat).toBe(49.24)
+    expect(prev).toEqual({})
+    const s2 = applyEnemyUnit(s1, { ...enemyFrame, lat: 49.25, lon: 11.86 })
+    expect(Object.keys(s2)).toHaveLength(1) // dedup by id
+    expect(s2['catalog-012'].lat).toBe(49.25)
   })
 })
 
