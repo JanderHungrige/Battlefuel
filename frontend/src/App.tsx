@@ -4,6 +4,13 @@ import { errorMessage } from './api/errors'
 import type { Recommendation, TileMutationRequest } from './api/types'
 import { AdvisorPanel } from './components/AdvisorPanel'
 import { ChatterLog } from './components/ChatterLog'
+import { ChatterFilterControls } from './components/ChatterFilterControls'
+import {
+  DEFAULT_CHATTER_FILTERS,
+  filterChatter,
+  filterCombatEvents,
+  type ChatterFilters,
+} from './lib/chatterFilter'
 import { GridLayoutControl } from './components/GridLayoutControl'
 import { HaltBanner } from './components/HaltBanner'
 import { InspectPanel, type InspectCell } from './components/InspectPanel'
@@ -90,6 +97,17 @@ export default function App() {
   const [locatePoint, setLocatePoint] = useState<{ lat: number; lon: number } | null>(null)
   // OF-8 on-map per-unit fuel bars (v2 Wave 11 F7); on by default.
   const [infoBarsOn, setInfoBarsOn] = useState(true)
+
+  // Chatter + combat-square filters (v2 Wave 4 F4): mode, threat threshold, per-zone toggles.
+  const [chatterFilters, setChatterFilters] = useState<ChatterFilters>(DEFAULT_CHATTER_FILTERS)
+  const filteredChatter = useMemo(
+    () => filterChatter(chatter, chatterFilters),
+    [chatter, chatterFilters],
+  )
+  const filteredCombatEvents = useMemo(
+    () => filterCombatEvents(Object.values(combatEvents), chatterFilters),
+    [combatEvents, chatterFilters],
+  )
 
   // Tiles merged with their latest live tile_update (threat/road/situation/etc.).
   const displayedTiles = useMemo(() => {
@@ -478,7 +496,7 @@ export default function App() {
               obstacleMode={obstacleActive}
               depotMode={depotMode && canShow(role, 'depotOverlay')}
               onPlaceDepot={placeDepot}
-              combatEvents={Object.values(combatEvents)}
+              combatEvents={filteredCombatEvents}
               highlightEventId={highlightEventId}
               enemyUnits={enemyUnits}
               depots={canShow(role, 'depotOverlay') ? (supply.overview?.depots ?? []) : []}
@@ -538,7 +556,13 @@ export default function App() {
               }
               onClearSelection={clear}
             />
-            <ChatterLog messages={chatter} onSelect={setHighlightH3} onSelectEvent={locateEvent} />
+            <ChatterLog
+              messages={filteredChatter}
+              onSelect={setHighlightH3}
+              onSelectEvent={locateEvent}
+            >
+              <ChatterFilterControls value={chatterFilters} onChange={setChatterFilters} />
+            </ChatterLog>
             {canShow(role, 'strategicFeed') && strategicOpen && (
               <ChatterLog
                 messages={strategic}

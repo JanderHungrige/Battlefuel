@@ -65,6 +65,13 @@ export interface ChatterMessage {
   event_id?: string
   lat?: number
   lon?: number
+  /** Expandable detail (v2 Wave 4 F3): carried from the combat_event so a row can show full
+   * context (category, threat, supply relevance, generated detail, sim timestamp) on expand. */
+  category?: string
+  estimated_threat?: number
+  supply_relevant?: boolean
+  detail?: string
+  game_s?: number
 }
 
 export type InstanceStatus =
@@ -578,4 +585,8 @@ export interface CombatEvent {
   sender: string
   zone: CombatEventZone
   game_s: number
+  /** Additive Wave-4 catalog fields (doc 92/93); present when the feed is the CSV catalog. */
+  catalog_id?: string
+  supply_relevant?: boolean
+  detail?: string
 }

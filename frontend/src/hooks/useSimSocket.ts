@@ -130,6 +130,12 @@ export function useSimSocket(enabled = true): SimSocketState {
               event_id: combat.id,
               lat: combat.lat,
               lon: combat.lon,
+              // Expandable detail (v2 Wave 4 F3).
+              category: combat.category,
+              estimated_threat: combat.estimated_threat,
+              supply_relevant: combat.supply_relevant,
+              detail: combat.detail,
+              game_s: combat.game_s,
             }
             setChatter((prev) => [...prev, msg].slice(-MAX_CHATTER))
           }

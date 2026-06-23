@@ -1245,6 +1245,104 @@ body {
   opacity: 0.7;
 }
 
+/* Expandable combat-event detail (v2 Wave 4 F3). */
+.chatter-row {
+  display: block;
+}
+
+.chatter-caret {
+  float: right;
+  margin-left: 6px;
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.chatter-detail {
+  margin: 0 0 4px;
+  padding: 5px 8px;
+  font-size: 11px;
+  background: #161b22;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 0 4px 4px;
+}
+
+.chatter-detail-row {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 2px;
+}
+
+.chatter-detail-row dt {
+  flex: 0 0 64px;
+  color: var(--muted);
+}
+
+.chatter-detail-row dd {
+  flex: 1;
+  margin: 0;
+}
+
+/* Chatter + map-square filter controls (v2 Wave 4 F4). Compact strip under the chatter title. */
+.chatter-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 0 0 6px;
+  padding: 5px 6px;
+  background: #161b22;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.cf-modes {
+  display: flex;
+  gap: 3px;
+}
+
+.cf-mode {
+  flex: 1;
+  padding: 3px 4px;
+  font-size: 11px;
+  color: var(--text);
+  background: #1c222b;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.cf-mode.active {
+  color: #0e1116;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.cf-threshold {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.cf-threshold input[type='range'] {
+  flex: 1;
+}
+
+.cf-zones {
+  display: flex;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.cf-zone {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+}
+
 /* Obstacle type picker (left side, under the planning area). */
 .obstacle-picker {
   position: absolute;

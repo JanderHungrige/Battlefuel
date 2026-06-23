@@ -60,4 +60,44 @@ describe('ChatterLog', () => {
     fireEvent.click(msg)
     expect(onSelectEvent).toHaveBeenCalledWith('ied-msr-7')
   })
+
+  it('expands a combat line in-place to reveal detail, and still locates (Wave 4 F3)', () => {
+    const onSelectEvent = vi.fn()
+    render(
+      <ChatterLog
+        messages={[
+          {
+            id: 4,
+            kind: 'status',
+            text: 'Convoy ambushed on MSR',
+            mgrs: '32U PU 11111 22222',
+            sender: 'RECON 2-7',
+            event_id: 'ambush-1',
+            category: 'Engagements & Fires',
+            estimated_threat: 5,
+            supply_relevant: true,
+            detail: 'Resupply column halted; request route advisory.',
+            game_s: 612,
+          },
+        ]}
+        onSelectEvent={onSelectEvent}
+      />,
+    )
+    // Collapsed by default — no detail block.
+    expect(screen.queryByTestId('chatter-detail')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('chatter-msg'))
+    // Single click both locates (Wave-3 contract) and expands (F3).
+    expect(onSelectEvent).toHaveBeenCalledWith('ambush-1')
+    const detail = screen.getByTestId('chatter-detail')
+    expect(detail).toHaveTextContent('Engagements & Fires')
+    expect(detail).toHaveTextContent('5/5')
+    expect(detail).toHaveTextContent('SUPPLY-RELEVANT')
+    expect(detail).toHaveTextContent('T+612s')
+    expect(detail).toHaveTextContent('Resupply column halted')
+
+    // Clicking again collapses.
+    fireEvent.click(screen.getByTestId('chatter-msg'))
+    expect(screen.queryByTestId('chatter-detail')).not.toBeInTheDocument()
+  })
 })
