@@ -1,8 +1,7 @@
-// Compact control strip for the chatter feed + map combat squares (v2 Wave 4 F4).
-// Controlled component: takes the current ChatterFilters and emits the next one via onChange.
+// Compact control strip for the unified chatter feed (Wave 4 F4 → unify-threat-chatter).
+// Controlled: takes the current ChatterFilters + the map-hover toggle and emits changes.
 
 import type { ChatterFilters, ChatterMode } from '../lib/chatterFilter'
-import type { CombatEventZone } from '../api/types'
 
 const MODES: { value: ChatterMode; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -10,18 +9,17 @@ const MODES: { value: ChatterMode; label: string }[] = [
   { value: 'supply', label: 'Supply' },
 ]
 
-const ZONES: { value: CombatEventZone; label: string }[] = [
-  { value: 'combat', label: 'Combat' },
-  { value: 'blocked', label: 'Blocked' },
-  { value: 'threat', label: 'Threat' },
-]
-
 export function ChatterFilterControls({
   value,
   onChange,
+  hoverDetails,
+  onHoverDetailsChange,
 }: {
   value: ChatterFilters
   onChange: (next: ChatterFilters) => void
+  /** Map-cell hover detail toggle (off = grid number only). */
+  hoverDetails: boolean
+  onHoverDetailsChange: (next: boolean) => void
 }) {
   return (
     <div className="chatter-filters" data-testid="chatter-filters">
@@ -51,21 +49,15 @@ export function ChatterFilterControls({
           onChange={(e) => onChange({ ...value, minThreat: Number(e.target.value) })}
         />
       </label>
-      <div className="cf-zones" role="group" aria-label="Map square zones">
-        {ZONES.map((z) => (
-          <label key={z.value} className={`cf-zone cf-zone-${z.value}`}>
-            <input
-              type="checkbox"
-              checked={value.zones[z.value]}
-              data-testid={`cf-zone-${z.value}`}
-              onChange={(e) =>
-                onChange({ ...value, zones: { ...value.zones, [z.value]: e.target.checked } })
-              }
-            />
-            {z.label}
-          </label>
-        ))}
-      </div>
+      <label className="cf-hover">
+        <input
+          type="checkbox"
+          checked={hoverDetails}
+          data-testid="cf-hover-details"
+          onChange={(e) => onHoverDetailsChange(e.target.checked)}
+        />
+        Cell hover details
+      </label>
     </div>
   )
 }

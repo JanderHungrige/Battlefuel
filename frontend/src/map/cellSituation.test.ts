@@ -21,6 +21,7 @@ describe('aggregateCell', () => {
       maxIntel: 'none',
       dominantTerrain: 'unknown',
       terrainMix: {},
+      event: null,
     })
   })
 

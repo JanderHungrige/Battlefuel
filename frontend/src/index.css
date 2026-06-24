@@ -914,6 +914,21 @@ body {
   color: var(--accent);
 }
 
+/* Located-event detail in the MGRS-cell panel (unify-threat-chatter). */
+.inspect-event {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.inspect-event h3 {
+  margin: 0 0 4px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+}
+
 /* Move planning panel (left side, opposite the inspect panel). */
 .move-panel {
   position: absolute;
@@ -1345,17 +1360,12 @@ body {
   flex: 1;
 }
 
-.cf-zones {
-  display: flex;
-  gap: 8px;
-  font-size: 11px;
-  color: var(--muted);
-}
-
-.cf-zone {
+.cf-hover {
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--muted);
   cursor: pointer;
 }
 

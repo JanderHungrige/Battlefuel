@@ -1,23 +1,23 @@
+import { latLngToCell } from 'h3-js'
 import { describe, expect, it, vi } from 'vitest'
-import type { CombatEvent, TileUpdate, UnitUpdate } from '../api/types'
+import type { TileUpdate, UnitUpdate } from '../api/types'
 import {
-  applyCombatEvent,
   applyEnemyUnit,
   applyTileUpdate,
   applyUnitUpdate,
-  combatEventMgrs,
   describeBuyOrderUpdate,
   describeRefuelOrderUpdate,
   describeRendezvousReminder,
-  describeTileUpdate,
   parseBuyOrderUpdate,
-  parseCombatEvent,
   parseEnemyUnit,
+  parseEnemyUnitRemoved,
   parseRefuelOrderUpdate,
   parseRendezvousReminder,
   parseStrategicMessage,
   parseTileUpdate,
   parseUnitUpdate,
+  removeEnemyUnit,
+  tileEventChatter,
 } from './simSocket'
 
 const frame: UnitUpdate = {
@@ -82,6 +82,7 @@ const tileFrame: TileUpdate = {
   cover: 'none',
   situation: null,
   note: null,
+  last_event: null,
 }
 
 describe('parseTileUpdate', () => {
@@ -108,13 +109,35 @@ describe('applyTileUpdate', () => {
   })
 })
 
-describe('describeTileUpdate', () => {
-  it('summarizes threat and road, including situation/note when present', () => {
-    const text = describeTileUpdate({ ...tileFrame, threat_level: 4, situation: 'under_fire', note: 'ridge' })
-    expect(text).toContain('threat 4/5')
-    expect(text).toContain('road damaged')
-    expect(text).toContain('under fire')
-    expect(text).toContain('ridge')
+describe('tileEventChatter', () => {
+  const hohenfelsCell = latLngToCell(49.2, 11.85, 8)
+
+  it('builds an expandable "<MGRS> — <headline>" line from a stamped event', () => {
+    const msg = tileEventChatter(
+      {
+        ...tileFrame,
+        h3_index: hohenfelsCell,
+        threat_level: 4,
+        last_event: {
+          headline: 'Hostile unit spotted / identified',
+          category: 'Threat Events',
+          sender: 'RECON 2-7',
+          supply_relevant: false,
+          at_game_s: 120,
+        },
+      },
+      7,
+    )
+    expect(msg).not.toBeNull()
+    expect(msg?.text).toBe('Hostile unit spotted / identified')
+    expect(msg?.mgrs).toMatch(/^32U [A-Z]{2} \d{5} \d{5}$/)
+    expect(msg?.category).toBe('Threat Events')
+    expect(msg?.estimated_threat).toBe(4)
+    expect(msg?.h3_index).toBe(hohenfelsCell)
+  })
+
+  it('returns null when the tile carries no event (a revert/decay update)', () => {
+    expect(tileEventChatter({ ...tileFrame, h3_index: hohenfelsCell }, 1)).toBeNull()
   })
 })
 
@@ -202,55 +225,6 @@ describe('parseStrategicMessage', () => {
   })
 })
 
-const combatFrame: CombatEvent = {
-  type: 'combat_event',
-  id: 'ied-msr-7',
-  category: 'Threat Events',
-  event: 'IED / mine detected or detonated',
-  lat: 49.215,
-  lon: 11.835,
-  precision_m: 100,
-  estimated_threat: 4,
-  sender: 'EOD 4-1 (52nd EOD)',
-  zone: 'blocked',
-  game_s: 20,
-}
-
-describe('parseCombatEvent', () => {
-  it('parses a valid combat_event frame', () => {
-    const parsed = parseCombatEvent(JSON.stringify(combatFrame))
-    expect(parsed?.id).toBe('ied-msr-7')
-    expect(parsed?.precision_m).toBe(100)
-    expect(parsed?.zone).toBe('blocked')
-  })
-
-  it('rejects wrong-type, missing-id, non-numeric-coord, and malformed frames', () => {
-    expect(parseCombatEvent(JSON.stringify({ type: 'tile_update' }))).toBeNull()
-    expect(parseCombatEvent(JSON.stringify({ ...combatFrame, id: undefined }))).toBeNull()
-    expect(parseCombatEvent(JSON.stringify({ ...combatFrame, lat: 'x' }))).toBeNull()
-    expect(parseCombatEvent('not json')).toBeNull()
-  })
-})
-
-describe('applyCombatEvent', () => {
-  it('keeps the latest frame per id and does not mutate the input', () => {
-    const prev = {}
-    const s1 = applyCombatEvent(prev, combatFrame)
-    expect(s1['ied-msr-7'].estimated_threat).toBe(4)
-    expect(prev).toEqual({})
-    const s2 = applyCombatEvent(s1, { ...combatFrame, estimated_threat: 5, zone: 'combat' })
-    expect(s2['ied-msr-7'].estimated_threat).toBe(5)
-    expect(s2['ied-msr-7'].zone).toBe('combat')
-  })
-})
-
-describe('combatEventMgrs', () => {
-  it('formats the event location as a spaced zone-32U MGRS string (to 1 m)', () => {
-    const mgrs = combatEventMgrs(combatFrame)
-    expect(mgrs).toMatch(/^32U [A-Z]{2} \d{5} \d{5}$/)
-  })
-})
-
 const enemyFrame = {
   type: 'enemy_unit',
   id: 'catalog-012',
@@ -286,6 +260,21 @@ describe('applyEnemyUnit', () => {
     const s2 = applyEnemyUnit(s1, { ...enemyFrame, lat: 49.25, lon: 11.86 })
     expect(Object.keys(s2)).toHaveLength(1) // dedup by id
     expect(s2['catalog-012'].lat).toBe(49.25)
+  })
+})
+
+describe('parseEnemyUnitRemoved / removeEnemyUnit', () => {
+  it('parses the removed sighting id', () => {
+    expect(parseEnemyUnitRemoved(JSON.stringify({ type: 'enemy_unit_removed', id: 'sight-1' }))).toBe(
+      'sight-1',
+    )
+    expect(parseEnemyUnitRemoved(JSON.stringify({ type: 'enemy_unit', id: 'x' }))).toBeNull()
+  })
+
+  it('drops the sighting by id (and leaves the map untouched when absent)', () => {
+    const s1 = applyEnemyUnit({}, enemyFrame)
+    expect(removeEnemyUnit(s1, 'catalog-012')).toEqual({})
+    expect(removeEnemyUnit(s1, 'missing')).toBe(s1) // unchanged reference
   })
 })
 

@@ -6,24 +6,19 @@ import { cellToLatLng } from 'h3-js'
 import maplibregl from 'maplibre-gl'
 import { Protocol } from 'pmtiles'
 import { useEffect, useRef } from 'react'
-import {
-  ROUTE,
-  SELECTED_UNIT,
-  SELECTED_UNIT_RING,
-  ZONE_BLOCKED_FILL,
-  ZONE_BLOCKED_LINE,
-  ZONE_COMBAT_FILL,
-  ZONE_COMBAT_LINE,
-  ZONE_THREAT_FILL,
-  ZONE_THREAT_LINE,
-} from './colors'
+import { ROUTE, SELECTED_UNIT, SELECTED_UNIT_RING } from './colors'
 import { DEPOT_SIDC, GAUGE_SEGMENTS, depotGauges, depotIconKey } from './depotSymbol'
 import { fuelBarColor, fuelBarKey, fuelFraction } from './unitFuelBar'
-import { ALL_EVENT_ICONS } from './eventIcons'
-import { formatMgrs, gridLabels, gridLines, squareCornersFromCenter, toMgrs } from './mgrsGrid'
+import {
+  cellMgrsLabel,
+  formatMgrs,
+  gridLabels,
+  gridLines,
+  squareCornersFromCenter,
+  toMgrs,
+} from './mgrsGrid'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type {
-  CombatEvent,
   DepotFuel,
   EnemyUnit,
   Obstacle,
@@ -38,7 +33,6 @@ import {
   activeRoutesToGeoJSON,
   adviceArrowToGeoJSON,
   cellThreatToGeoJSON,
-  combatEventsToGeoJSON,
   depotsToGeoJSON,
   enemyUnitsToGeoJSON,
   destinationToGeoJSON,
@@ -69,8 +63,8 @@ export interface MapViewProps {
   activeRoutes: number[][][]
   obstacles: Obstacle[]
   obstacleMode: boolean
-  combatEvents: CombatEvent[]
-  highlightEventId: string | null
+  /** Cell-hover popup detail toggle (unify): off = grid number only. */
+  hoverDetails: boolean
   enemyUnits: EnemyUnit[]
   depots: DepotFuel[]
   /** When set, mark + ease the map to this point (locate a depot / truck / etc.). v2 Wave 11. */
@@ -202,76 +196,9 @@ function initLayers(map: maplibregl.Map): void {
     },
   })
 
-  // Located combat-event threat squares (v2 Wave 3): MGRS-aligned squares coloured by zone
-  // (combat → red, blocked → light-yellow, threat → amber), opacity ramped by estimated_threat.
-  // Drawn above the grid but below routes/units so symbols stay legible.
-  map.addSource('combat-events', { type: 'geojson', data: EMPTY })
-  map.addLayer({
-    id: 'combat-events-fill',
-    type: 'fill',
-    source: 'combat-events',
-    paint: {
-      'fill-color': [
-        'match',
-        ['get', 'zone'],
-        'combat',
-        ZONE_COMBAT_FILL,
-        'blocked',
-        ZONE_BLOCKED_FILL,
-        ZONE_THREAT_FILL,
-      ],
-      'fill-opacity': [
-        'interpolate',
-        ['linear'],
-        ['get', 'estimated_threat'],
-        0,
-        0.18,
-        5,
-        0.5,
-      ],
-    },
-  })
-  map.addLayer({
-    id: 'combat-events-outline',
-    type: 'line',
-    source: 'combat-events',
-    paint: {
-      'line-color': [
-        'match',
-        ['get', 'zone'],
-        'combat',
-        ZONE_COMBAT_LINE,
-        'blocked',
-        ZONE_BLOCKED_LINE,
-        ZONE_THREAT_LINE,
-      ],
-      'line-width': 1.5,
-      'line-opacity': 0.9,
-    },
-  })
-  // Category glyph at each square's centre (offline-rasterized; F3 event-hover-icons).
-  for (const ic of ALL_EVENT_ICONS) {
-    if (!map.hasImage(ic.key)) map.addImage(ic.key, glyphImage(ic.glyph))
-  }
-  map.addLayer({
-    id: 'combat-events-icons',
-    type: 'symbol',
-    source: 'combat-events',
-    layout: {
-      'symbol-placement': 'point',
-      'icon-image': ['get', 'icon'],
-      'icon-size': 1,
-      'icon-allow-overlap': true,
-    },
-  })
-  // Bright highlight outline for a combat square located from the chatter log (F4 click-to-locate).
-  map.addLayer({
-    id: 'combat-events-highlight',
-    type: 'line',
-    source: 'combat-events',
-    filter: ['==', ['get', 'id'], ''],
-    paint: { 'line-color': '#ffd23f', 'line-width': 3.5, 'line-opacity': 0.95 },
-  })
+  // (Unify-threat-chatter) the separate combat-event threat squares are gone — the unified threat
+  // shows via the ambient cell-threat shading above, and the located event detail via the chatter,
+  // the MGRS-cell panel, and the optional cell-hover popup (wireCellHover).
 
   // Selected MGRS cell outline (v2 Wave 9 inspection) — the cell the operator clicked.
   map.addSource('selected-cell', { type: 'geojson', data: EMPTY })
@@ -693,29 +620,6 @@ function labelImage(text: string): { width: number; height: number; data: Uint8C
   return ctx.getImageData(0, 0, width, height)
 }
 
-/** Rasterise a category glyph into a small dark disc icon (offline — same technique as labels). */
-function glyphImage(glyph: string): { width: number; height: number; data: Uint8ClampedArray } {
-  const d = 22
-  const canvas = document.createElement('canvas')
-  canvas.width = d
-  canvas.height = d
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return { width: d, height: d, data: new Uint8ClampedArray(d * d * 4) }
-  ctx.beginPath()
-  ctx.arc(d / 2, d / 2, d / 2 - 1, 0, Math.PI * 2)
-  ctx.fillStyle = 'rgba(20,18,14,0.82)'
-  ctx.fill()
-  ctx.lineWidth = 1.5
-  ctx.strokeStyle = 'rgba(244,241,232,0.9)'
-  ctx.stroke()
-  ctx.fillStyle = '#f4f1e8'
-  ctx.font = 'bold 12px system-ui, -apple-system, sans-serif'
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillText(glyph, d / 2, d / 2 + 0.5)
-  return ctx.getImageData(0, 0, d, d)
-}
-
 /**
  * Repaint the MGRS grid for the current precision. MGRS is the only grid (v2 Wave 9 — hex retired):
  * the H3 `tiles` layers stay only as the invisible data substrate (tiles-fill at opacity 0 is the
@@ -828,27 +732,32 @@ function wireHover(map: maplibregl.Map): void {
   })
 }
 
-/** Hover popup over a combat-event square: event, category, estimated threat, sender. */
-function wireCombatHover(map: maplibregl.Map): void {
+/**
+ * Cell-hover popup (unify-threat-chatter). Off (default) → just the MGRS grid number; on
+ * (the "Cell hover details" checkbox) → grid + threat and, when the cell carries a located event,
+ * its headline / category / sender. Reads the (invisible) tiles-fill features.
+ */
+function wireCellHover(map: maplibregl.Map, propsRef: { current: MapViewProps }): void {
   const popup = new maplibregl.Popup({
     closeButton: false,
     closeOnClick: false,
     className: 'hex-popup',
   })
-  map.on('mousemove', 'combat-events-fill', (e) => {
+  map.on('mousemove', 'tiles-fill', (e) => {
     const p = e.features?.[0]?.properties
     if (!p) return
-    map.getCanvas().style.cursor = 'pointer'
-    popup
-      .setLngLat(e.lngLat)
-      .setHTML(
-        `<b>${p.event}</b><br>${p.category} · threat ${p.estimated_threat}/5<br>` +
-          `<i>${p.sender}</i>`,
-      )
-      .addTo(map)
+    const grid = cellMgrsLabel(e.lngLat.lat, e.lngLat.lng, propsRef.current.gridPrecisionM)
+    let html = `<b>${grid}</b>`
+    if (propsRef.current.hoverDetails) {
+      html += `<br>threat ${p.threat_level ?? 0}/5`
+      if (p.event_headline) {
+        html += `<br>${p.event_headline}`
+        html += `<br><i>${p.event_category ?? ''} · ${p.event_sender ?? ''}</i>`
+      }
+    }
+    popup.setLngLat(e.lngLat).setHTML(html).addTo(map)
   })
-  map.on('mouseleave', 'combat-events-fill', () => {
-    map.getCanvas().style.cursor = ''
+  map.on('mouseleave', 'tiles-fill', () => {
     popup.remove()
   })
 }
@@ -895,7 +804,6 @@ export function MapView(props: MapViewProps) {
       setData(map, 'route', routeToGeoJSON(p.routeGeometry))
       setData(map, 'destination', destinationToGeoJSON(p.destination))
       setData(map, 'obstacles', obstaclesToGeoJSON(p.obstacles))
-      setData(map, 'combat-events', combatEventsToGeoJSON(p.combatEvents))
       syncDepots(map, p.depots)
       setData(map, 'rendezvous', destinationToGeoJSON(p.rendezvous))
       setData(map, 'advice-arrow', adviceArrowToGeoJSON(p.adviceArrow?.from, p.adviceArrow?.to))
@@ -904,7 +812,7 @@ export function MapView(props: MapViewProps) {
       syncFuelRunRoutes(map, p.fuelRunOptions, p.fuelRunMetric)
       wireInteraction(map, propsRef)
       wireHover(map)
-      wireCombatHover(map)
+      wireCellHover(map, propsRef)
       applyMgrsGrid(map, p.theater, p.gridPrecisionM)
       if (readoutRef.current) wireReadout(map, readoutRef.current)
       readyRef.current = true
@@ -969,21 +877,6 @@ export function MapView(props: MapViewProps) {
         props.rendezvousMetric,
       )
   }, [props.rendezvousRoutes, props.rendezvousMetric])
-  useEffect(() => {
-    if (readyRef.current && mapRef.current)
-      setData(mapRef.current, 'combat-events', combatEventsToGeoJSON(props.combatEvents))
-  }, [props.combatEvents])
-  // Highlight + recentre only when the *selected event* changes — NOT on every combat_event frame
-  // (combatEvents is a fresh array each render, so depending on it would re-focus on every tick).
-  useEffect(() => {
-    if (!readyRef.current || !mapRef.current) return
-    const map = mapRef.current
-    map.setFilter('combat-events-highlight', ['==', ['get', 'id'], props.highlightEventId ?? ''])
-    if (props.highlightEventId) {
-      const ev = propsRef.current.combatEvents.find((e) => e.id === props.highlightEventId)
-      if (ev) map.easeTo({ center: [ev.lon, ev.lat], duration: 600 })
-    }
-  }, [props.highlightEventId])
   useEffect(() => {
     if (readyRef.current && mapRef.current) syncDepots(mapRef.current, props.depots)
   }, [props.depots])

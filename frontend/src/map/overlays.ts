@@ -5,7 +5,6 @@ import type { FeatureCollection } from 'geojson'
 import { cellToLatLng } from 'h3-js'
 import type {
   BBox,
-  CombatEvent,
   DepotFuel,
   EnemyUnit,
   Obstacle,
@@ -14,7 +13,6 @@ import type {
   UnitInstance,
 } from '../api/types'
 import { depotIconKey } from './depotSymbol'
-import { iconForEvent } from './eventIcons'
 import { cellIdFor, squareCornersFromCenter } from './mgrsGrid'
 
 // Light classic terrain tints — soft, distinct fills that read on the parchment basemap (45).
@@ -58,6 +56,10 @@ export function tilesToGeoJSON(tiles: Tile[]): FeatureCollection {
         road_condition: t.road_condition,
         intel_level: t.intel_level,
         color: TERRAIN_COLORS[t.terrain] ?? TERRAIN_COLORS.unknown,
+        // Flattened located-event fields for the cell-hover popup (unify-threat-chatter).
+        event_headline: t.last_event?.headline ?? '',
+        event_category: t.last_event?.category ?? '',
+        event_sender: t.last_event?.sender ?? '',
       },
     })),
   }
@@ -90,34 +92,6 @@ export function unitsToGeoJSON(
         },
       }
     }),
-  }
-}
-
-/**
- * Located combat events → Polygon FeatureCollection, one MGRS-grid-aligned square per event at its
- * `precision_m` (v2 Wave 3, threat-mgrs-squares). Properties carry `zone` + `estimated_threat` for
- * styling and `category`/`event`/`sender` for the F3 hover / F4 chatter consumers.
- */
-export function combatEventsToGeoJSON(events: CombatEvent[]): FeatureCollection {
-  return {
-    type: 'FeatureCollection',
-    features: events.map((ev) => ({
-      type: 'Feature',
-      geometry: {
-        type: 'Polygon',
-        coordinates: [squareCornersFromCenter(ev.lat, ev.lon, ev.precision_m)],
-      },
-      properties: {
-        id: ev.id,
-        zone: ev.zone,
-        estimated_threat: ev.estimated_threat,
-        category: ev.category,
-        event: ev.event,
-        sender: ev.sender,
-        precision_m: ev.precision_m,
-        icon: iconForEvent(ev.category, ev.event).key,
-      },
-    })),
   }
 }
 

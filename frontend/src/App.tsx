@@ -9,7 +9,6 @@ import { ChatterFilterControls } from './components/ChatterFilterControls'
 import {
   DEFAULT_CHATTER_FILTERS,
   filterChatter,
-  filterCombatEvents,
   type ChatterFilters,
 } from './lib/chatterFilter'
 import { supplyAdviceKind } from './lib/supplyAdvisorAction'
@@ -70,7 +69,6 @@ export default function App() {
   const [selectedCell, setSelectedCell] = useState<{ lat: number; lon: number } | null>(null)
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null)
   const [highlightH3, setHighlightH3] = useState<string | null>(null)
-  const [highlightEventId, setHighlightEventId] = useState<string | null>(null)
 
   // Map grid: MGRS only (v2 Wave 9 — hex retired). Drawn precision is persisted.
   const [gridPrecisionM, setGridPrecisionM] = useState<number>(() => {
@@ -84,7 +82,6 @@ export default function App() {
   const {
     positions: live,
     tileUpdates,
-    combatEvents,
     enemySightings,
     chatter,
     strategic,
@@ -109,16 +106,14 @@ export default function App() {
   // OF-8 on-map per-unit fuel bars (v2 Wave 11 F7); on by default.
   const [infoBarsOn, setInfoBarsOn] = useState(true)
 
-  // Chatter + combat-square filters (v2 Wave 4 F4): mode, threat threshold, per-zone toggles.
+  // Unified chatter filter (Wave 4 F4): mode + threat threshold (default ≥3).
   const [chatterFilters, setChatterFilters] = useState<ChatterFilters>(DEFAULT_CHATTER_FILTERS)
   const filteredChatter = useMemo(
     () => filterChatter(chatter, chatterFilters),
     [chatter, chatterFilters],
   )
-  const filteredCombatEvents = useMemo(
-    () => filterCombatEvents(Object.values(combatEvents), chatterFilters),
-    [combatEvents, chatterFilters],
-  )
+  // Map-cell hover detail toggle (unify F6): off (default) → grid number only.
+  const [hoverDetails, setHoverDetails] = useState(false)
   // Seed hostile force merged with live chatter-driven sightings (v2 Wave 4 F6); dedup by id,
   // a dynamic sighting wins over a seed unit with the same id.
   const allEnemyUnits = useMemo(() => {
@@ -245,7 +240,6 @@ export default function App() {
     setSelectedCell(null)
     setSelectedUnitId(null)
     setHighlightH3(null)
-    setHighlightEventId(null)
     setLocatePoint(null)
     planning.resetPlanning()
     planRdv.cancel()
@@ -261,7 +255,6 @@ export default function App() {
         const u = units[0]
         if (!u) return
         setSelectedCell(null)
-        setHighlightEventId(null)
         planning.resetPlanning()
         setSelectedUnitId(u.id)
       },
@@ -286,19 +279,6 @@ export default function App() {
     [supply, pushChatter],
   )
 
-  // Click a tagged combat chatter line: focus its MGRS square (clearing any other selection), and
-  // clicking the same line again toggles the highlight off. Clearing also happens via `clear`
-  // (map-background click or closing any inspect panel).
-  const locateEvent = useCallback(
-    (id: string) => {
-      setSelectedCell(null)
-      setSelectedUnitId(null)
-      setHighlightH3(null)
-      planning.resetPlanning()
-      setHighlightEventId((prev) => (prev === id ? null : id))
-    },
-    [planning],
-  )
 
   // Ask the advisor about a supply-relevant chatter event (v2 Wave 4 F5): map the event's
   // category to the right advisor kind, open the panel + request it (advisory only — never
@@ -342,7 +322,6 @@ export default function App() {
   const rerouteHalted = useCallback(() => {
     if (!halted) return
     setSelectedCell(null)
-    setHighlightEventId(null)
     planning.resetPlanning()
     setSelectedUnitId(halted.instanceId)
   }, [halted, planning])
@@ -539,8 +518,7 @@ export default function App() {
               obstacleMode={obstacleActive}
               depotMode={depotMode && canShow(role, 'depotOverlay')}
               onPlaceDepot={placeDepot}
-              combatEvents={filteredCombatEvents}
-              highlightEventId={highlightEventId}
+              hoverDetails={hoverDetails}
               enemyUnits={allEnemyUnits}
               depots={canShow(role, 'depotOverlay') ? (supply.overview?.depots ?? []) : []}
               locatePoint={locatePoint}
@@ -558,13 +536,11 @@ export default function App() {
               onRemoveObstacle={removeObstacle}
               onSelectCell={(lat, lon) => {
                 setSelectedUnitId(null)
-                setHighlightEventId(null)
                 planning.resetPlanning()
                 setSelectedCell({ lat, lon })
               }}
               onSelectUnit={(id) => {
                 setSelectedCell(null)
-                setHighlightEventId(null)
                 planning.resetPlanning()
                 setSelectedUnitId(id)
                 // OF-8: clicking a refuelable unit starts a routed fuel run — find the nearest
@@ -602,10 +578,14 @@ export default function App() {
             <ChatterLog
               messages={filteredChatter}
               onSelect={setHighlightH3}
-              onSelectEvent={locateEvent}
               onAskAdvisor={canShow(role, 'advisor') ? askAdvisorForEvent : undefined}
             >
-              <ChatterFilterControls value={chatterFilters} onChange={setChatterFilters} />
+              <ChatterFilterControls
+                value={chatterFilters}
+                onChange={setChatterFilters}
+                hoverDetails={hoverDetails}
+                onHoverDetailsChange={setHoverDetails}
+              />
             </ChatterLog>
             {canShow(role, 'strategicFeed') && strategicOpen && (
               <ChatterLog

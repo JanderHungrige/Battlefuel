@@ -1,9 +1,10 @@
 // Pure helpers for the sim WebSocket: parse and reduce frames. Kept free of the
 // WebSocket API so they are deterministically unit-testable.
 
+import { cellToLatLng } from 'h3-js'
 import type {
   BuyOrderUpdate,
-  CombatEvent,
+  ChatterMessage,
   EnemyUnit,
   RefuelOrderUpdate,
   RendezvousReminder,
@@ -50,12 +51,31 @@ export function applyTileUpdate(
   return { ...state, [update.h3_index]: update }
 }
 
-/** A short human-readable summary of a tile_update, for the chatter log. */
-export function describeTileUpdate(u: TileUpdate): string {
-  const parts = [`threat ${u.threat_level}/5`, `road ${u.road_condition}`]
-  if (u.situation) parts.push(u.situation.replace(/_/g, ' '))
-  if (u.note) parts.push(`“${u.note}”`)
-  return parts.join(' · ')
+/** The MGRS "grid number" for a tile's cell — its centre, to 1 m (unify-threat-chatter). */
+export function tileMgrs(h3Index: string): string {
+  const [lat, lon] = cellToLatLng(h3Index)
+  return formatMgrs(toMgrs(lat, lon))
+}
+
+/**
+ * Build a unified chatter line from a tile_update's stamped located event ("<MGRS> — <headline>",
+ * expandable), or null when the tile carries none (a revert/decay just updates the map silently).
+ */
+export function tileEventChatter(u: TileUpdate, id: number): ChatterMessage | null {
+  if (!u.last_event) return null
+  const e = u.last_event
+  return {
+    id,
+    kind: 'status',
+    text: e.headline,
+    mgrs: tileMgrs(u.h3_index),
+    sender: e.sender,
+    category: e.category,
+    estimated_threat: u.threat_level,
+    supply_relevant: e.supply_relevant,
+    h3_index: u.h3_index,
+    game_s: e.at_game_s,
+  }
 }
 
 /** Parse a raw WS frame into a BuyOrderUpdate, or null if it is not a valid buy_order_update. */
@@ -76,35 +96,7 @@ export function parseRefuelOrderUpdate(raw: string): RefuelOrderUpdate | null {
   return null
 }
 
-/** Parse a raw WS frame into a CombatEvent, or null if it is not a valid combat_event. */
-export function parseCombatEvent(raw: string): CombatEvent | null {
-  const msg = parse(raw)
-  if (
-    msg &&
-    msg.type === 'combat_event' &&
-    typeof msg.id === 'string' &&
-    typeof msg.lat === 'number' &&
-    typeof msg.lon === 'number'
-  ) {
-    return msg as unknown as CombatEvent
-  }
-  return null
-}
-
-/** Formatted MGRS coordinate (to 1 m) for a combat event's location — the chatter tag. */
-export function combatEventMgrs(ev: CombatEvent): string {
-  return formatMgrs(toMgrs(ev.lat, ev.lon))
-}
-
-/** Latest combat-event frame per id wins. Returns a new map (never mutates the input). */
-export function applyCombatEvent(
-  state: Record<string, CombatEvent>,
-  event: CombatEvent,
-): Record<string, CombatEvent> {
-  return { ...state, [event.id]: event }
-}
-
-/** Parse a raw WS frame into an EnemyUnit sighting, or null if not valid (v2 Wave 4 F6). */
+/** Parse a raw WS frame into an EnemyUnit sighting, or null if not valid (unify-threat-chatter). */
 export function parseEnemyUnit(raw: string): EnemyUnit | null {
   const msg = parse(raw)
   if (
@@ -120,12 +112,32 @@ export function parseEnemyUnit(raw: string): EnemyUnit | null {
   return null
 }
 
+/** Parse an `enemy_unit_removed` frame → the removed sighting id, or null (its threat reverted). */
+export function parseEnemyUnitRemoved(raw: string): string | null {
+  const msg = parse(raw)
+  if (msg && msg.type === 'enemy_unit_removed' && typeof msg.id === 'string') {
+    return msg.id
+  }
+  return null
+}
+
 /** Latest enemy-unit sighting per id wins (dedup/update a contact). Returns a new map. */
 export function applyEnemyUnit(
   state: Record<string, EnemyUnit>,
   unit: EnemyUnit,
 ): Record<string, EnemyUnit> {
   return { ...state, [unit.id]: unit }
+}
+
+/** Drop an enemy sighting by id (its threat event reverted/decayed). Returns a new map. */
+export function removeEnemyUnit(
+  state: Record<string, EnemyUnit>,
+  id: string,
+): Record<string, EnemyUnit> {
+  if (!(id in state)) return state
+  const next = { ...state }
+  delete next[id]
+  return next
 }
 
 /** Parse a raw WS frame into a StrategicMessage, or null if not a valid strategic_message. */
