@@ -66,6 +66,57 @@ def road_for_event(event: str) -> RoadCondition | None:
     return None
 
 
+# Event types reported only broadly (sensor / area / air) → coarse 2 km location.
+_BROAD_KEYS = (
+    "air threat",
+    "drone",
+    "fixed-wing",
+    "helo",
+    "spotted",
+    "identified",
+    "humint",
+    "sigint",
+    "imint",
+    "osint",
+    "masint",
+    "satellite",
+)
+# Event types pinned to a point of contact / fires → 1 km.
+_SHARP_KEYS = (
+    "under fire",
+    "ambush",
+    "vbied",
+    "suicide",
+    "air strike",
+    "engagement",
+    "troops in contact",
+    "route classified red",
+    "chokepoint",
+)
+# Per-category fallback when no keyword matches (metres).
+_CATEGORY_PRECISION_M: dict[str, int] = {
+    "Threat Events": 1500,
+    "Movement & Access": 1000,
+    "Engagements & Fires": 1000,
+    "Adversary Activity": 2000,
+    "Intelligence & Information": 2000,
+}
+
+
+def precision_for_event(category: str, event: str, threat: int) -> int:
+    """Location detail (metres) from the event type — a static, deterministic lookup (no LLM):
+    pinpoint mines/IEDs → 100 m, contact/fires → 1 km, broad sensor/air sightings → 2 km, else a
+    per-category fallback. Drives how precisely the event's MGRS is shown."""
+    e = event.lower()
+    if _BLOCK_RE.search(e):
+        return 100
+    if any(k in e for k in _SHARP_KEYS) or threat >= 5:
+        return 1000
+    if any(k in e for k in _BROAD_KEYS):
+        return 2000
+    return _CATEGORY_PRECISION_M.get(category, 1000)
+
+
 @dataclass(frozen=True)
 class FiredEvent:
     """A catalog event that fired this tick: the tile mutation + an optional enemy to spawn."""
@@ -159,6 +210,7 @@ class EventEngine:
             sender=sender,
             supply_relevant=item.supply_relevant,
             at_game_s=round(now_s, 1),
+            precision_m=precision_for_event(item.category, item.event, item.threat_level),
         )
         mutation = TileMutation(
             threat_level=item.threat_level,

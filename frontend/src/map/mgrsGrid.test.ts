@@ -8,6 +8,7 @@ import {
   formatMgrs,
   gridLabels,
   gridLines,
+  precisionLabel,
   precisionToAccuracy,
   squareCornersFromCenter,
   squareLabel,
@@ -31,6 +32,14 @@ describe('precision table', () => {
     expect(precisionToAccuracy(1000)).toBe(2)
     expect(precisionToAccuracy(500)).toBe(3)
     expect(precisionToAccuracy(100)).toBe(3)
+  })
+})
+
+describe('precisionLabel', () => {
+  it('formats metres vs kilometres', () => {
+    expect(precisionLabel(100)).toBe('100 m')
+    expect(precisionLabel(1000)).toBe('1 km')
+    expect(precisionLabel(2000)).toBe('2 km')
   })
 })
 

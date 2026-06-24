@@ -73,6 +73,8 @@ export interface ChatterMessage {
   supply_relevant?: boolean
   detail?: string
   game_s?: number
+  /** Location detail (m) of the event — its MGRS is shown at this precision (unify). */
+  precision_m?: number
 }
 
 export type InstanceStatus =
@@ -563,6 +565,8 @@ export interface TileEvent {
   sender: string
   supply_relevant: boolean
   at_game_s: number
+  /** Location detail (m) derived from the event type — drives the displayed MGRS precision. */
+  precision_m?: number
 }
 
 export interface TileUpdate {

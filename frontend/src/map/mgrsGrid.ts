@@ -41,6 +41,11 @@ export function toMgrs(lat: number, lon: number, accuracy = 5): string {
   return mgrsForward([lon, lat], accuracy)
 }
 
+/** Human label for a location-detail precision in metres, e.g. 100 → "100 m", 2000 → "2 km". */
+export function precisionLabel(precisionM: number): string {
+  return precisionM >= 1000 ? `${precisionM / 1000} km` : `${precisionM} m`
+}
+
 /** Pretty-print an MGRS string: `32UQV0752455822` → `32U QV 07524 55822`. */
 export function formatMgrs(mgrs: string): string {
   const m = /^(\d{1,2}[C-X])([A-Z]{2})(\d*)$/.exec(mgrs)

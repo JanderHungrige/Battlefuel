@@ -112,28 +112,40 @@ describe('applyTileUpdate', () => {
 describe('tileEventChatter', () => {
   const hohenfelsCell = latLngToCell(49.2, 11.85, 8)
 
-  it('builds an expandable "<MGRS> — <headline>" line from a stamped event', () => {
-    const msg = tileEventChatter(
-      {
-        ...tileFrame,
-        h3_index: hohenfelsCell,
-        threat_level: 4,
-        last_event: {
-          headline: 'Hostile unit spotted / identified',
-          category: 'Threat Events',
-          sender: 'RECON 2-7',
-          supply_relevant: false,
-          at_game_s: 120,
-        },
-      },
-      7,
-    )
-    expect(msg).not.toBeNull()
+  const eventTile = (lastEvent: object) => ({
+    ...tileFrame,
+    h3_index: hohenfelsCell,
+    threat_level: 4,
+    last_event: {
+      headline: 'Hostile unit spotted / identified',
+      category: 'Threat Events',
+      sender: 'RECON 2-7',
+      supply_relevant: false,
+      at_game_s: 120,
+      ...lastEvent,
+    },
+  })
+
+  it('builds an expandable "<MGRS> — <headline>" line, MGRS at the event precision', () => {
+    const msg = tileEventChatter(eventTile({ precision_m: 2000 }), 7)
     expect(msg?.text).toBe('Hostile unit spotted / identified')
-    expect(msg?.mgrs).toMatch(/^32U [A-Z]{2} \d{5} \d{5}$/)
+    // 2 km location detail → 2-digit MGRS grid number.
+    expect(msg?.mgrs).toMatch(/^32U [A-Z]{2} \d{2} \d{2}$/)
     expect(msg?.category).toBe('Threat Events')
     expect(msg?.estimated_threat).toBe(4)
+    expect(msg?.precision_m).toBe(2000)
     expect(msg?.h3_index).toBe(hohenfelsCell)
+  })
+
+  it('shows a finer MGRS for a pinpoint (100 m) event', () => {
+    const msg = tileEventChatter(eventTile({ headline: 'IED / mine', precision_m: 100 }), 8)
+    expect(msg?.mgrs).toMatch(/^32U [A-Z]{2} \d{3} \d{3}$/) // 100 m → 3 digits
+  })
+
+  it('defaults to 1 km precision when the event carries none', () => {
+    const msg = tileEventChatter(eventTile({}), 9)
+    expect(msg?.mgrs).toMatch(/^32U [A-Z]{2} \d{2} \d{2}$/)
+    expect(msg?.precision_m).toBe(1000)
   })
 
   it('returns null when the tile carries no event (a revert/decay update)', () => {

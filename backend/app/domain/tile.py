@@ -80,6 +80,10 @@ class TileEvent(BaseModel):
     sender: str
     supply_relevant: bool
     at_game_s: float
+    # Location detail (metres) derived from the event type: how tightly the report is located —
+    # 100 m for a pinpoint mine, 1-2 km for a broad sighting. Drives the displayed MGRS precision.
+    # Defaulted so older persisted events (without it) still deserialize.
+    precision_m: int = 1000
 
 
 class Tile(BaseModel):
