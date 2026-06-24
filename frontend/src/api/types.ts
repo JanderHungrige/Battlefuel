@@ -41,6 +41,7 @@ export interface Tile {
   cover: 'none' | 'light' | 'heavy'
   situation?: SectorSituation | null
   note?: string | null
+  last_event?: TileEvent | null
   boundary: number[][] // ring of [lon, lat]
 }
 
@@ -65,6 +66,13 @@ export interface ChatterMessage {
   event_id?: string
   lat?: number
   lon?: number
+  /** Expandable detail (v2 Wave 4 F3): carried from the combat_event so a row can show full
+   * context (category, threat, supply relevance, generated detail, sim timestamp) on expand. */
+  category?: string
+  estimated_threat?: number
+  supply_relevant?: boolean
+  detail?: string
+  game_s?: number
 }
 
 export type InstanceStatus =
@@ -545,6 +553,18 @@ export interface StrategicMessage {
 }
 
 /** A live tile-change frame broadcast when a tile is mutated (Wave 4 dynamic-tile-updates). */
+/**
+ * The latest located catalog event stamped on a tile (unify-threat-chatter). Drives the unified
+ * chatter line, the MGRS-cell panel, and the map hover. Null once the event reverts/decays.
+ */
+export interface TileEvent {
+  headline: string
+  category: string
+  sender: string
+  supply_relevant: boolean
+  at_game_s: number
+}
+
 export interface TileUpdate {
   type: 'tile_update'
   h3_index: string
@@ -556,26 +576,14 @@ export interface TileUpdate {
   cover: Tile['cover']
   situation: SectorSituation | null
   note: string | null
+  last_event: TileEvent | null
 }
 
-/** Colour semantics for a located combat event (v2 Wave 3). */
-export type CombatEventZone = 'combat' | 'blocked' | 'threat'
-
-/**
- * A located, categorised, precision-tagged combat event (v2 Wave 3 located-event-model).
- * `precision_m` is the drawn MGRS-square side in metres; `zone` drives the colour
- * (combat → red, blocked → light-yellow, threat → graded by `estimated_threat`).
- */
-export interface CombatEvent {
-  type: 'combat_event'
+/** One normalized row of the combat-event CSV catalog (v2 Wave 4; GET /combat-events/catalog). */
+export interface CombatEventCatalogItem {
   id: string
   category: string
   event: string
-  lat: number
-  lon: number
-  precision_m: number
-  estimated_threat: number
-  sender: string
-  zone: CombatEventZone
-  game_s: number
+  threat_level: number
+  supply_relevant: boolean
 }

@@ -1,102 +1,78 @@
-"""Random real-time event engine (Wave 4, event-engine).
+"""Catalog-driven real-time event engine (v2 unify-threat-chatter).
 
-Each sim tick may fire a catalog event that mutates a random tile, flowing through the same
-``apply_tile_mutation`` + ``tile_update`` path as the scripted feed. Temporary events snapshot
-the tile's prior values and auto-revert after their duration; permanent ones persist. The RNG
-and clock are injected, so a seeded engine is fully deterministic under test.
+The single threat/chatter system. Each sim tick may fire one located event drawn from the
+``combat_zone_events.csv`` catalog: it mutates a frontline-weighted tile (threat + road), stamps
+the tile with the located event (``last_event``) — which drives the unified chatter, the MGRS-cell
+panel, and the map hover — and, for enemy-sighting events, spawns a hostile unit. Every fired event
+has a finite duration and then **reverts**: the tile's prior state is restored, ``last_event`` is
+cleared, and any spawned enemy unit is removed, so threats (and their enemy units) disappear. Light
+ambient threats also decay probabilistically. The RNG, clock, and catalog are injected, so a seeded
+engine is fully deterministic under test.
+
+This replaces the old generic ``EVENT_CATALOG`` of hard-coded tile mutations and the separate
+``combat_event`` feed (Channel B), which has been removed.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from random import Random
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.api.ws import ConnectionManager
+from app.domain.enemy_unit import EnemyUnit, enemy_unit_frame, enemy_unit_removed_frame
 from app.domain.frontline import threat_weight
-from app.domain.tile import IntelLevel, RoadCondition, Tile, TileMutation, Weather
+from app.domain.tile import RoadCondition, Tile, TileEvent, TileMutation
+from app.providers.combat_event_catalog import CombatEventCatalogItem
+from app.providers.enemy_units import (
+    is_enemy_sighting,
+    map_enemy_sighting,
+    register_dynamic_enemy_sighting,
+    remove_dynamic_enemy_sighting,
+)
 from app.providers.tiles import TileDataProvider
 from app.services.tile_mutation import apply_tile_mutation, tile_update_frame
 
-_GAME_MIN = 60.0  # game-seconds per game-minute
+# Radio sender per catalog category (the chatter's "from" line).
+_SENDER_BY_CATEGORY: dict[str, str] = {
+    "Intelligence & Information": "INTEL (J2 FUSION)",
+    "Threat Events": "RECON 2-7 (1-4 CAV)",
+    "Movement & Access": "ENGINEER NET (54th BEB)",
+    "Engagements & Fires": "FIRES (1-9 FA)",
+    "Adversary Activity": "DRONE FEED (RQ-7 SHADOW)",
+    "Refueling & Fuel": "JLSG FUEL CELL",
+    "Supply Chain & Rearming": "SUSTAINMENT (BSB SPO)",
+    "Logistics & Support": "SUSTAINMENT (BSB SPO)",
+}
+_DEFAULT_SENDER = "HQ (3 ID TOC)"
 
-Build = Callable[[Tile, Random], dict[str, object]]
+# Word-boundary mine/IED match (so "ident**ified**" doesn't trip it).
+_BLOCK_RE = re.compile(r"\b(ied|mine\w*)\b")
+
+
+_DAMAGE_KEYS = ("chokepoint", "bottleneck", "damaged", "degraded", "severed", "bridge")
+
+
+def road_for_event(event: str) -> RoadCondition | None:
+    """Road impact from the event text: mines/destruction block, damage degrades, else none."""
+    e = event.lower()
+    if _BLOCK_RE.search(e) or "destroyed" in e:
+        return RoadCondition.BLOCKED
+    if any(k in e for k in _DAMAGE_KEYS):
+        return RoadCondition.DAMAGED
+    return None
 
 
 @dataclass(frozen=True)
-class EventSpec:
-    """One event type: how it mutates a tile, which fields it touches, and how long it lasts."""
+class FiredEvent:
+    """A catalog event that fired this tick: the tile mutation + an optional enemy to spawn."""
 
-    name: str
-    duration_game_s: float  # 0 ⇒ permanent (no auto-revert)
-    touched: tuple[str, ...]
-    build: Build
-
-    def apply(self, tile: Tile, rng: Random) -> TileMutation:
-        return TileMutation(**self.build(tile, rng))
-
-    def revert(self, tile: Tile) -> TileMutation:
-        """A mutation restoring the touched fields to ``tile``'s current (pre-event) values."""
-        return TileMutation(**{f: getattr(tile, f) for f in self.touched})
-
-
-def _threat_spike(tile: Tile, rng: Random) -> dict[str, object]:
-    return {"threat_level": min(5, tile.threat_level + 2)}
-
-
-def _combat_area(tile: Tile, rng: Random) -> dict[str, object]:
-    return {"threat_level": 4}
-
-
-def _active_combat(tile: Tile, rng: Random) -> dict[str, object]:
-    return {"threat_level": 5, "road_condition": RoadCondition.DAMAGED}
-
-
-def _road_damage(tile: Tile, rng: Random) -> dict[str, object]:
-    return {"road_condition": RoadCondition.DAMAGED}
-
-
-def _road_blocked(tile: Tile, rng: Random) -> dict[str, object]:
-    return {"road_condition": RoadCondition.BLOCKED}
-
-
-def _weather_shift(tile: Tile, rng: Random) -> dict[str, object]:
-    return {"weather": rng.choice([Weather.FOG, Weather.RAIN, Weather.STORM])}
-
-
-def _intel_report(tile: Tile, rng: Random) -> dict[str, object]:
-    return {"intel_level": IntelLevel.HIGH}
-
-
-def _threat_clears(tile: Tile, rng: Random) -> dict[str, object]:
-    return {"threat_level": max(0, tile.threat_level - 1)}
-
-
-def _drone_activity(tile: Tile, rng: Random) -> dict[str, object]:
-    return {"threat_level": min(5, tile.threat_level + 1)}
-
-
-def _minefield(tile: Tile, rng: Random) -> dict[str, object]:
-    return {"road_condition": RoadCondition.BLOCKED}
-
-
-def _area_secured(tile: Tile, rng: Random) -> dict[str, object]:
-    return {"threat_level": 0}
-
-
-EVENT_CATALOG: tuple[EventSpec, ...] = (
-    EventSpec("threat_spike", 10 * _GAME_MIN, ("threat_level",), _threat_spike),
-    EventSpec("combat_area", 0.0, ("threat_level",), _combat_area),  # permanent until changed
-    EventSpec("active_combat", 10 * _GAME_MIN, ("threat_level", "road_condition"), _active_combat),
-    EventSpec("road_damage", 30 * _GAME_MIN, ("road_condition",), _road_damage),
-    EventSpec("road_blocked", 15 * _GAME_MIN, ("road_condition",), _road_blocked),
-    EventSpec("weather_shift", 20 * _GAME_MIN, ("weather",), _weather_shift),
-    EventSpec("intel_report", 0.0, ("intel_level",), _intel_report),
-    EventSpec("threat_clears", 0.0, ("threat_level",), _threat_clears),
-    EventSpec("drone_activity", 15 * _GAME_MIN, ("threat_level",), _drone_activity),
-    EventSpec("minefield", 0.0, ("road_condition",), _minefield),  # permanent until cleared
-    EventSpec("area_secured", 0.0, ("threat_level",), _area_secured),  # permanent until changed
-)
+    h3_index: str
+    mutation: TileMutation
+    enemy: EnemyUnit | None
 
 
 @dataclass
@@ -104,99 +80,154 @@ class _Revert:
     at_game_s: float
     h3_index: str
     mutation: TileMutation
+    enemy_id: str | None  # remove this enemy unit when the event reverts
 
 
 class EventEngine:
-    """Fires catalog events and schedules reverts. Decision logic is pure + injectable."""
+    """Fires catalog events, schedules reverts, decays light threats. Pure + injectable."""
 
     def __init__(
         self,
         rng: Random,
         *,
+        catalog: Sequence[CombatEventCatalogItem],
         mean_interval_game_s: float,
         enabled: bool,
+        revert_game_s: float = 3600.0,
         decay_interval_game_s: float = 600.0,
         decay_chance: float = 0.2,
         light_threat_max: int = 2,
     ) -> None:
         self._rng = rng
+        self._catalog = list(catalog)
         self._mean_interval = mean_interval_game_s
         self._enabled = enabled
+        self._revert_game_s = revert_game_s
         self._pending: list[_Revert] = []
         self._decay_interval = decay_interval_game_s
         self._decay_chance = decay_chance
         self._light_threat_max = light_threat_max
         self._next_decay_s = decay_interval_game_s  # first decay pass one interval in
 
-    def collect_due_reverts(self, now_s: float) -> list[tuple[str, TileMutation]]:
-        """Pop and return reverts whose time has come (pure list bookkeeping)."""
-        due = [(r.h3_index, r.mutation) for r in self._pending if r.at_game_s <= now_s]
+    def collect_due_reverts(self, now_s: float) -> list[tuple[str, TileMutation, str | None]]:
+        """Pop reverts whose time has come: (h3, restore-mutation, enemy-id-to-remove)."""
+        due = [(r.h3_index, r.mutation, r.enemy_id) for r in self._pending if r.at_game_s <= now_s]
         self._pending = [r for r in self._pending if r.at_game_s > now_s]
         return due
 
     def decay_due(self, tiles: Sequence[Tile], now_s: float) -> list[tuple[str, TileMutation]]:
         """When a decay interval elapses, step *some* light-threat tiles (1..max) down by one.
 
-        Decay is **probabilistic per tile** (``decay_chance``), not a synchronized purge: light
-        threats fade gradually and at any moment most persist, so the contested east stays visibly
-        threatened (replenished by ``maybe_fire``) while stale sightings clear over time. Heavier
-        threats (combat zones at 3+) never decay (v2 Wave 14).
+        Probabilistic per tile (``decay_chance``), not a synchronized purge: light threats fade
+        gradually while the contested east stays populated (replenished by ``maybe_fire``). Heavier
+        threats (3+) never decay here — they end via their event's revert. A tile decaying to 0 also
+        clears its ``last_event`` so the cell reads benign again (v2 Wave 14 + unify).
         """
         if not self._enabled or now_s < self._next_decay_s:
             return []
         self._next_decay_s = now_s + self._decay_interval
-        return [
-            (t.h3_index, TileMutation(threat_level=t.threat_level - 1))
-            for t in tiles
-            if 0 < t.threat_level <= self._light_threat_max
-            and self._rng.random() < self._decay_chance
-        ]
+        out: list[tuple[str, TileMutation]] = []
+        for t in tiles:
+            if not (0 < t.threat_level <= self._light_threat_max):
+                continue
+            if self._rng.random() < self._decay_chance:
+                stepped = t.threat_level - 1
+                out.append(
+                    (t.h3_index, TileMutation(threat_level=stepped, clear_last_event=stepped == 0))
+                )
+        return out
 
     def maybe_fire(
         self, tiles: Sequence[Tile], now_s: float, dt_game_s: float
-    ) -> tuple[str, TileMutation] | None:
-        """Roll for a new event; if it fires, schedule any revert and return (h3, mutation)."""
-        if not self._enabled or not tiles:
+    ) -> FiredEvent | None:
+        """Roll for a catalog event; if it fires, mutate a tile, stamp ``last_event``, schedule its
+        revert, and (for sightings) build the enemy unit to spawn."""
+        if not self._enabled or not tiles or not self._catalog:
             return None
         if self._rng.random() >= min(1.0, dt_game_s / self._mean_interval):
             return None
-        # Weight the spawn toward the frontline + the OPFOR east (v2 Wave 14): the event lands where
-        # the fighting is, not on a uniform-random tile across the whole theater.
+        # Weight the spawn toward the frontline + the OPFOR east (v2 Wave 14).
         pool = list(tiles)
         weights = [threat_weight(t.center_lat, t.center_lon) for t in pool]
         tile = self._rng.choices(pool, weights=weights, k=1)[0]
-        spec = self._rng.choice(list(EVENT_CATALOG))
-        if spec.duration_game_s > 0:
-            self._pending.append(
-                _Revert(now_s + spec.duration_game_s, tile.h3_index, spec.revert(tile))
+        item = self._rng.choice(self._catalog)
+
+        sender = _SENDER_BY_CATEGORY.get(item.category, _DEFAULT_SENDER)
+        last_event = TileEvent(
+            headline=item.event,
+            category=item.category,
+            sender=sender,
+            supply_relevant=item.supply_relevant,
+            at_game_s=round(now_s, 1),
+        )
+        mutation = TileMutation(
+            threat_level=item.threat_level,
+            road_condition=road_for_event(item.event),
+            last_event=last_event,
+        )
+        enemy: EnemyUnit | None = None
+        if is_enemy_sighting(item.category, item.event):
+            name, sidc, echelon = map_enemy_sighting(item.category, item.event)
+            enemy = EnemyUnit(
+                id=f"sight-{tile.h3_index}",
+                name=name,
+                sidc=sidc,
+                lat=tile.center_lat,
+                lon=tile.center_lon,
+                echelon=echelon,
             )
-        return (tile.h3_index, spec.apply(tile, self._rng))
+        # Schedule the revert: restore prior threat/road, clear the event, drop the enemy.
+        self._pending.append(
+            _Revert(
+                now_s + self._revert_game_s,
+                tile.h3_index,
+                TileMutation(
+                    threat_level=tile.threat_level,
+                    road_condition=tile.road_condition,
+                    clear_last_event=True,
+                ),
+                enemy.id if enemy is not None else None,
+            )
+        )
+        return FiredEvent(tile.h3_index, mutation, enemy)
 
     async def step(
         self,
-        session: object,
+        session: AsyncSession,
         tiles: TileDataProvider,
         manager: ConnectionManager,
         now_s: float,
         dt_game_s: float,
     ) -> int:
-        """Apply due reverts + any new event against the DB, broadcasting each. Returns count."""
+        """Apply due reverts + decay + any new event, broadcasting each. Returns the count."""
         applied = 0
-        for h3_index, mutation in self.collect_due_reverts(now_s):
-            tile = await apply_tile_mutation(session, tiles, h3_index, mutation)  # type: ignore[arg-type]
+        for h3_index, mutation, enemy_id in self.collect_due_reverts(now_s):
+            tile = await apply_tile_mutation(session, tiles, h3_index, mutation)
             if tile is not None:
                 await manager.broadcast(tile_update_frame(tile))
                 applied += 1
-        all_tiles = await tiles.list_tiles(session)  # type: ignore[arg-type]
+            if enemy_id is not None and remove_dynamic_enemy_sighting(enemy_id):
+                await manager.broadcast(enemy_unit_removed_frame(enemy_id))
+        all_tiles = await tiles.list_tiles(session)
         for h3_index, mutation in self.decay_due(all_tiles, now_s):
-            tile = await apply_tile_mutation(session, tiles, h3_index, mutation)  # type: ignore[arg-type]
+            tile = await apply_tile_mutation(session, tiles, h3_index, mutation)
             if tile is not None:
                 await manager.broadcast(tile_update_frame(tile))
                 applied += 1
         fired = self.maybe_fire(all_tiles, now_s, dt_game_s)
         if fired is not None:
-            tile = await apply_tile_mutation(session, tiles, fired[0], fired[1])  # type: ignore[arg-type]
+            tile = await apply_tile_mutation(session, tiles, fired.h3_index, fired.mutation)
             if tile is not None:
                 await manager.broadcast(tile_update_frame(tile))
                 applied += 1
+                if fired.enemy is not None:
+                    register_dynamic_enemy_sighting(
+                        fired.enemy.id,
+                        fired.enemy.name,
+                        fired.enemy.sidc,
+                        fired.enemy.lat,
+                        fired.enemy.lon,
+                        fired.enemy.echelon,
+                    )
+                    await manager.broadcast(enemy_unit_frame(fired.enemy))
         return applied

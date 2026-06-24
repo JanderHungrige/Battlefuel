@@ -12,6 +12,7 @@ import type {
   CreateRefuelOrderRequest,
   CreateRendezvousRequest,
   CreateWaypointMoveOrderRequest,
+  CombatEventCatalogItem,
   ConfirmLaunchResponse,
   FuelRunResponse,
   MoveRefuelOption,
@@ -116,6 +117,8 @@ export const api = {
   listMoveOrders: (): Promise<MoveOrder[]> => getJson<MoveOrder[]>('/move-orders'),
 
   // Operator ops (Wave 4).
+  getCombatEventCatalog: (): Promise<CombatEventCatalogItem[]> =>
+    getJson<CombatEventCatalogItem[]>('/combat-events/catalog'),
   listObstacles: (): Promise<Obstacle[]> => getJson<Obstacle[]>('/obstacles'),
   createObstacle: (lat: number, lon: number, kind = 'manual'): Promise<Obstacle> =>
     postJson<Obstacle>('/obstacles', { lat, lon, kind }),

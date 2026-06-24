@@ -6,6 +6,9 @@ H3 provides cell identity, neighbours, and boundary; see app.domain.tile.
 
 from __future__ import annotations
 
+from typing import Any
+
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -26,3 +29,6 @@ class TileRow(Base):
     cover: Mapped[str] = mapped_column(default="none")
     situation: Mapped[str | None] = mapped_column(default=None)  # Wave 4: operator sector status
     note: Mapped[str | None] = mapped_column(default=None)  # Wave 4: free-text sector note
+    # Latest located catalog event (v2 unify-threat-chatter): {headline, category, sender,
+    # supply_relevant, at_game_s} or NULL. Drives the unified chatter, MGRS-cell panel + hover.
+    last_event: Mapped[dict[str, Any] | None] = mapped_column(JSONB, default=None)

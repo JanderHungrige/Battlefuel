@@ -2,7 +2,7 @@
 // (v2 Wave 9, mgrs-cell-aggregation). No canvas/MapLibre — unit-testable. The single aggregation
 // rule; the backend /mgrs-cells endpoint mirrors it.
 
-import type { TerrainType, Tile } from '../api/types'
+import type { TerrainType, Tile, TileEvent } from '../api/types'
 
 type RoadCondition = Tile['road_condition'] // 'clear' | 'damaged' | 'blocked'
 type IntelLevel = Tile['intel_level'] // 'none' | 'low' | 'medium' | 'high'
@@ -33,9 +33,11 @@ export interface CellSituation {
   maxIntel: IntelLevel
   dominantTerrain: TerrainType
   terrainMix: Partial<Record<TerrainType, number>>
+  /** Most-recent located event among the cell's tiles (unify); drives the panel detail. */
+  event: TileEvent | null
 }
 
-type CellTile = Pick<Tile, 'threat_level' | 'road_condition' | 'intel_level' | 'terrain'>
+type CellTile = Pick<Tile, 'threat_level' | 'road_condition' | 'intel_level' | 'terrain' | 'last_event'>
 
 /** Aggregate the tiles in one MGRS cell. Worst-case for threat/road/intel; dominant for terrain. */
 export function aggregateCell(tiles: CellTile[]): CellSituation {
@@ -47,12 +49,14 @@ export function aggregateCell(tiles: CellTile[]): CellSituation {
       maxIntel: 'none',
       dominantTerrain: 'unknown',
       terrainMix: {},
+      event: null,
     }
   }
 
   let maxThreat = 0
   let worstRoadRank = 0
   let maxIntelRank = 0
+  let event: TileEvent | null = null
   const terrainMix: Partial<Record<TerrainType, number>> = {}
 
   for (const t of tiles) {
@@ -60,6 +64,9 @@ export function aggregateCell(tiles: CellTile[]): CellSituation {
     worstRoadRank = Math.max(worstRoadRank, ROAD_RANK[t.road_condition] ?? 0)
     maxIntelRank = Math.max(maxIntelRank, INTEL_RANK[t.intel_level] ?? 0)
     terrainMix[t.terrain] = (terrainMix[t.terrain] ?? 0) + 1
+    if (t.last_event && (!event || t.last_event.at_game_s > event.at_game_s)) {
+      event = t.last_event
+    }
   }
 
   // Dominant terrain: highest count, ties broken by TERRAIN_ORDER.
@@ -80,5 +87,6 @@ export function aggregateCell(tiles: CellTile[]): CellSituation {
     maxIntel: INTEL_BY_RANK[maxIntelRank],
     dominantTerrain,
     terrainMix,
+    event,
   }
 }

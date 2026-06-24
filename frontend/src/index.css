@@ -914,6 +914,21 @@ body {
   color: var(--accent);
 }
 
+/* Located-event detail in the MGRS-cell panel (unify-threat-chatter). */
+.inspect-event {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.inspect-event h3 {
+  margin: 0 0 4px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+}
+
 /* Move planning panel (left side, opposite the inspect panel). */
 .move-panel {
   position: absolute;
@@ -1245,6 +1260,115 @@ body {
   opacity: 0.7;
 }
 
+/* Expandable combat-event detail (v2 Wave 4 F3). */
+.chatter-row {
+  display: block;
+}
+
+.chatter-caret {
+  float: right;
+  margin-left: 6px;
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.chatter-detail {
+  margin: 0 0 4px;
+  padding: 5px 8px;
+  font-size: 11px;
+  background: #161b22;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 0 4px 4px;
+}
+
+.chatter-detail-row {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 2px;
+}
+
+.chatter-detail-row dt {
+  flex: 0 0 64px;
+  color: var(--muted);
+}
+
+.chatter-detail-row dd {
+  flex: 1;
+  margin: 0;
+}
+
+/* Ask-advisor action on a supply-relevant line (v2 Wave 4 F5). */
+.chatter-advisor-btn {
+  margin-top: 4px;
+  padding: 3px 8px;
+  font-size: 11px;
+  color: #0e1116;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.chatter-advisor-btn:hover {
+  filter: brightness(1.08);
+}
+
+/* Chatter + map-square filter controls (v2 Wave 4 F4). Compact strip under the chatter title. */
+.chatter-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 0 0 6px;
+  padding: 5px 6px;
+  background: #161b22;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.cf-modes {
+  display: flex;
+  gap: 3px;
+}
+
+.cf-mode {
+  flex: 1;
+  padding: 3px 4px;
+  font-size: 11px;
+  color: var(--text);
+  background: #1c222b;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.cf-mode.active {
+  color: #0e1116;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.cf-threshold {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.cf-threshold input[type='range'] {
+  flex: 1;
+}
+
+.cf-hover {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
 /* Obstacle type picker (left side, under the planning area). */
 .obstacle-picker {
   position: absolute;
@@ -1282,6 +1406,55 @@ body {
 .kind-btn.active {
   border-color: #ff3030;
   color: #ff9a9a;
+}
+
+/* Searchable obstacle catalog picker (v2 Wave 4 F7). */
+.obstacle-catalog {
+  width: 260px;
+}
+
+.obstacle-search {
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--text);
+  background: #1c222b;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.obstacle-catalog-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.catalog-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  text-align: left;
+  padding: 4px 8px;
+  background: #1c222b;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.catalog-item.active {
+  border-color: #ff3030;
+  color: #ff9a9a;
+}
+
+.catalog-event {
+  font-size: 12px;
+}
+
+.catalog-meta {
+  font-size: 10px;
+  color: var(--muted);
 }
 
 .tile-edit-note {

@@ -1,4 +1,5 @@
 import { act, renderHook } from '@testing-library/react'
+import { latLngToCell } from 'h3-js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useSimSocket } from './useSimSocket'
 
@@ -77,58 +78,65 @@ describe('useSimSocket', () => {
     expect(result.current.positions).toEqual({})
   })
 
-  it('logs a chatter line for each tile_update, carrying its h3_index', () => {
+  it('logs an expandable chatter line only when a tile_update carries a located event', () => {
     vi.stubGlobal('WebSocket', FakeWebSocket as unknown as typeof WebSocket)
     const { result } = renderHook(() => useSimSocket())
     const ws = FakeWebSocket.last
-    const frame = (h3: string, threat: number): string =>
+    const cell = latLngToCell(49.2, 11.85, 8)
+    const frame = (lastEvent: object | null): string =>
       JSON.stringify({
         type: 'tile_update',
-        h3_index: h3,
+        h3_index: cell,
         terrain: 'forest',
-        threat_level: threat,
+        threat_level: 4,
         road_condition: 'clear',
         intel_level: 'low',
         weather: 'clear',
         cover: 'none',
         situation: null,
         note: null,
+        last_event: lastEvent,
       })
-    act(() => ws?.onmessage?.({ data: frame('cell-hi', 4) }))
-    expect(result.current.chatter).toHaveLength(1)
-    expect(result.current.chatter[0].h3_index).toBe('cell-hi')
-    expect(result.current.chatter[0].text).toContain('threat 4/5')
+    // A revert/decay update (no event) updates the map but logs nothing.
+    act(() => ws?.onmessage?.({ data: frame(null) }))
+    expect(result.current.tileUpdates[cell].threat_level).toBe(4)
+    expect(result.current.chatter).toHaveLength(0)
+    // A stamped event becomes a "<MGRS> — <headline>" line carrying the sector + sender.
+    act(() =>
+      ws?.onmessage?.({
+        data: frame({
+          headline: 'IED / mine detected or detonated',
+          category: 'Threat Events',
+          sender: 'EOD 4-1',
+          supply_relevant: false,
+          at_game_s: 20,
+        }),
+      }),
+    )
+    const line = result.current.chatter.at(-1)
+    expect(line?.h3_index).toBe(cell)
+    expect(line?.sender).toBe('EOD 4-1')
+    expect(line?.mgrs).toMatch(/^32U /)
+    expect(line?.text).toBe('IED / mine detected or detonated')
   })
 
-  it('routes a combat_event into combatEvents and a MGRS-tagged chatter line', () => {
+  it('adds and removes chatter-driven enemy sightings', () => {
     vi.stubGlobal('WebSocket', FakeWebSocket as unknown as typeof WebSocket)
     const { result } = renderHook(() => useSimSocket())
     const ws = FakeWebSocket.last
-    const combat = JSON.stringify({
-      type: 'combat_event',
-      id: 'ied-msr-7',
-      category: 'Threat Events',
-      event: 'IED / mine detected or detonated',
-      lat: 49.215,
-      lon: 11.835,
-      precision_m: 100,
-      estimated_threat: 4,
-      sender: 'EOD 4-1 (52nd EOD)',
-      zone: 'blocked',
-      game_s: 20,
+    const enemy = JSON.stringify({
+      type: 'enemy_unit',
+      id: 'sight-1',
+      name: 'OPFOR',
+      sidc: '10061000131606000000',
+      lat: 49.24,
+      lon: 11.85,
+      echelon: 'section',
     })
-    act(() => ws?.onmessage?.({ data: combat }))
-    expect(result.current.combatEvents['ied-msr-7'].zone).toBe('blocked')
-    const line = result.current.chatter.at(-1)
-    expect(line?.event_id).toBe('ied-msr-7')
-    expect(line?.sender).toBe('EOD 4-1 (52nd EOD)')
-    expect(line?.mgrs).toMatch(/^32U /)
-    expect(line?.text).toContain('IED')
-
-    // The on-connect snapshot + timed feed can send the same event twice — only one chatter line.
-    act(() => ws?.onmessage?.({ data: combat }))
-    expect(result.current.chatter.filter((m) => m.event_id === 'ied-msr-7')).toHaveLength(1)
-    expect(result.current.combatEvents['ied-msr-7'].zone).toBe('blocked')
+    act(() => ws?.onmessage?.({ data: enemy }))
+    expect(result.current.enemySightings['sight-1'].lat).toBe(49.24)
+    act(() => ws?.onmessage?.({ data: JSON.stringify({ type: 'enemy_unit_removed', id: 'sight-1' }) }))
+    expect(result.current.enemySightings['sight-1']).toBeUndefined()
   })
 
   it('pushChatter adds an order line', () => {
