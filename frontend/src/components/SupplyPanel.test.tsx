@@ -209,7 +209,7 @@ describe('SupplyPanel', () => {
     )
     expect(screen.getByTestId('depot-site-tag')).toHaveTextContent('BSA')
     fireEvent.click(screen.getByTestId('depot-locate-site-bsa'))
-    expect(onLocate).toHaveBeenCalledWith(49.2, 11.8)
+    expect(onLocate).toHaveBeenCalledWith(49.2, 11.8, 'depot', 'site-bsa')
   })
 
   it('locates a fuel truck from the Supply fleet tab (W11)', () => {
@@ -218,7 +218,7 @@ describe('SupplyPanel', () => {
     fireEvent.click(screen.getByTestId('supply-tab-fleet'))
     // baseProps TANKER is at (49.2, 11.83).
     fireEvent.click(screen.getByTestId('truck-locate-inst-fuel-1'))
-    expect(onLocate).toHaveBeenCalledWith(49.2, 11.83)
+    expect(onLocate).toHaveBeenCalledWith(49.2, 11.83, 'truck', 'inst-fuel-1')
   })
 
   it('offers a refuel proposal for a low site only (W11 F5)', () => {
