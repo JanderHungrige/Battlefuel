@@ -66,6 +66,26 @@ class SectorSituation(StrEnum):
     MEDEVAC = "medevac"
 
 
+class TileEvent(BaseModel):
+    """The most recent catalog event that set a tile's state (v2 unify-threat-chatter).
+
+    Persisted on the tile (JSONB) so the unified chatter, the MGRS-cell panel, and the map hover
+    can show the located event's detail — and so it survives a page reload.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    headline: str
+    category: str
+    sender: str
+    supply_relevant: bool
+    at_game_s: float
+    # Location detail (metres) derived from the event type: how tightly the report is located —
+    # 100 m for a pinpoint mine, 1-2 km for a broad sighting. Drives the displayed MGRS precision.
+    # Defaulted so older persisted events (without it) still deserialize.
+    precision_m: int = 1000
+
+
 class Tile(BaseModel):
     """A single hex tile with its game attributes (API representation)."""
 
@@ -83,6 +103,7 @@ class Tile(BaseModel):
     cover: Cover
     situation: SectorSituation | None = None
     note: str | None = None
+    last_event: TileEvent | None = None
     # Hex boundary as a closed ring of [lon, lat] pairs (GeoJSON order), derived from H3.
     boundary: list[list[float]]
 
@@ -107,10 +128,15 @@ class TileMutation(BaseModel):
     cover: Cover | None = None
     situation: SectorSituation | None = None
     note: str | None = Field(default=None, max_length=280)
+    # The located event that caused this mutation (v2 unify): set it, or clear_last_event to wipe it
+    # on revert. Handled out-of-band in update_tile (JSONB), not via the scalar changes() loop.
+    last_event: TileEvent | None = None
+    clear_last_event: bool = False
 
     def changes(self) -> dict[str, object]:
-        """Column → stored value for the set fields (enums stored as their string value)."""
+        """Column → stored value for the set scalar fields (enums stored as their string value)."""
         out: dict[str, object] = {}
-        for field, value in self.model_dump(exclude_none=True).items():
+        dumped = self.model_dump(exclude_none=True, exclude={"last_event", "clear_last_event"})
+        for field, value in dumped.items():
             out[field] = value.value if isinstance(value, StrEnum) else value
         return out

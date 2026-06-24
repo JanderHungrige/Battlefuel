@@ -1,9 +1,11 @@
 // Pure helpers for the sim WebSocket: parse and reduce frames. Kept free of the
 // WebSocket API so they are deterministically unit-testable.
 
+import { cellToLatLng } from 'h3-js'
 import type {
   BuyOrderUpdate,
-  CombatEvent,
+  ChatterMessage,
+  EnemyUnit,
   RefuelOrderUpdate,
   RendezvousReminder,
   StrategicMessage,
@@ -11,7 +13,7 @@ import type {
   UnitUpdate,
 } from '../api/types'
 import { natoStageLabel } from '../lib/natoStage'
-import { formatMgrs, toMgrs } from '../map/mgrsGrid'
+import { formatMgrs, precisionToAccuracy, toMgrs } from '../map/mgrsGrid'
 
 function parse(raw: string): Record<string, unknown> | null {
   try {
@@ -49,12 +51,37 @@ export function applyTileUpdate(
   return { ...state, [update.h3_index]: update }
 }
 
-/** A short human-readable summary of a tile_update, for the chatter log. */
-export function describeTileUpdate(u: TileUpdate): string {
-  const parts = [`threat ${u.threat_level}/5`, `road ${u.road_condition}`]
-  if (u.situation) parts.push(u.situation.replace(/_/g, ' '))
-  if (u.note) parts.push(`“${u.note}”`)
-  return parts.join(' · ')
+/**
+ * The MGRS "grid number" for a tile's cell centre, shown at `precisionM` location detail — e.g. a
+ * pinpoint mine (100 m) reads `32U QV 074 558`, a broad sighting (2 km) reads `32U QV 07 55`.
+ */
+export function tileMgrs(h3Index: string, precisionM = 1000): string {
+  const [lat, lon] = cellToLatLng(h3Index)
+  return formatMgrs(toMgrs(lat, lon, precisionToAccuracy(precisionM)))
+}
+
+/**
+ * Build a unified chatter line from a tile_update's stamped located event ("<MGRS> — <headline>",
+ * expandable), or null when the tile carries none (a revert/decay just updates the map silently).
+ * The MGRS is shown at the event's type-derived location detail (`precision_m`).
+ */
+export function tileEventChatter(u: TileUpdate, id: number): ChatterMessage | null {
+  if (!u.last_event) return null
+  const e = u.last_event
+  const precision = e.precision_m ?? 1000
+  return {
+    id,
+    kind: 'status',
+    text: e.headline,
+    mgrs: tileMgrs(u.h3_index, precision),
+    sender: e.sender,
+    category: e.category,
+    estimated_threat: u.threat_level,
+    supply_relevant: e.supply_relevant,
+    h3_index: u.h3_index,
+    game_s: e.at_game_s,
+    precision_m: precision,
+  }
 }
 
 /** Parse a raw WS frame into a BuyOrderUpdate, or null if it is not a valid buy_order_update. */
@@ -75,32 +102,48 @@ export function parseRefuelOrderUpdate(raw: string): RefuelOrderUpdate | null {
   return null
 }
 
-/** Parse a raw WS frame into a CombatEvent, or null if it is not a valid combat_event. */
-export function parseCombatEvent(raw: string): CombatEvent | null {
+/** Parse a raw WS frame into an EnemyUnit sighting, or null if not valid (unify-threat-chatter). */
+export function parseEnemyUnit(raw: string): EnemyUnit | null {
   const msg = parse(raw)
   if (
     msg &&
-    msg.type === 'combat_event' &&
+    msg.type === 'enemy_unit' &&
     typeof msg.id === 'string' &&
+    typeof msg.sidc === 'string' &&
     typeof msg.lat === 'number' &&
     typeof msg.lon === 'number'
   ) {
-    return msg as unknown as CombatEvent
+    return msg as unknown as EnemyUnit
   }
   return null
 }
 
-/** Formatted MGRS coordinate (to 1 m) for a combat event's location — the chatter tag. */
-export function combatEventMgrs(ev: CombatEvent): string {
-  return formatMgrs(toMgrs(ev.lat, ev.lon))
+/** Parse an `enemy_unit_removed` frame → the removed sighting id, or null (its threat reverted). */
+export function parseEnemyUnitRemoved(raw: string): string | null {
+  const msg = parse(raw)
+  if (msg && msg.type === 'enemy_unit_removed' && typeof msg.id === 'string') {
+    return msg.id
+  }
+  return null
 }
 
-/** Latest combat-event frame per id wins. Returns a new map (never mutates the input). */
-export function applyCombatEvent(
-  state: Record<string, CombatEvent>,
-  event: CombatEvent,
-): Record<string, CombatEvent> {
-  return { ...state, [event.id]: event }
+/** Latest enemy-unit sighting per id wins (dedup/update a contact). Returns a new map. */
+export function applyEnemyUnit(
+  state: Record<string, EnemyUnit>,
+  unit: EnemyUnit,
+): Record<string, EnemyUnit> {
+  return { ...state, [unit.id]: unit }
+}
+
+/** Drop an enemy sighting by id (its threat event reverted/decayed). Returns a new map. */
+export function removeEnemyUnit(
+  state: Record<string, EnemyUnit>,
+  id: string,
+): Record<string, EnemyUnit> {
+  if (!(id in state)) return state
+  const next = { ...state }
+  delete next[id]
+  return next
 }
 
 /** Parse a raw WS frame into a StrategicMessage, or null if not a valid strategic_message. */

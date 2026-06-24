@@ -42,4 +42,5 @@ def tile_update_frame(tile: Tile) -> dict[str, object]:
         "cover": tile.cover.value,
         "situation": tile.situation.value if tile.situation else None,
         "note": tile.note,
+        "last_event": tile.last_event.model_dump() if tile.last_event else None,
     }

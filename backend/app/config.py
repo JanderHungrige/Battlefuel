@@ -38,14 +38,17 @@ class Settings(BaseSettings):
     # Provider the factory builds for move orders (Wave 3 ships "db").
     move_order_provider: str = "db"
 
-    # Scripted "incoming sector info" tile feed (Wave 4): "scripted" or "none".
-    tile_feed_provider: str = "scripted"
+    # Scripted "incoming sector info" tile feed: superseded by the catalog EventEngine
+    # (unify-threat-chatter), so disabled by default. "scripted" or "none".
+    tile_feed_provider: str = "none"
 
     # Scripted OF-8 strategic-support message feed (Wave 5): "scripted" or "none".
     strategic_feed_provider: str = "scripted"
 
-    # Scripted located-combat-event feed (v2 Wave 3): "scripted" or "none".
-    combat_event_feed_provider: str = "scripted"
+    # Combat-event CSV catalog: the single source the EventEngine fires from, and the F7 obstacle
+    # picker reads. "csv_catalog" or "none".
+    combat_event_catalog_provider: str = "csv_catalog"
+    combat_event_catalog_path: str = "data/combat_zone_events.csv"
 
     # Enemy-unit provider (v2 Wave 3): "seed" (Hohenfels stub) or "none".
     enemy_unit_provider: str = "seed"
@@ -74,10 +77,12 @@ class Settings(BaseSettings):
     # Default fuel-procurement lead time in game-seconds (overridable per buy order).
     buy_order_lead_time_game_s: float = 600.0
 
-    # Random event engine (Wave 4): master toggle + mean interval between events in game-seconds.
-    # Tempo slowed in v2 Wave 14 (was 120) so new threats appear more gradually.
+    # Catalog event engine (unify-threat-chatter): master toggle + mean interval between located
+    # events. 900 game-s ≈ 15 real-s at sim_time_scale=60. Each event reverts (threat/road restored,
+    # last_event cleared, enemy removed) after event_revert_game_s, so threats disappear over time.
     game_mode: bool = True
-    event_mean_interval_game_s: float = 240.0
+    event_mean_interval_game_s: float = 900.0
+    event_revert_game_s: float = 3600.0
 
     # Light-threat decay (v2 Wave 14): each decay interval (game-seconds), every tile at threat
     # 1..light_threat_max has threat_decay_chance of dropping one level — a gradual, probabilistic

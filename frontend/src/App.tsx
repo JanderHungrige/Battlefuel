@@ -1,16 +1,28 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { latLngToCell } from 'h3-js'
 import { api } from './api/client'
 import { errorMessage } from './api/errors'
-import type { Recommendation, TileMutationRequest } from './api/types'
+import type { ChatterMessage, Recommendation, TileMutationRequest } from './api/types'
 import { AdvisorPanel } from './components/AdvisorPanel'
 import { ChatterLog } from './components/ChatterLog'
+import { ChatterFilterControls } from './components/ChatterFilterControls'
+import {
+  DEFAULT_CHATTER_FILTERS,
+  filterChatter,
+  type ChatterFilters,
+} from './lib/chatterFilter'
+import { supplyAdviceKind } from './lib/supplyAdvisorAction'
 import { GridLayoutControl } from './components/GridLayoutControl'
 import { HaltBanner } from './components/HaltBanner'
 import { InspectPanel, type InspectCell } from './components/InspectPanel'
 import { MoveRoutesPanel } from './components/MoveRoutesPanel'
 import { firstHaltedUnit } from './lib/halt'
-import { ObstacleKindPicker } from './components/ObstacleKindPicker'
-import type { ObstacleKind } from './components/obstacleKinds'
+import { ObstacleCatalogPicker } from './components/ObstacleCatalogPicker'
+import {
+  DEFAULT_OBSTACLE_TEMPLATE,
+  type ObstacleTemplate,
+} from './lib/obstacleCatalog'
+import { useCombatEventCatalog } from './hooks/useCombatEventCatalog'
 import { RoleToggle } from './components/RoleToggle'
 import { InfoDocsPanel } from './components/InfoDocsPanel'
 import { FuelRunPanel } from './components/FuelRunPanel'
@@ -57,7 +69,6 @@ export default function App() {
   const [selectedCell, setSelectedCell] = useState<{ lat: number; lon: number } | null>(null)
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null)
   const [highlightH3, setHighlightH3] = useState<string | null>(null)
-  const [highlightEventId, setHighlightEventId] = useState<string | null>(null)
 
   // Map grid: MGRS only (v2 Wave 9 — hex retired). Drawn precision is persisted.
   const [gridPrecisionM, setGridPrecisionM] = useState<number>(() => {
@@ -71,7 +82,7 @@ export default function App() {
   const {
     positions: live,
     tileUpdates,
-    combatEvents,
+    enemySightings,
     chatter,
     strategic,
     pushChatter,
@@ -82,14 +93,38 @@ export default function App() {
   // Operator ops: obstacles + tile edits + the obstacle-placement mode and chosen kind.
   const { obstacles, placeObstacle, removeObstacle, mutateTile } = useObstacleOps()
   const [obstacleMode, setObstacleMode] = useState(false)
-  const [obstacleKind, setObstacleKind] = useState<ObstacleKind>('minefield')
+  // Obstacle template chosen from the searchable combat-event catalog (v2 Wave 4 F7).
+  const [obstacleTemplate, setObstacleTemplate] = useState<ObstacleTemplate>(
+    DEFAULT_OBSTACLE_TEMPLATE,
+  )
+  const catalogItems = useCombatEventCatalog(obstacleMode)
   const [depotMode, setDepotMode] = useState(false)
   // Site type for the next placed depot ('' = plain depot/marker); v2 Wave 11 F5.
   const [depotSiteType, setDepotSiteType] = useState('')
-  // Depot the operator asked to locate on the map (v2 Wave 11 F5).
-  const [locatePoint, setLocatePoint] = useState<{ lat: number; lon: number } | null>(null)
+  // Supply entity the operator asked to locate on the map (v2 Wave 11 F5). Carries the entity id +
+  // kind so the purple halo can fade with the entity (OF-8 per-tab dimming) and clear on delete.
+  const [located, setLocated] = useState<
+    { lat: number; lon: number; kind: 'depot' | 'truck'; id: string } | null
+  >(null)
   // OF-8 on-map per-unit fuel bars (v2 Wave 11 F7); on by default.
   const [infoBarsOn, setInfoBarsOn] = useState(true)
+
+  // Unified chatter filter (Wave 4 F4): mode + threat threshold (default ≥3).
+  const [chatterFilters, setChatterFilters] = useState<ChatterFilters>(DEFAULT_CHATTER_FILTERS)
+  const filteredChatter = useMemo(
+    () => filterChatter(chatter, chatterFilters),
+    [chatter, chatterFilters],
+  )
+  // Map-cell hover detail toggle (unify F6): off (default) → grid number only.
+  const [hoverDetails, setHoverDetails] = useState(false)
+  // Seed hostile force merged with live chatter-driven sightings (v2 Wave 4 F6); dedup by id,
+  // a dynamic sighting wins over a seed unit with the same id.
+  const allEnemyUnits = useMemo(() => {
+    const byId: Record<string, (typeof enemyUnits)[number]> = {}
+    for (const e of enemyUnits) byId[e.id] = e
+    for (const e of Object.values(enemySightings)) byId[e.id] = e
+    return Object.values(byId)
+  }, [enemyUnits, enemySightings])
 
   // Tiles merged with their latest live tile_update (threat/road/situation/etc.).
   const displayedTiles = useMemo(() => {
@@ -128,6 +163,18 @@ export default function App() {
       for (const h3 of h3Indexes) mutateTile(h3, mutation)
     },
     [mutateTile],
+  )
+
+  // Place an obstacle from the selected catalog template (v2 Wave 4 F7): drop the obstacle, then
+  // apply the template's tile defaults (situation/threat/road) to the containing H3 cell — the
+  // tile_update WS echo refreshes the map. Operator can still edit the cell afterwards.
+  const placeObstacleFromTemplate = useCallback(
+    (lat: number, lon: number) => {
+      placeObstacle(lat, lon, obstacleTemplate.kind)
+      const res = tiles[0]?.resolution
+      if (res !== undefined) mutateTile(latLngToCell(lat, lon, res), obstacleTemplate.mutation)
+    },
+    [placeObstacle, mutateTile, obstacleTemplate, tiles],
   )
   const selectedUnit = useMemo(
     () => units.find((u) => u.id === selectedUnitId),
@@ -196,8 +243,7 @@ export default function App() {
     setSelectedCell(null)
     setSelectedUnitId(null)
     setHighlightH3(null)
-    setHighlightEventId(null)
-    setLocatePoint(null)
+    setLocated(null)
     planning.resetPlanning()
     planRdv.cancel()
     rdvArchive.clearSelection()
@@ -212,7 +258,6 @@ export default function App() {
         const u = units[0]
         if (!u) return
         setSelectedCell(null)
-        setHighlightEventId(null)
         planning.resetPlanning()
         setSelectedUnitId(u.id)
       },
@@ -231,24 +276,27 @@ export default function App() {
       if (!window.confirm('Remove this depot / logistic site?')) return
       api
         .deleteDepot(depotId)
-        .then(() => supply.refetch())
+        .then(() => {
+          // Deleting the located depot must clear its purple halo (fix 99).
+          setLocated((cur) => (cur && cur.id === depotId ? null : cur))
+          supply.refetch()
+        })
         .catch((e) => pushChatter(`Could not remove depot: ${errorMessage(e)}`, 'status'))
     },
     [supply, pushChatter],
   )
 
-  // Click a tagged combat chatter line: focus its MGRS square (clearing any other selection), and
-  // clicking the same line again toggles the highlight off. Clearing also happens via `clear`
-  // (map-background click or closing any inspect panel).
-  const locateEvent = useCallback(
-    (id: string) => {
-      setSelectedCell(null)
-      setSelectedUnitId(null)
-      setHighlightH3(null)
-      planning.resetPlanning()
-      setHighlightEventId((prev) => (prev === id ? null : id))
+
+  // Ask the advisor about a supply-relevant chatter event (v2 Wave 4 F5): map the event's
+  // category to the right advisor kind, open the panel + request it (advisory only — never
+  // auto-places an order; the operator still applies a recommendation manually).
+  const askAdvisorForEvent = useCallback(
+    (m: ChatterMessage) => {
+      const kind = supplyAdviceKind(m.category ?? '')
+      advisor.ask(kind)
+      pushChatter(`Advisor: requested ${kind} re "${m.text}"`, 'status')
     },
-    [planning],
+    [advisor, pushChatter],
   )
 
   // A halted unit (v2 Wave 10 F1/F4): offer "Proceed slowly" or "Re-route".
@@ -281,7 +329,6 @@ export default function App() {
   const rerouteHalted = useCallback(() => {
     if (!halted) return
     setSelectedCell(null)
-    setHighlightEventId(null)
     planning.resetPlanning()
     setSelectedUnitId(halted.instanceId)
   }, [halted, planning])
@@ -303,6 +350,12 @@ export default function App() {
     () => (isOf8 ? dimmedUnitIds(supplyTab, units.map((u) => u.id), truckIds) : []),
     [isOf8, supplyTab, units, truckIds],
   )
+  // Whether the located entity's halo should fade — it is dimmed when its depot/truck is greyed
+  // out on the active OF-8 tab (depot → supply-fleet tab; truck → whenever it's in dimmedUnits).
+  const locateDimmed = useMemo(() => {
+    if (!located || !isOf8) return false
+    return located.kind === 'depot' ? dimDepots(supplyTab) : dimmedUnits.includes(located.id)
+  }, [located, isOf8, supplyTab, dimmedUnits])
   // Rendezvous preview precedence: an active plan flow → a clicked archive order → an added refuel stop.
   const rdvRoutes =
     planRdv.phase !== 'idle'
@@ -338,9 +391,12 @@ export default function App() {
   // Locate a supply point on the map (v2 Wave 11 F5). Pulse the id so MapView re-eases each click.
   // Mark + locate any supply entity (depot, fuel truck, …) on the map. A fresh object each call
   // so re-clicking the same point still re-eases (v2 Wave 11).
-  const locate = useCallback((lat: number, lon: number) => {
-    setLocatePoint({ lat, lon })
-  }, [])
+  const locate = useCallback(
+    (lat: number, lon: number, kind: 'depot' | 'truck', id: string) => {
+      setLocated({ lat, lon, kind, id })
+    },
+    [],
+  )
 
   // Ask the Wave-6 redistribution advisor to propose a refuel for a low site (v2 Wave 11 F5).
   const proposeSiteRefuel = useCallback(
@@ -478,11 +534,11 @@ export default function App() {
               obstacleMode={obstacleActive}
               depotMode={depotMode && canShow(role, 'depotOverlay')}
               onPlaceDepot={placeDepot}
-              combatEvents={Object.values(combatEvents)}
-              highlightEventId={highlightEventId}
-              enemyUnits={enemyUnits}
+              hoverDetails={hoverDetails}
+              enemyUnits={allEnemyUnits}
               depots={canShow(role, 'depotOverlay') ? (supply.overview?.depots ?? []) : []}
-              locatePoint={locatePoint}
+              locatePoint={located}
+              locateDimmed={locateDimmed}
               fuelRunOptions={fuelRun.options}
               fuelRunMetric={fuelRun.metric}
               showUnitFuelBars={canShow(role, 'depotOverlay') && infoBarsOn}
@@ -493,17 +549,15 @@ export default function App() {
               selectedUnitId={selectedUnitId}
               selectedCell={selectedCell}
               gridPrecisionM={gridPrecisionM}
-              onPlaceObstacle={(lat, lon) => placeObstacle(lat, lon, obstacleKind)}
+              onPlaceObstacle={placeObstacleFromTemplate}
               onRemoveObstacle={removeObstacle}
               onSelectCell={(lat, lon) => {
                 setSelectedUnitId(null)
-                setHighlightEventId(null)
                 planning.resetPlanning()
                 setSelectedCell({ lat, lon })
               }}
               onSelectUnit={(id) => {
                 setSelectedCell(null)
-                setHighlightEventId(null)
                 planning.resetPlanning()
                 setSelectedUnitId(id)
                 // OF-8: clicking a refuelable unit starts a routed fuel run — find the nearest
@@ -538,7 +592,18 @@ export default function App() {
               }
               onClearSelection={clear}
             />
-            <ChatterLog messages={chatter} onSelect={setHighlightH3} onSelectEvent={locateEvent} />
+            <ChatterLog
+              messages={filteredChatter}
+              onSelect={setHighlightH3}
+              onAskAdvisor={canShow(role, 'advisor') ? askAdvisorForEvent : undefined}
+            >
+              <ChatterFilterControls
+                value={chatterFilters}
+                onChange={setChatterFilters}
+                hoverDetails={hoverDetails}
+                onHoverDetailsChange={setHoverDetails}
+              />
+            </ChatterLog>
             {canShow(role, 'strategicFeed') && strategicOpen && (
               <ChatterLog
                 messages={strategic}
@@ -624,7 +689,11 @@ export default function App() {
               />
             )}
             {obstacleActive && (
-              <ObstacleKindPicker selected={obstacleKind} onSelect={setObstacleKind} />
+              <ObstacleCatalogPicker
+                items={catalogItems}
+                selectedId={obstacleTemplate.id}
+                onSelect={setObstacleTemplate}
+              />
             )}
             {canShow(role, 'moveRoutes') && selectedUnit && (
               <MoveRoutesPanel

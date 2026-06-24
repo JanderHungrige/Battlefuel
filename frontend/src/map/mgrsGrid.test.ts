@@ -8,6 +8,7 @@ import {
   formatMgrs,
   gridLabels,
   gridLines,
+  precisionLabel,
   precisionToAccuracy,
   squareCornersFromCenter,
   squareLabel,
@@ -31,6 +32,14 @@ describe('precision table', () => {
     expect(precisionToAccuracy(1000)).toBe(2)
     expect(precisionToAccuracy(500)).toBe(3)
     expect(precisionToAccuracy(100)).toBe(3)
+  })
+})
+
+describe('precisionLabel', () => {
+  it('formats metres vs kilometres', () => {
+    expect(precisionLabel(100)).toBe('100 m')
+    expect(precisionLabel(1000)).toBe('1 km')
+    expect(precisionLabel(2000)).toBe('2 km')
   })
 })
 
@@ -162,10 +171,15 @@ describe('cellIdFor', () => {
 })
 
 describe('cellMgrsLabel', () => {
-  it('returns one formatted MGRS string shared by all points in the cell', () => {
+  it('returns the MGRS grid reference at the precision, shared by all points in the cell', () => {
     const a = cellMgrsLabel(49.215, 11.835, 1000)
     const b = cellMgrsLabel(49.2156, 11.8356, 1000) // same 1km cell (small nudge)
-    expect(a).toMatch(/^32U [A-Z]{2} /)
+    // Grid number (32U QV 07 55), not a full 1 m coordinate.
+    expect(a).toMatch(/^32U [A-Z]{2} \d{2} \d{2}$/)
     expect(b).toBe(a)
+  })
+
+  it('uses finer digits at finer precision', () => {
+    expect(cellMgrsLabel(49.215, 11.835, 100)).toMatch(/^32U [A-Z]{2} \d{3} \d{3}$/)
   })
 })

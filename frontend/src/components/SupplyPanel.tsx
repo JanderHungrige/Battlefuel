@@ -34,7 +34,7 @@ export interface SupplyPanelProps {
   /** Open the Info Docs panel (v2 Wave 11 F8). */
   onShowDocs?: () => void
   /** Mark + locate a supply entity (depot / fuel truck / …) on the map (v2 Wave 11). */
-  onLocate?: (lat: number, lon: number) => void
+  onLocate?: (lat: number, lon: number, kind: 'depot' | 'truck', id: string) => void
   /** Start a routed fuel run from a truck (v2 Wave 12): pick a target unit next. */
   onCreateFuelRun?: (truckId: string, truckName: string) => void
   /** Start a rendezvous plan from a truck (v2 Wave 13): pick a unit + a sector next. */
@@ -193,7 +193,7 @@ export function SupplyPanel({
                 type="button"
                 className="depot-name link"
                 data-testid={`depot-locate-${d.depot.id}`}
-                onClick={() => onLocate?.(d.depot.lat, d.depot.lon)}
+                onClick={() => onLocate?.(d.depot.lat, d.depot.lon, 'depot', d.depot.id)}
                 title="Mark + locate on map"
               >
                 {d.depot.name}
@@ -283,7 +283,7 @@ export function SupplyPanel({
                   type="button"
                   className="depot-name link"
                   data-testid={`truck-locate-${t.instance_id}`}
-                  onClick={() => onLocate?.(t.lat, t.lon)}
+                  onClick={() => onLocate?.(t.lat, t.lon, 'truck', t.instance_id)}
                   title="Mark + locate on map"
                 >
                   {t.name}

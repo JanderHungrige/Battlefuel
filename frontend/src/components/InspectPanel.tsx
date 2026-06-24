@@ -9,6 +9,7 @@ import type {
   UnitType,
 } from '../api/types'
 import type { CellSituation } from '../map/cellSituation'
+import { precisionLabel } from '../map/mgrsGrid'
 
 const SITUATIONS: SectorSituation[] = [
   'quiet',
@@ -162,6 +163,21 @@ export function InspectPanel({
           <Row label="Tiles" value={cell.situation.count} />
           {cell.units.length > 0 && (
             <Row label="Units" value={cell.units.map((u) => u.name).join(', ')} />
+          )}
+          {cell.situation.event && (
+            <div className="inspect-event" data-testid="inspect-event">
+              <h3>Latest event</h3>
+              <Row label="Event" value={cell.situation.event.headline} />
+              <Row label="Category" value={cell.situation.event.category} />
+              {cell.situation.event.precision_m !== undefined && (
+                <Row label="Location" value={precisionLabel(cell.situation.event.precision_m)} />
+              )}
+              <Row label="Sender" value={cell.situation.event.sender} />
+              <Row
+                label="Supply"
+                value={cell.situation.event.supply_relevant ? 'supply-relevant' : '—'}
+              />
+            </div>
           )}
           {onMutateCell && cell.h3Indexes.length > 0 && (
             <CellEdit cell={cell} onMutate={onMutateCell} />

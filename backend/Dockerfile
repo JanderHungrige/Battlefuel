@@ -42,6 +42,9 @@ COPY app ./app
 COPY scripts ./scripts
 COPY alembic ./alembic
 COPY alembic.ini ./
+# Combat-event CSV catalog (v2 Wave 4). Lands at /app/data so the default relative path
+# `data/combat_zone_events.csv` resolves in-container when combat_event_feed_provider=catalog.
+COPY data ./data
 
 USER app
 EXPOSE 8000

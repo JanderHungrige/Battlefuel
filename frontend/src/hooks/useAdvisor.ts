@@ -26,6 +26,8 @@ export interface AdvisorState {
   error: string | null
   busy: boolean
   request: (kind: RecommendationKind) => void
+  /** Open the panel and request a kind in one call (v2 Wave 4 F5: supply-event advisor action). */
+  ask: (kind: RecommendationKind) => void
   apply: (rec: Recommendation) => void
 }
 
@@ -97,6 +99,14 @@ export function useAdvisor(
     [pushChatter, onApplied],
   )
 
+  const ask = useCallback(
+    (kind: RecommendationKind) => {
+      setOpen(true)
+      request(kind)
+    },
+    [request],
+  )
+
   const toggle = useCallback(() => setOpen((o) => !o), [])
-  return { open, toggle, result, loading, error, busy, request, apply }
+  return { open, toggle, result, loading, error, busy, request, ask, apply }
 }

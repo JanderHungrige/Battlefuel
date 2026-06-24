@@ -41,6 +41,11 @@ export function toMgrs(lat: number, lon: number, accuracy = 5): string {
   return mgrsForward([lon, lat], accuracy)
 }
 
+/** Human label for a location-detail precision in metres, e.g. 100 → "100 m", 2000 → "2 km". */
+export function precisionLabel(precisionM: number): string {
+  return precisionM >= 1000 ? `${precisionM / 1000} km` : `${precisionM} m`
+}
+
 /** Pretty-print an MGRS string: `32UQV0752455822` → `32U QV 07524 55822`. */
 export function formatMgrs(mgrs: string): string {
   const m = /^(\d{1,2}[C-X])([A-Z]{2})(\d*)$/.exec(mgrs)
@@ -145,13 +150,17 @@ export function cellIdFor(lat: number, lon: number, precisionM: number): string 
   return `${precisionM}:${e0}:${n0}`
 }
 
-/** Formatted MGRS coordinate of the cell's centre — one label shared by every point in the cell. */
+/**
+ * The MGRS grid reference of the cell at the given precision — e.g. `32U QV 07 55` for a 1 km cell
+ * (matching the on-map grid labels), not a full 1 m coordinate. One label shared by every point in
+ * the cell; drives the inspect-panel "Coordinate" and the cell-hover grid number.
+ */
 export function cellMgrsLabel(lat: number, lon: number, precisionM: number): string {
   const [e, n] = toUtm(lon, lat)
   const cE = Math.floor(e / precisionM) * precisionM + precisionM / 2
   const cN = Math.floor(n / precisionM) * precisionM + precisionM / 2
   const [clon, clat] = toLonLat(cE, cN)
-  return formatMgrs(toMgrs(clat, clon))
+  return formatMgrs(toMgrs(clat, clon, precisionToAccuracy(precisionM)))
 }
 
 export interface GridLabel {
