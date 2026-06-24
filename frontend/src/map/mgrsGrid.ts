@@ -145,13 +145,17 @@ export function cellIdFor(lat: number, lon: number, precisionM: number): string 
   return `${precisionM}:${e0}:${n0}`
 }
 
-/** Formatted MGRS coordinate of the cell's centre — one label shared by every point in the cell. */
+/**
+ * The MGRS grid reference of the cell at the given precision — e.g. `32U QV 07 55` for a 1 km cell
+ * (matching the on-map grid labels), not a full 1 m coordinate. One label shared by every point in
+ * the cell; drives the inspect-panel "Coordinate" and the cell-hover grid number.
+ */
 export function cellMgrsLabel(lat: number, lon: number, precisionM: number): string {
   const [e, n] = toUtm(lon, lat)
   const cE = Math.floor(e / precisionM) * precisionM + precisionM / 2
   const cN = Math.floor(n / precisionM) * precisionM + precisionM / 2
   const [clon, clat] = toLonLat(cE, cN)
-  return formatMgrs(toMgrs(clat, clon))
+  return formatMgrs(toMgrs(clat, clon, precisionToAccuracy(precisionM)))
 }
 
 export interface GridLabel {
