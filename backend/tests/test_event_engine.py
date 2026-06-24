@@ -14,7 +14,7 @@ from app.domain.tile import (
     Weather,
 )
 from app.providers.combat_event_catalog import CombatEventCatalogItem
-from app.services.event_engine import EventEngine, road_for_event
+from app.services.event_engine import EventEngine, precision_for_event, road_for_event
 
 
 def _tile_at(idx: int, lat: float, lon: float, threat: int = 2) -> Tile:
@@ -80,6 +80,30 @@ class TestRoadForEvent:
         assert road_for_event("New HUMINT report received") is None
         # word-boundary: "identified" must NOT trip the mine rule
         assert road_for_event("Hostile unit spotted / identified") is None
+
+
+class TestPrecisionForEvent:
+    def test_mines_are_pinpoint_100m(self) -> None:
+        assert precision_for_event("Threat Events", "IED / mine detected", 4) == 100
+        assert precision_for_event("Movement & Access", "Minefield confirmed on MSR", 5) == 100
+
+    def test_contact_and_fires_are_1km(self) -> None:
+        assert precision_for_event("Movement & Access", "Route classified RED", 5) == 1000
+        assert precision_for_event("Engagements & Fires", "Troops in contact", 3) == 1000
+
+    def test_broad_sensor_sightings_are_2km(self) -> None:
+        assert precision_for_event("Threat Events", "Air threat detected (drone/helo)", 4) == 2000
+        assert precision_for_event("Threat Events", "Hostile unit spotted / identified", 3) == 2000
+
+    def test_fallback_is_by_category(self) -> None:
+        assert precision_for_event("Intelligence & Information", "New HUMINT report", 2) == 2000
+        assert precision_for_event("Weird Category", "something benign", 1) == 1000
+
+    def test_mine_rule_wins_over_threat5(self) -> None:
+        # word-boundary mine match beats the threat>=5 → 1km rule
+        assert precision_for_event("Movement & Access", "Minefield confirmed on MSR", 5) == 100
+        # and "identified" must not trip the mine rule
+        assert precision_for_event("Threat Events", "Hostile unit identified", 3) == 2000
 
 
 class TestMaybeFire:

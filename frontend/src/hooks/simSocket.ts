@@ -13,7 +13,7 @@ import type {
   UnitUpdate,
 } from '../api/types'
 import { natoStageLabel } from '../lib/natoStage'
-import { formatMgrs, toMgrs } from '../map/mgrsGrid'
+import { formatMgrs, precisionToAccuracy, toMgrs } from '../map/mgrsGrid'
 
 function parse(raw: string): Record<string, unknown> | null {
   try {
@@ -51,30 +51,36 @@ export function applyTileUpdate(
   return { ...state, [update.h3_index]: update }
 }
 
-/** The MGRS "grid number" for a tile's cell — its centre, to 1 m (unify-threat-chatter). */
-export function tileMgrs(h3Index: string): string {
+/**
+ * The MGRS "grid number" for a tile's cell centre, shown at `precisionM` location detail — e.g. a
+ * pinpoint mine (100 m) reads `32U QV 074 558`, a broad sighting (2 km) reads `32U QV 07 55`.
+ */
+export function tileMgrs(h3Index: string, precisionM = 1000): string {
   const [lat, lon] = cellToLatLng(h3Index)
-  return formatMgrs(toMgrs(lat, lon))
+  return formatMgrs(toMgrs(lat, lon, precisionToAccuracy(precisionM)))
 }
 
 /**
  * Build a unified chatter line from a tile_update's stamped located event ("<MGRS> — <headline>",
  * expandable), or null when the tile carries none (a revert/decay just updates the map silently).
+ * The MGRS is shown at the event's type-derived location detail (`precision_m`).
  */
 export function tileEventChatter(u: TileUpdate, id: number): ChatterMessage | null {
   if (!u.last_event) return null
   const e = u.last_event
+  const precision = e.precision_m ?? 1000
   return {
     id,
     kind: 'status',
     text: e.headline,
-    mgrs: tileMgrs(u.h3_index),
+    mgrs: tileMgrs(u.h3_index, precision),
     sender: e.sender,
     category: e.category,
     estimated_threat: u.threat_level,
     supply_relevant: e.supply_relevant,
     h3_index: u.h3_index,
     game_s: e.at_game_s,
+    precision_m: precision,
   }
 }
 

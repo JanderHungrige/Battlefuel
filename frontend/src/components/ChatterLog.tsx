@@ -8,6 +8,7 @@
 
 import { useState, type ReactNode } from 'react'
 import type { ChatterMessage } from '../api/types'
+import { precisionLabel } from '../map/mgrsGrid'
 
 /** A chatter line is "expandable" when it carries combat-event detail (category or locate id). */
 function isExpandable(m: ChatterMessage): boolean {
@@ -106,6 +107,12 @@ export function ChatterLog({
                   <div className="chatter-detail-row">
                     <dt>Est. threat</dt>
                     <dd>{m.estimated_threat}/5</dd>
+                  </div>
+                )}
+                {m.precision_m !== undefined && (
+                  <div className="chatter-detail-row">
+                    <dt>Location</dt>
+                    <dd>{precisionLabel(m.precision_m)}</dd>
                   </div>
                 )}
                 <div className="chatter-detail-row">
