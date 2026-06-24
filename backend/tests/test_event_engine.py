@@ -1,4 +1,4 @@
-"""Tests for the random event engine (Wave 4 event-engine). Pure, deterministic (seeded RNG)."""
+"""Tests for the catalog-driven event engine (unify-threat-chatter). Pure, deterministic."""
 
 from __future__ import annotations
 
@@ -13,17 +13,18 @@ from app.domain.tile import (
     Tile,
     Weather,
 )
-from app.services.event_engine import EVENT_CATALOG, EventEngine
+from app.providers.combat_event_catalog import CombatEventCatalogItem
+from app.services.event_engine import EventEngine, road_for_event
 
 
-def _tile_at(idx: int, lat: float, lon: float) -> Tile:
+def _tile_at(idx: int, lat: float, lon: float, threat: int = 2) -> Tile:
     return Tile(
         h3_index=f"88{idx:04x}",
         resolution=8,
         center_lat=lat,
         center_lon=lon,
         terrain=TerrainType.OPEN,
-        threat_level=2,
+        threat_level=threat,
         intel_level=IntelLevel.LOW,
         weather=Weather.CLEAR,
         road_condition=RoadCondition.CLEAR,
@@ -33,180 +34,139 @@ def _tile_at(idx: int, lat: float, lon: float) -> Tile:
 
 
 def _tile(threat: int = 2, road: RoadCondition = RoadCondition.CLEAR) -> Tile:
-    return Tile(
-        h3_index="8811aa",
-        resolution=8,
-        center_lat=49.2,
-        center_lon=11.85,
-        terrain=TerrainType.OPEN,
-        threat_level=threat,
-        intel_level=IntelLevel.LOW,
-        weather=Weather.CLEAR,
-        road_condition=road,
-        cover=Cover.NONE,
-        boundary=[],
+    return _tile_at(0x11AA, 49.2, 11.85, threat).model_copy(
+        update={"h3_index": "8811aa", "road_condition": road}
     )
 
 
-def _spec(name: str):  # type: ignore[no-untyped-def]
-    return next(s for s in EVENT_CATALOG if s.name == name)
+def _item(category: str, event: str, threat: int, supply: bool = False) -> CombatEventCatalogItem:
+    return CombatEventCatalogItem(
+        id=f"x-{event}", category=category, event=event, threat_level=threat, supply_relevant=supply
+    )
 
 
-class TestCatalog:
-    def test_includes_all_requested_events(self) -> None:
-        names = {s.name for s in EVENT_CATALOG}
-        assert {
-            "threat_spike",
-            "combat_area",
-            "active_combat",
-            "road_damage",
-            "road_blocked",
-            "weather_shift",
-            "intel_report",
-            "threat_clears",
-            "drone_activity",
-            "minefield",
-            "area_secured",
-        } <= names
-
-    def test_combat_area_and_secured_are_permanent(self) -> None:
-        assert _spec("combat_area").duration_game_s == 0.0
-        assert _spec("area_secured").duration_game_s == 0.0
-        assert _spec("minefield").duration_game_s == 0.0
-        assert _spec("active_combat").duration_game_s > 0.0  # temporary
+_SIGHTING = _item("Threat Events", "Hostile unit spotted / identified", 4)
+_MINE = _item("Movement & Access", "Minefield confirmed on MSR", 5)
+_HUMINT = _item("Intelligence & Information", "New HUMINT report received", 2, supply=False)
 
 
-class TestEventSpecs:
-    def test_threat_spike_caps_at_five(self) -> None:
-        assert _spec("threat_spike").apply(_tile(threat=4), Random(0)).threat_level == 5
+def _engine(
+    catalog: list[CombatEventCatalogItem],
+    *,
+    mean: float = 60.0,
+    enabled: bool = True,
+    revert: float = 1000.0,
+) -> EventEngine:
+    return EventEngine(
+        Random(0),
+        catalog=catalog,
+        mean_interval_game_s=mean,
+        enabled=enabled,
+        revert_game_s=revert,
+    )
 
-    def test_combat_area_sets_four(self) -> None:
-        assert _spec("combat_area").apply(_tile(threat=1), Random(0)).threat_level == 4
 
-    def test_active_combat_sets_threat_and_damages_road(self) -> None:
-        mut = _spec("active_combat").apply(_tile(), Random(0))
-        assert mut.threat_level == 5
-        assert mut.road_condition is RoadCondition.DAMAGED
+class TestRoadForEvent:
+    def test_mines_and_destruction_block(self) -> None:
+        assert road_for_event("Minefield confirmed on MSR") is RoadCondition.BLOCKED
+        assert road_for_event("IED / mine detected") is RoadCondition.BLOCKED
+        assert road_for_event("Road / bridge destroyed") is RoadCondition.BLOCKED
 
-    def test_area_secured_zeroes_threat(self) -> None:
-        assert _spec("area_secured").apply(_tile(threat=5), Random(0)).threat_level == 0
+    def test_chokepoint_and_damage_degrade(self) -> None:
+        assert road_for_event("Chokepoint / bottleneck identified") is RoadCondition.DAMAGED
+        assert road_for_event("Road surface degraded (mud)") is RoadCondition.DAMAGED
 
-    def test_minefield_blocks_road(self) -> None:
-        assert _spec("minefield").apply(_tile(), Random(0)).road_condition is RoadCondition.BLOCKED
-
-    def test_drone_activity_bumps_threat_by_one(self) -> None:
-        assert _spec("drone_activity").apply(_tile(threat=2), Random(0)).threat_level == 3
-
-    def test_revert_restores_pre_event_values(self) -> None:
-        tile = _tile(threat=3, road=RoadCondition.CLEAR)
-        revert = _spec("active_combat").revert(tile)
-        assert revert.threat_level == 3
-        assert revert.road_condition is RoadCondition.CLEAR
+    def test_benign_event_leaves_road_unchanged(self) -> None:
+        assert road_for_event("New HUMINT report received") is None
+        # word-boundary: "identified" must NOT trip the mine rule
+        assert road_for_event("Hostile unit spotted / identified") is None
 
 
 class TestMaybeFire:
-    def test_disabled_never_fires(self) -> None:
-        eng = EventEngine(Random(0), mean_interval_game_s=60.0, enabled=False)
-        assert eng.maybe_fire([_tile()], now_s=0.0, dt_game_s=600.0) is None
+    def test_disabled_no_tiles_no_catalog_never_fires(self) -> None:
+        assert _engine([_HUMINT], enabled=False).maybe_fire([_tile()], 0.0, 60.0) is None
+        assert _engine([_HUMINT]).maybe_fire([], 0.0, 60.0) is None
+        assert _engine([]).maybe_fire([_tile()], 0.0, 60.0) is None
+        assert _engine([_HUMINT]).maybe_fire([_tile()], 0.0, 0.0) is None  # zero dt
 
-    def test_no_tiles_never_fires(self) -> None:
-        eng = EventEngine(Random(0), mean_interval_game_s=60.0, enabled=True)
-        assert eng.maybe_fire([], now_s=0.0, dt_game_s=600.0) is None
-
-    def test_zero_dt_never_fires(self) -> None:
-        eng = EventEngine(Random(0), mean_interval_game_s=60.0, enabled=True)
-        assert eng.maybe_fire([_tile()], now_s=0.0, dt_game_s=0.0) is None
-
-    def test_fires_when_probability_is_one(self) -> None:
-        eng = EventEngine(Random(0), mean_interval_game_s=60.0, enabled=True)
-        fired = eng.maybe_fire([_tile()], now_s=0.0, dt_game_s=60.0)  # prob = 1.0
+    def test_fires_and_stamps_tile_with_the_catalog_event(self) -> None:
+        eng = _engine([_HUMINT])
+        fired = eng.maybe_fire([_tile(threat=0)], now_s=10.0, dt_game_s=60.0)  # prob = 1.0
         assert fired is not None
-        h3_index, mutation = fired
-        assert h3_index == "8811aa"
-        assert mutation.changes()  # at least one attribute changed
+        assert fired.h3_index == "8811aa"
+        assert fired.mutation.threat_level == 2  # = the catalog item's threat
+        assert fired.mutation.last_event is not None
+        assert fired.mutation.last_event.headline == "New HUMINT report received"
+        assert fired.mutation.last_event.category == "Intelligence & Information"
+        assert fired.mutation.last_event.sender  # a sender was assigned
+        assert fired.enemy is None  # HUMINT is not a sighting
 
-    def test_temporary_reverts_are_time_gated_and_target_the_tile(self) -> None:
-        eng = EventEngine(Random(0), mean_interval_game_s=60.0, enabled=True)
-        eng.maybe_fire([_tile()], now_s=0.0, dt_game_s=60.0)
-        assert eng.collect_due_reverts(0.0) == []  # nothing due immediately
-        later = eng.collect_due_reverts(1e9)  # 0 (permanent) or 1 (temporary) — both valid
-        assert all(h == "8811aa" for h, _ in later)
-        assert eng.collect_due_reverts(1e9) == []  # drained
+    def test_mine_event_blocks_the_road(self) -> None:
+        fired = _engine([_MINE]).maybe_fire([_tile()], 0.0, 60.0)
+        assert fired is not None and fired.mutation.road_condition is RoadCondition.BLOCKED
+
+    def test_sighting_event_spawns_an_enemy_at_the_tile(self) -> None:
+        fired = _engine([_SIGHTING]).maybe_fire([_tile_at(1, 49.24, 11.86)], 0.0, 60.0)
+        assert fired is not None and fired.enemy is not None
+        assert fired.enemy.lat == 49.24 and fired.enemy.lon == 11.86
+        assert fired.enemy.sidc.startswith("1006")  # hostile affiliation
+        assert fired.enemy.id == f"sight-{fired.h3_index}"
+
+    def test_revert_restores_state_clears_event_and_drops_enemy(self) -> None:
+        eng = _engine([_SIGHTING], revert=500.0)
+        tile = _tile(threat=1, road=RoadCondition.CLEAR)
+        fired = eng.maybe_fire([tile], now_s=0.0, dt_game_s=60.0)
+        assert fired is not None and fired.enemy is not None
+        assert eng.collect_due_reverts(100.0) == []  # not due yet
+        due = eng.collect_due_reverts(1000.0)
+        assert len(due) == 1
+        h3, mutation, enemy_id = due[0]
+        assert h3 == "8811aa"
+        assert mutation.threat_level == 1  # prior threat restored
+        assert mutation.clear_last_event is True
+        assert enemy_id == fired.enemy.id
+        assert eng.collect_due_reverts(1000.0) == []  # drained
 
 
-class TestLightThreatDecay:
-    """Light threats (1..max) fade probabilistically each interval; heavier ones persist (W14)."""
-
-    def _engine(self, chance: float = 0.5) -> EventEngine:
-        # Spawning off (mean_interval huge) so we isolate decay behaviour.
+class TestDecay:
+    def _engine(self, chance: float = 1.0) -> EventEngine:
         return EventEngine(
             Random(0),
-            mean_interval_game_s=1e12,
+            catalog=[_HUMINT],
+            mean_interval_game_s=1e12,  # spawning off → isolate decay
             enabled=True,
             decay_interval_game_s=600.0,
             decay_chance=chance,
             light_threat_max=2,
         )
 
-    def _light_tiles(self, n: int, level: int = 2) -> list[Tile]:
-        return [
-            _tile_at(i, 49.2, 11.86).model_copy(update={"threat_level": level}) for i in range(n)
-        ]
+    def test_no_decay_before_interval(self) -> None:
+        tiles = [_tile_at(i, 49.2, 11.86, threat=2) for i in range(10)]
+        assert self._engine().decay_due(tiles, now_s=599.0) == []
 
-    def test_no_decay_before_the_interval(self) -> None:
-        eng = self._engine()
-        assert eng.decay_due(self._light_tiles(50), now_s=599.0) == []
-
-    def test_some_but_not_all_light_threats_step_down(self) -> None:
-        eng = self._engine(chance=0.5)
-        due = eng.decay_due(self._light_tiles(200), now_s=600.0)
-        assert 0 < len(due) < 200  # probabilistic — a gradual fade, not a purge
+    def test_light_threats_step_down_and_zero_clears_event(self) -> None:
+        ones = [_tile_at(i, 49.2, 11.86, threat=1) for i in range(8)]
+        due = self._engine(chance=1.0).decay_due(ones, now_s=600.0)
+        assert len(due) == 8
         for _h3, mutation in due:
-            assert mutation.threat_level == 1  # each decayed tile stepped 2 -> 1
-
-    def test_chance_one_decays_every_light_tile(self) -> None:
-        eng = self._engine(chance=1.0)
-        assert len(eng.decay_due(self._light_tiles(30), now_s=600.0)) == 30
+            assert mutation.threat_level == 0
+            assert mutation.clear_last_event is True  # decayed to 0 → wipe the event
 
     def test_heavy_threats_never_decay(self) -> None:
-        eng = self._engine(chance=1.0)
-        heavy = [
-            _tile_at(i, 49.2, 11.86).model_copy(update={"threat_level": 4}) for i in range(50)
-        ]
-        assert eng.decay_due(heavy, now_s=600.0) == []
-
-    def test_benign_tiles_never_decay(self) -> None:
-        eng = self._engine(chance=1.0)
-        benign = [
-            _tile_at(i, 49.2, 11.86).model_copy(update={"threat_level": 0}) for i in range(50)
-        ]
-        assert eng.decay_due(benign, now_s=600.0) == []
-
-    def test_decay_is_rate_limited_to_one_pass_per_interval(self) -> None:
-        eng = self._engine(chance=1.0)
-        tiles = self._light_tiles(10)
-        assert eng.decay_due(tiles, now_s=600.0)  # first pass fires
-        assert eng.decay_due(tiles, now_s=900.0) == []  # within the next interval → nothing
-        assert eng.decay_due(tiles, now_s=1200.0)  # next interval → fires again
-
-    def test_disabled_engine_never_decays(self) -> None:
-        eng = EventEngine(Random(0), mean_interval_game_s=1e12, enabled=False)
-        assert eng.decay_due(self._light_tiles(10), now_s=1e9) == []
+        heavy = [_tile_at(i, 49.2, 11.86, threat=4) for i in range(10)]
+        assert self._engine(chance=1.0).decay_due(heavy, now_s=600.0) == []
 
 
 class TestFrontlineWeightedSpawn:
-    """Spawns are weighted toward the front + the OPFOR east, not uniform (v2 Wave 14)."""
-
     def _run(self, n: int) -> list[Tile]:
-        # A west→east strip of tiles across the theater at one latitude.
         tiles = [_tile_at(i, 49.22, 11.79 + 0.005 * i) for i in range(28)]
         by_h3 = {t.h3_index: t for t in tiles}
-        eng = EventEngine(Random(7), mean_interval_game_s=1.0, enabled=True)
+        eng = EventEngine(Random(7), catalog=[_HUMINT], mean_interval_game_s=1.0, enabled=True)
         out = []
         for _ in range(n):
-            fired = eng.maybe_fire(tiles, now_s=0.0, dt_game_s=1000.0)  # prob = 1.0 → always fires
+            fired = eng.maybe_fire(tiles, now_s=0.0, dt_game_s=1000.0)  # prob = 1.0
             assert fired is not None
-            out.append(by_h3[fired[0]])
+            out.append(by_h3[fired.h3_index])
         return out
 
     def test_majority_of_spawns_land_in_or_east_of_the_front(self) -> None:
@@ -216,7 +176,5 @@ class TestFrontlineWeightedSpawn:
 
     def test_deep_nato_rear_is_rarely_hit(self) -> None:
         fired = self._run(500)
-        deep_rear = sum(
-            1 for t in fired if t.center_lon < frontline_lon(t.center_lat) - 0.02
-        )
+        deep_rear = sum(1 for t in fired if t.center_lon < frontline_lon(t.center_lat) - 0.02)
         assert deep_rear / len(fired) < 0.10

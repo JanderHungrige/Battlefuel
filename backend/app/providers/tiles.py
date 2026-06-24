@@ -22,6 +22,7 @@ from app.domain.tile import (
     SectorSituation,
     TerrainType,
     Tile,
+    TileEvent,
     TileMutation,
     Weather,
 )
@@ -60,6 +61,7 @@ def _to_tile(row: TileRow) -> Tile:
         cover=Cover(row.cover),
         situation=SectorSituation(row.situation) if row.situation else None,
         note=row.note,
+        last_event=TileEvent(**row.last_event) if row.last_event else None,
         boundary=Tile.boundary_for(row.h3_index),
     )
 
@@ -91,6 +93,11 @@ class DbTileProvider(TileDataProvider):
             return None
         for column, value in mutation.changes().items():
             setattr(row, column, value)
+        # last_event is JSONB, set/cleared explicitly (a revert clears it; changes() skips it).
+        if mutation.last_event is not None:
+            row.last_event = mutation.last_event.model_dump()
+        elif mutation.clear_last_event:
+            row.last_event = None
         await session.commit()
         await session.refresh(row)
         return _to_tile(row)

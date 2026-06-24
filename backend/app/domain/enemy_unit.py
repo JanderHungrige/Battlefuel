@@ -36,3 +36,9 @@ def enemy_unit_frame(unit: EnemyUnit) -> dict[str, object]:
         "lon": unit.lon,
         "echelon": unit.echelon,
     }
+
+
+def enemy_unit_removed_frame(event_id: str) -> dict[str, object]:
+    """The ``enemy_unit_removed`` frame: a chatter-driven sighting whose threat event has ended
+    (v2 unify-threat-chatter). The frontend drops it from the live enemy-sighting map."""
+    return {"type": "enemy_unit_removed", "id": event_id}
