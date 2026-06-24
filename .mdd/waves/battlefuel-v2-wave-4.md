@@ -42,6 +42,18 @@ Mark `complete` only after all three gates pass:
 - [ ] **tested online** — merged to `dev-deployment`, deployed to `:3001`, verified there
 - [ ] **merged into main / deployed in prod** — on `main`, live `:3000`, after explicit approval
 
+## ⚠ Post-build redesign — UNIFIED into Channel A (see docs/100-unified-threat-chatter.md)
+The original build shipped the catalog chatter as a **separate** system (Channel B: combat-event
+squares + a second chatter feed) alongside the original tile/event-engine threat (Channel A). Per
+operator feedback this was merged: the **EventEngine now fires from the catalog**, stamps each tile
+with its located event (`Tile.last_event`, migration 0017), drives **one** expandable
+`"<MGRS> — <headline>"` chatter feed (filter kept, default ≥3), shows the detail in the MGRS-cell
+panel + an optional cell-hover popup, and spawns/*removes* enemy units with the threat. Channel B
+(the `combat_event` feed, squares, second feed) is **deleted**. The catalog feed is no longer an
+opt-in flag — it is the default EventEngine source (`BATTLEFUEL_COMBAT_EVENT_FEED_PROVIDER` is gone).
+F1 (catalog provider) and F7 (obstacle picker) are retained; F2/F3/F6 are subsumed by the unified
+flow. On `feat/unify-threat-chatter`.
+
 ## Scope
 Wave 3 created the forward-compatible `combat_event` contract, MGRS threat squares, hover icons,
 and MGRS-tagged chatter from a small seeded event list. This wave turns that slice into the real
