@@ -296,7 +296,10 @@ class TestApplyCombatFeed:
 
 
 @pytest.fixture
-def client() -> Iterator[TestClient]:
+def client(monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
+    # Pin the scripted demo feed so the snapshot assertions below are deterministic regardless of a
+    # developer's .env (a local catalog demo sets BATTLEFUEL_COMBAT_EVENT_FEED_PROVIDER=catalog).
+    monkeypatch.setenv("BATTLEFUEL_COMBAT_EVENT_FEED_PROVIDER", "scripted")
     with TestClient(create_app()) as c:
         yield c
 

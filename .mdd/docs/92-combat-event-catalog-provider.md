@@ -8,7 +8,7 @@ wave_status: planned
 depends_on: [49-located-event-model]
 relates: [52-chatter-mgrs-tagging, 53-enemy-red-nato-units]
 source_files:
-  - data/combat_zone_events.csv
+  - backend/data/combat_zone_events.csv
   - backend/app/domain/combat_event.py
   - backend/app/providers/combat_events.py
   - backend/app/config.py

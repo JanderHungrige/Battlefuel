@@ -35,6 +35,10 @@ services:
       BATTLEFUEL_DATABASE_URL: ${BATTLEFUEL_DATABASE_URL:?set in env-file}
       BATTLEFUEL_CORS_ORIGINS: ${BATTLEFUEL_CORS_ORIGINS:?set in env-file}
       BATTLEFUEL_REFUEL_RECOMMENDER: ${BATTLEFUEL_REFUEL_RECOMMENDER:-ortools}
+      # Combat-event chatter feed (v2 Wave 4): defaults to the full CSV catalog (baked into the
+      # backend image at /app/data). Set BATTLEFUEL_COMBAT_EVENT_FEED_PROVIDER=scripted in an
+      # env-file to fall back to the 6-event demo set on a given environment.
+      BATTLEFUEL_COMBAT_EVENT_FEED_PROVIDER: ${BATTLEFUEL_COMBAT_EVENT_FEED_PROVIDER:-catalog}
     command: >
       sh -c "alembic upgrade head &&
              python scripts/startup_data.py &&
