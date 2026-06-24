@@ -7,6 +7,9 @@ depends_on: []
 relates: [29-of8-supply-ui]
 source_files:
   - frontend/src/map/MapView.tsx
+  - frontend/src/map/colors.ts
+  - frontend/src/App.tsx
+  - frontend/src/components/SupplyPanel.tsx
 routes: []
 models: []
 test_files: []
@@ -44,9 +47,29 @@ path: Map/Markers
   (`circle-opacity` / `circle-stroke-opacity`) with the same dimmed-id expression used for the
   unit icon, so a dimmed selected unit's halo fades proportionally and stays behind the icon.
 
+## Follow-up round (locate halo polish)
+
+Further OF-8 feedback on the purple locate marker, fixed together:
+
+- **Looked weak / sat low.** The locate marker now mirrors the selected-unit halo exactly —
+  radius 18, `circle-opacity` 0.55, 2.5 px stroke — in purple (`LOCATE_HALO` / `LOCATE_HALO_RING`
+  in `colors.ts`) instead of a small thin ring.
+- **Depot ring sat below the symbol.** Centre-anchoring the depot put the *image* centre on the
+  point, but the image centre is 7.5 px below the NATO-symbol centre (the gauges hang below). Added
+  `icon-offset: [0, 7.5]` to the `depots` layer so the symbol — not the gauges — sits on the point;
+  trucks (center-anchored, no gauges) were already correct.
+- **Halo stayed bright when its entity was dimmed** (depot on the supply-fleet tab; truck on the
+  order-fuel tab). The locate state now tracks the entity `{kind, id}` (App + `SupplyPanel.onLocate`
+  now pass `'depot'|'truck'` + id), App derives `locateDimmed`, and MapView fades the
+  `locate-marker` opacity to match — same treatment as the selected-unit halo.
+- **Deleting the located depot left the halo on the map.** `removeDepot` now clears the located
+  entity when the deleted depot is the one marked.
+
 ## Verification
 
-MapView is not unit-testable (jsdom has no WebGL; tests mock MapView), so these are pure MapLibre
-layer-config changes verified at the live `make dev` gate: tsc + eslint + the full vitest suite
-stay green, and the prod build compiles. Manual check: locate a depot in OF-8 (ring centred behind
-the symbol), and select a unit then switch OF-4→OF-8 (halo fades behind the dimmed icon).
+MapView is not unit-testable (jsdom has no WebGL; tests mock MapView), so the layer-config changes
+are verified at the live `make dev` gate; the App/SupplyPanel wiring is covered by the updated
+SupplyPanel locate tests. tsc + eslint + the full vitest suite (278) stay green and the prod build
+compiles. Manual check: locate a depot in OF-8 (purple halo framing the symbol, behind it); switch
+to the supply-fleet tab (halo fades with the dimmed depot); locate a truck then switch to the
+order-fuel tab (halo fades with the dimmed truck); delete a located depot (halo clears).

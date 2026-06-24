@@ -6,7 +6,7 @@ import { cellToLatLng } from 'h3-js'
 import maplibregl from 'maplibre-gl'
 import { Protocol } from 'pmtiles'
 import { useEffect, useRef } from 'react'
-import { ROUTE, SELECTED_UNIT, SELECTED_UNIT_RING } from './colors'
+import { LOCATE_HALO, LOCATE_HALO_RING, ROUTE, SELECTED_UNIT, SELECTED_UNIT_RING } from './colors'
 import { DEPOT_SIDC, GAUGE_SEGMENTS, depotGauges, depotIconKey } from './depotSymbol'
 import { fuelBarColor, fuelBarKey, fuelFraction } from './unitFuelBar'
 import {
@@ -107,6 +107,8 @@ export interface MapViewProps {
   dimmedUnitIds?: string[]
   /** Dim the depots layer (OF-8 supply-fleet tab focus) (v2 W13). */
   dimDepots?: boolean
+  /** Fade the purple locate halo when the entity it marks is itself dimmed (fix 99). */
+  locateDimmed?: boolean
   onClearSelection: () => void
 }
 
@@ -323,9 +325,12 @@ function initLayers(map: maplibregl.Map): void {
       'icon-image': ['get', 'icon'],
       'icon-size': 1,
       'icon-allow-overlap': true,
-      // Centre the depot symbol on its geo-point (consistent with unit/enemy icons) so the locate
-      // ring frames it instead of sitting at the bottom of the gauges (fix 99).
+      // The composited depot image is the NATO symbol (top) + two fuel gauges (15 px below it), so
+      // the image centre sits 7.5 px below the symbol centre. Centre-anchor + a 7.5 px downward
+      // icon-offset puts the SYMBOL — not the gauges — on the geo-point, so the locate halo frames
+      // the symbol like the selected-unit halo frames a unit (fix 99).
       'icon-anchor': 'center',
+      'icon-offset': [0, 7.5],
     },
   })
 
@@ -382,12 +387,14 @@ function initLayers(map: maplibregl.Map): void {
       id: 'locate-marker',
       type: 'circle',
       source: 'locate-marker',
-      // Purple indicator for a located/selected fuel unit (depot or tanker) (v2 W13 correction).
+      // Purple halo for a located/selected supply entity — same shape as the selected-unit halo
+      // (fix 99), just purple, so it frames the icon rather than sitting as a small ring on top.
       paint: {
-        'circle-radius': 14,
-        'circle-color': 'rgba(168,85,247,0.25)',
-        'circle-stroke-width': 3,
-        'circle-stroke-color': '#a855f7',
+        'circle-radius': 18,
+        'circle-color': LOCATE_HALO,
+        'circle-opacity': 0.55,
+        'circle-stroke-width': 2.5,
+        'circle-stroke-color': LOCATE_HALO_RING,
       },
     },
     // Draw beneath the unit/depot icons so the ring frames the symbol from behind, not on top of
@@ -957,6 +964,14 @@ export function MapView(props: MapViewProps) {
     if (!readyRef.current || !mapRef.current) return
     mapRef.current.setPaintProperty('depots', 'icon-opacity', props.dimDepots ? 0.3 : 1)
   }, [props.dimDepots])
+  // Fade the purple locate halo with the entity it marks (fix 99): when the located depot/truck is
+  // greyed out on the active OF-8 tab, the halo must not stay bright on top of the dimmed icon.
+  useEffect(() => {
+    if (!readyRef.current || !mapRef.current) return
+    const map = mapRef.current
+    map.setPaintProperty('locate-marker', 'circle-opacity', props.locateDimmed ? 0.12 : 0.55)
+    map.setPaintProperty('locate-marker', 'circle-stroke-opacity', props.locateDimmed ? 0.2 : 1)
+  }, [props.locateDimmed])
   useEffect(() => {
     if (!readyRef.current || !mapRef.current) return
     const c = props.selectedCell

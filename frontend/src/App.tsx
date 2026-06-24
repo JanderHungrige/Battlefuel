@@ -101,8 +101,11 @@ export default function App() {
   const [depotMode, setDepotMode] = useState(false)
   // Site type for the next placed depot ('' = plain depot/marker); v2 Wave 11 F5.
   const [depotSiteType, setDepotSiteType] = useState('')
-  // Depot the operator asked to locate on the map (v2 Wave 11 F5).
-  const [locatePoint, setLocatePoint] = useState<{ lat: number; lon: number } | null>(null)
+  // Supply entity the operator asked to locate on the map (v2 Wave 11 F5). Carries the entity id +
+  // kind so the purple halo can fade with the entity (OF-8 per-tab dimming) and clear on delete.
+  const [located, setLocated] = useState<
+    { lat: number; lon: number; kind: 'depot' | 'truck'; id: string } | null
+  >(null)
   // OF-8 on-map per-unit fuel bars (v2 Wave 11 F7); on by default.
   const [infoBarsOn, setInfoBarsOn] = useState(true)
 
@@ -240,7 +243,7 @@ export default function App() {
     setSelectedCell(null)
     setSelectedUnitId(null)
     setHighlightH3(null)
-    setLocatePoint(null)
+    setLocated(null)
     planning.resetPlanning()
     planRdv.cancel()
     rdvArchive.clearSelection()
@@ -273,7 +276,11 @@ export default function App() {
       if (!window.confirm('Remove this depot / logistic site?')) return
       api
         .deleteDepot(depotId)
-        .then(() => supply.refetch())
+        .then(() => {
+          // Deleting the located depot must clear its purple halo (fix 99).
+          setLocated((cur) => (cur && cur.id === depotId ? null : cur))
+          supply.refetch()
+        })
         .catch((e) => pushChatter(`Could not remove depot: ${errorMessage(e)}`, 'status'))
     },
     [supply, pushChatter],
@@ -343,6 +350,12 @@ export default function App() {
     () => (isOf8 ? dimmedUnitIds(supplyTab, units.map((u) => u.id), truckIds) : []),
     [isOf8, supplyTab, units, truckIds],
   )
+  // Whether the located entity's halo should fade — it is dimmed when its depot/truck is greyed
+  // out on the active OF-8 tab (depot → supply-fleet tab; truck → whenever it's in dimmedUnits).
+  const locateDimmed = useMemo(() => {
+    if (!located || !isOf8) return false
+    return located.kind === 'depot' ? dimDepots(supplyTab) : dimmedUnits.includes(located.id)
+  }, [located, isOf8, supplyTab, dimmedUnits])
   // Rendezvous preview precedence: an active plan flow → a clicked archive order → an added refuel stop.
   const rdvRoutes =
     planRdv.phase !== 'idle'
@@ -378,9 +391,12 @@ export default function App() {
   // Locate a supply point on the map (v2 Wave 11 F5). Pulse the id so MapView re-eases each click.
   // Mark + locate any supply entity (depot, fuel truck, …) on the map. A fresh object each call
   // so re-clicking the same point still re-eases (v2 Wave 11).
-  const locate = useCallback((lat: number, lon: number) => {
-    setLocatePoint({ lat, lon })
-  }, [])
+  const locate = useCallback(
+    (lat: number, lon: number, kind: 'depot' | 'truck', id: string) => {
+      setLocated({ lat, lon, kind, id })
+    },
+    [],
+  )
 
   // Ask the Wave-6 redistribution advisor to propose a refuel for a low site (v2 Wave 11 F5).
   const proposeSiteRefuel = useCallback(
@@ -521,7 +537,8 @@ export default function App() {
               hoverDetails={hoverDetails}
               enemyUnits={allEnemyUnits}
               depots={canShow(role, 'depotOverlay') ? (supply.overview?.depots ?? []) : []}
-              locatePoint={locatePoint}
+              locatePoint={located}
+              locateDimmed={locateDimmed}
               fuelRunOptions={fuelRun.options}
               fuelRunMetric={fuelRun.metric}
               showUnitFuelBars={canShow(role, 'depotOverlay') && infoBarsOn}
