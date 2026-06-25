@@ -6,7 +6,7 @@ import type { UnitUpdate } from '../api/types'
 export interface HaltedUnit {
   instanceId: string
   orderId: string
-  reason: 'blocked' | 'threat'
+  reason: 'impassable' | 'threat'
   lat: number
   lon: number
   /** Adjusted fuel to crawl the remaining threat tiles slowly, when the backend estimated it. */
@@ -20,7 +20,7 @@ export function firstHaltedUnit(live: Record<string, UnitUpdate>): HaltedUnit | 
       return {
         instanceId: u.instance_id,
         orderId: u.order_id,
-        reason: u.reason ?? 'blocked',
+        reason: u.reason ?? 'threat',
         lat: u.lat,
         lon: u.lon,
         slowModeFuelL: u.slow_mode_fuel_l,

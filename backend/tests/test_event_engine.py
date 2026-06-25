@@ -67,10 +67,10 @@ def _engine(
 
 
 class TestRoadForEvent:
-    def test_mines_and_destruction_block(self) -> None:
-        assert road_for_event("Minefield confirmed on MSR") is RoadCondition.BLOCKED
-        assert road_for_event("IED / mine detected") is RoadCondition.BLOCKED
-        assert road_for_event("Road / bridge destroyed") is RoadCondition.BLOCKED
+    def test_mines_and_destruction_obstruct(self) -> None:
+        assert road_for_event("Minefield confirmed on MSR") is RoadCondition.OBSTRUCTED
+        assert road_for_event("IED / mine detected") is RoadCondition.OBSTRUCTED
+        assert road_for_event("Road / bridge destroyed") is RoadCondition.OBSTRUCTED
 
     def test_chokepoint_and_damage_degrade(self) -> None:
         assert road_for_event("Chokepoint / bottleneck identified") is RoadCondition.DAMAGED
@@ -125,9 +125,9 @@ class TestMaybeFire:
         assert fired.mutation.last_event.sender  # a sender was assigned
         assert fired.enemy is None  # HUMINT is not a sighting
 
-    def test_mine_event_blocks_the_road(self) -> None:
+    def test_mine_event_obstructs_the_road(self) -> None:
         fired = _engine([_MINE]).maybe_fire([_tile()], 0.0, 60.0)
-        assert fired is not None and fired.mutation.road_condition is RoadCondition.BLOCKED
+        assert fired is not None and fired.mutation.road_condition is RoadCondition.OBSTRUCTED
 
     def test_sighting_event_spawns_an_enemy_at_the_tile(self) -> None:
         fired = _engine([_SIGHTING]).maybe_fire([_tile_at(1, 49.24, 11.86)], 0.0, 60.0)

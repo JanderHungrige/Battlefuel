@@ -28,12 +28,12 @@ describe('aggregateCell', () => {
   it('takes the worst-case threat, road, and intel across tiles', () => {
     const s = aggregateCell([
       t({ threat_level: 1, road_condition: 'clear', intel_level: 'low' }),
-      t({ threat_level: 4, road_condition: 'blocked', intel_level: 'medium' }),
+      t({ threat_level: 4, road_condition: 'obstructed', intel_level: 'medium' }),
       t({ threat_level: 2, road_condition: 'damaged', intel_level: 'high' }),
     ])
     expect(s.count).toBe(3)
     expect(s.maxThreat).toBe(4)
-    expect(s.worstRoad).toBe('blocked')
+    expect(s.worstRoad).toBe('obstructed')
     expect(s.maxIntel).toBe('high')
   })
 

@@ -14,10 +14,10 @@ function item(over: Partial<CombatEventCatalogItem> = {}): CombatEventCatalogIte
 }
 
 describe('catalogToObstacleTemplate', () => {
-  it('maps mine/IED events to a blocked minefield', () => {
+  it('maps mine/IED events to an obstructed minefield', () => {
     const t = catalogToObstacleTemplate(item({ event: 'IED / mine detected or detonated' }))
     expect(t.kind).toBe('minefield')
-    expect(t.mutation.road_condition).toBe('blocked')
+    expect(t.mutation.road_condition).toBe('obstructed')
   })
 
   it('maps destroyed road/bridge to a crater', () => {

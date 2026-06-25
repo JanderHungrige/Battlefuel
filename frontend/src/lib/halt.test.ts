@@ -38,9 +38,9 @@ describe('firstHaltedUnit', () => {
     expect(h?.slowModeFuelL).toBe(42.5)
   })
 
-  it('defaults reason to blocked and leaves slow fuel undefined when absent', () => {
+  it('defaults reason to threat and leaves slow fuel undefined when absent', () => {
     const h = firstHaltedUnit({ b: unit({ status: 'halted' }) })
-    expect(h?.reason).toBe('blocked')
+    expect(h?.reason).toBe('threat')
     expect(h?.slowModeFuelL).toBeUndefined()
   })
 })
