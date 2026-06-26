@@ -7,6 +7,7 @@ a PostgreSQL-backed provider; an alternate source can register under its own nam
 
 from __future__ import annotations
 
+import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 
@@ -28,6 +29,8 @@ from app.domain.tile import (
 )
 from app.models.tile import TileRow
 
+logger = logging.getLogger(__name__)
+
 
 class TileDataProvider(ABC):
     """Read access to map tiles."""
@@ -47,6 +50,20 @@ class TileDataProvider(ABC):
         """Apply a partial mutation to a tile and return the updated tile, or ``None``."""
 
 
+def _road_condition(value: str) -> RoadCondition:
+    """Parse a stored ``road_condition``, falling back to ``CLEAR`` on an unknown value.
+
+    Guards against legacy/stale rows (e.g. a pre-rename ``'blocked'`` left by an older sim before
+    the blocked→obstructed rename in migration 0018) so one bad row can't 500 the whole tiles
+    endpoint. The bad value is logged for visibility rather than swallowed silently.
+    """
+    try:
+        return RoadCondition(value)
+    except ValueError:
+        logger.warning("tiles: unknown road_condition %r — falling back to 'clear'", value)
+        return RoadCondition.CLEAR
+
+
 def _to_tile(row: TileRow) -> Tile:
     return Tile(
         h3_index=row.h3_index,
@@ -57,7 +74,7 @@ def _to_tile(row: TileRow) -> Tile:
         threat_level=row.threat_level,
         intel_level=IntelLevel(row.intel_level),
         weather=Weather(row.weather),
-        road_condition=RoadCondition(row.road_condition),
+        road_condition=_road_condition(row.road_condition),
         cover=Cover(row.cover),
         situation=SectorSituation(row.situation) if row.situation else None,
         note=row.note,

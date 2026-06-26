@@ -43,7 +43,9 @@ export interface FuelRunState {
   selectMetric: (m: RouteMetric) => void
   /** Switch the unit-first source between the tanker and the depot, re-planning the route. */
   selectSource: (kind: SourceKind) => void
-  confirm: () => void
+  /** Dispatch the fuel run. ``onDone`` runs after a successful dispatch (e.g. to deselect the
+   *  mover + clear its locate halo, matching the OF-4 move-order confirm). */
+  confirm: (onDone?: () => void) => void
   cancel: () => void
 }
 
@@ -207,30 +209,36 @@ export function useFuelRun(
     [unitPoint, sourceKind, truckSource, depotSource, applySource],
   )
 
-  const confirm = useCallback(() => {
-    if (!target || !moverId || !unitId || !metric || (!truckId && !depotId)) return
-    setBusy(true)
-    api
-      .createFuelRun({
-        mover_id: moverId,
-        unit_id: unitId,
-        truck_id: truckId || null,
-        depot_id: depotId || null,
-        dest_lat: target.lat,
-        dest_lon: target.lon,
-        metric,
-        mode: 'road',
-      })
-      .then(() => {
-        pushChatter(`Fuel run: ${moverName} → ${target.name} (${metric}).`, 'order')
-        refetch()
-        reset()
-      })
-      .catch((e: unknown) =>
-        setMessage(e instanceof ApiError ? `Fuel run failed (${e.status}).` : 'Fuel run failed.'),
-      )
-      .finally(() => setBusy(false))
-  }, [target, moverId, unitId, truckId, depotId, metric, moverName, pushChatter, refetch, reset])
+  const confirm = useCallback(
+    (onDone?: () => void) => {
+      if (!target || !moverId || !unitId || !metric || (!truckId && !depotId)) return
+      setBusy(true)
+      api
+        .createFuelRun({
+          mover_id: moverId,
+          unit_id: unitId,
+          truck_id: truckId || null,
+          depot_id: depotId || null,
+          dest_lat: target.lat,
+          dest_lon: target.lon,
+          metric,
+          mode: 'road',
+        })
+        .then(() => {
+          pushChatter(`Fuel run: ${moverName} → ${target.name} (${metric}).`, 'order')
+          refetch()
+          reset()
+          // Deselect the mover + clear its locate halo on a confirmed run, like the OF-4 move
+          // order — otherwise the icon dispatches but the purple circle lingers (v2 W17 F2).
+          onDone?.()
+        })
+        .catch((e: unknown) =>
+          setMessage(e instanceof ApiError ? `Fuel run failed (${e.status}).` : 'Fuel run failed.'),
+        )
+        .finally(() => setBusy(false))
+    },
+    [target, moverId, unitId, truckId, depotId, metric, moverName, pushChatter, refetch, reset],
+  )
 
   const routeGeometry = useMemo(
     () => options.find((o) => o.metric === metric)?.geometry ?? null,
