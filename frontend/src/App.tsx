@@ -250,6 +250,14 @@ export default function App() {
     refuelStop.cancel()
   }, [planning, planRdv, rdvArchive, refuelStop])
 
+  // The purple locate halo is an OF-8 concept (depots / fuel fleet). Leaving OF-8 hides those
+  // markers, so the halo must go with them — otherwise it lingers (and shows fully, since
+  // locateDimmed is OF-8-only) on OF-4 (v2 Wave 17 F1).
+  const changeRole = useCallback((r: Role) => {
+    setRole(r)
+    if (r !== 'OF8') setLocated(null)
+  }, [])
+
   // Actions the "Take a tour" walkthrough drives so it can show gated controls: open the OF-4
   // Plan-move panel (select a demo unit), and open/close the OF-8 rendezvous planner.
   const tourActions = useMemo<TourActions>(
@@ -438,7 +446,7 @@ export default function App() {
       <header className="topbar">
         <span className="brand">BattleFuel</span>
         {theater && <span className="theater">{theater.name}</span>}
-        {theater && <RoleToggle role={role} onChange={setRole} />}
+        {theater && <RoleToggle role={role} onChange={changeRole} />}
         {theater && <GridLayoutControl precisionM={gridPrecisionM} onPrecision={setGridPrecisionM} />}
         {theater && canShow(role, 'unitOverview') && (
           <button
@@ -668,7 +676,7 @@ export default function App() {
                 depotSourceName={fuelRun.depotSourceName}
                 onSelectMetric={fuelRun.selectMetric}
                 onSelectSource={fuelRun.selectSource}
-                onConfirm={fuelRun.confirm}
+                onConfirm={() => fuelRun.confirm(clear)}
                 onCancel={fuelRun.cancel}
               />
             )}
