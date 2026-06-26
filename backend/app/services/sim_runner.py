@@ -395,7 +395,10 @@ class SimEngine:
             "distance_m": round(order.distance_m, 1),
         }
         if step.status is MoveOrderStatus.HALTED:
-            reason = "blocked" if not enter_factors.passable else "threat"
+            # Obstructed roads are now a passable crawl (doc 101), so the only halt the operator
+            # sees is a threat sector. The not-passable case stays as a silent never-stall safety
+            # for genuinely impassable terrain (reason "impassable"), which routing avoids.
+            reason = "impassable" if not enter_factors.passable else "threat"
             frame["reason"] = reason
             if slow_mode_fuel_l is not None:
                 frame["slow_mode_fuel_l"] = round(slow_mode_fuel_l, 1)

@@ -45,7 +45,7 @@ class Weather(StrEnum):
 class RoadCondition(StrEnum):
     CLEAR = "clear"
     DAMAGED = "damaged"
-    BLOCKED = "blocked"
+    OBSTRUCTED = "obstructed"  # ex-"blocked" (doc 101): a passable crawl, not impassable
 
 
 class Cover(StrEnum):

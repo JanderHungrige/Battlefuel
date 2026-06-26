@@ -37,7 +37,7 @@ export interface Tile {
   threat_level: number
   intel_level: 'none' | 'low' | 'medium' | 'high'
   weather: 'clear' | 'rain' | 'fog' | 'snow' | 'storm'
-  road_condition: 'clear' | 'damaged' | 'blocked'
+  road_condition: 'clear' | 'damaged' | 'obstructed'
   cover: 'none' | 'light' | 'heavy'
   situation?: SectorSituation | null
   note?: string | null
@@ -216,7 +216,7 @@ export interface UnitUpdate {
   status: MoveOrderStatus
   progress_m: number
   distance_m: number
-  reason?: 'blocked' | 'threat' // why the unit halted, set when status === 'halted' (Wave 10 F1)
+  reason?: 'impassable' | 'threat' // why the unit halted (doc 101: roads no longer halt; threat does)
   /** Adjusted fuel to crawl the remaining threat tiles slowly; set on a threat halt (v2 W13 F5). */
   slow_mode_fuel_l?: number
 }

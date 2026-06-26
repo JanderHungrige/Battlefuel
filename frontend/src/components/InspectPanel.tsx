@@ -84,7 +84,7 @@ function CellEdit({
         >
           <option value="clear">clear</option>
           <option value="damaged">damaged</option>
-          <option value="blocked">blocked</option>
+          <option value="obstructed">obstructed</option>
         </select>
       </label>
       <label className="inspect-row">

@@ -37,17 +37,19 @@ TERRAIN_FUEL: Final[dict[TerrainType, float]] = {
 ROAD_SPEED: Final[dict[RoadCondition, float]] = {
     RoadCondition.CLEAR: 1.0,
     RoadCondition.DAMAGED: 0.5,
-    RoadCondition.BLOCKED: 0.0,
+    # Obstructed (ex-"blocked"): a heavy crawl, NOT impassable — routing uses it as a costly last
+    # resort (no hard-avoid) and units crawl through instead of halting (doc 101).
+    RoadCondition.OBSTRUCTED: 0.15,
 }
 ROAD_FUEL: Final[dict[RoadCondition, float]] = {
     RoadCondition.CLEAR: 1.0,
     RoadCondition.DAMAGED: 1.3,
-    RoadCondition.BLOCKED: 1.0,
+    RoadCondition.OBSTRUCTED: 1.6,
 }
 
 # How strongly threat inflates the "safe" cost: safe = time_cost * (1 + W * threat_level).
 THREAT_WEIGHT: Final[float] = 5.0
-# Sentinel cost for impassable (blocked) edges — large but finite.
+# Sentinel cost for impassable edges (e.g. obstacle-filtered) — large but finite.
 BLOCKED_COST: Final[float] = 1.0e12
 
 

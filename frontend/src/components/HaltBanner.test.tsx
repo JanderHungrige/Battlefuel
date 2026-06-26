@@ -24,8 +24,8 @@ describe('HaltBanner (v2 W13 F5)', () => {
     expect(onContinue).toHaveBeenCalledOnce()
   })
 
-  it('hides Continue for a physical block (cannot cross at normal speed)', () => {
-    render(<HaltBanner {...base} halted={halted({ reason: 'blocked' })} />)
+  it('hides Continue for an impassable tile (cannot cross at normal speed)', () => {
+    render(<HaltBanner {...base} halted={halted({ reason: 'impassable' })} />)
     expect(screen.queryByTestId('halt-continue')).toBeNull()
     expect(screen.getByTestId('halt-proceed')).toBeInTheDocument()
   })
