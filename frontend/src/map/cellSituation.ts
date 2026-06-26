@@ -4,13 +4,13 @@
 
 import type { TerrainType, Tile, TileEvent } from '../api/types'
 
-type RoadCondition = Tile['road_condition'] // 'clear' | 'damaged' | 'blocked'
+type RoadCondition = Tile['road_condition'] // 'clear' | 'damaged' | 'obstructed'
 type IntelLevel = Tile['intel_level'] // 'none' | 'low' | 'medium' | 'high'
 
 /** Worst-case ordering (higher = more significant for the threat picture). */
-const ROAD_RANK: Record<RoadCondition, number> = { clear: 0, damaged: 1, blocked: 2 }
+const ROAD_RANK: Record<RoadCondition, number> = { clear: 0, damaged: 1, obstructed: 2 }
 const INTEL_RANK: Record<IntelLevel, number> = { none: 0, low: 1, medium: 2, high: 3 }
-const ROAD_BY_RANK: RoadCondition[] = ['clear', 'damaged', 'blocked']
+const ROAD_BY_RANK: RoadCondition[] = ['clear', 'damaged', 'obstructed']
 const INTEL_BY_RANK: IntelLevel[] = ['none', 'low', 'medium', 'high']
 
 /** Stable terrain order for dominant-terrain tie-breaking. */

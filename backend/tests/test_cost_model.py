@@ -8,6 +8,7 @@ from app.domain.tile import RoadCondition, TerrainType
 from app.services.cost_model import (
     BLOCKED_COST,
     THREAT_WEIGHT,
+    TileFactors,
     edge_time_cost,
     safe_edge_cost,
     tile_factors,
@@ -30,10 +31,10 @@ class TestTileFactors:
         assert f.speed_factor == pytest.approx(0.80 * 0.50)
         assert f.fuel_factor == pytest.approx(1.15 * 1.30)
 
-    def test_blocked_is_impassable(self) -> None:
-        f = tile_factors(TerrainType.OPEN, RoadCondition.BLOCKED)
-        assert f.speed_factor == 0.0
-        assert f.passable is False
+    def test_obstructed_is_a_passable_crawl(self) -> None:
+        f = tile_factors(TerrainType.OPEN, RoadCondition.OBSTRUCTED)
+        assert f.speed_factor == pytest.approx(0.15)  # doc 101: a crawl, not impassable
+        assert f.passable is True
 
 
 class TestEdgeCost:
@@ -45,9 +46,13 @@ class TestEdgeCost:
         f = tile_factors(TerrainType.OPEN, RoadCondition.CLEAR)
         assert edge_time_cost(500.0, f) == pytest.approx(500.0)
 
-    def test_blocked_edge_returns_sentinel(self) -> None:
-        f = tile_factors(TerrainType.OPEN, RoadCondition.BLOCKED)
-        assert edge_time_cost(500.0, f) == BLOCKED_COST
+    def test_obstructed_edge_is_finite_high_cost(self) -> None:
+        f = tile_factors(TerrainType.OPEN, RoadCondition.OBSTRUCTED)
+        assert edge_time_cost(500.0, f) == pytest.approx(500.0 / 0.15)  # passable, not sentinel
+
+    def test_impassable_factor_returns_sentinel(self) -> None:
+        # The sentinel path still covers a genuinely impassable (zero-speed) factor.
+        assert edge_time_cost(500.0, TileFactors(speed_factor=0.0, fuel_factor=1.0)) == BLOCKED_COST
 
 
 class TestSafeCost:

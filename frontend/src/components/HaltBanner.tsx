@@ -23,7 +23,7 @@ export function HaltBanner({
   onDismiss,
 }: HaltBannerProps) {
   const isThreat = halted.reason === 'threat'
-  const what = isThreat ? 'a threat (L5) sector' : 'a blocked tile'
+  const what = isThreat ? 'a threat (L5) sector' : 'an impassable tile'
   // Slow-mode fuel estimate for the remaining threat tiles (v2 W13 F5).
   const slowFuel = halted.slowModeFuelL
   return (

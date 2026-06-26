@@ -63,6 +63,7 @@ else
 fi
 
 (cd backend && .venv/bin/python scripts/generate_tiles.py >/dev/null)
+(cd backend && .venv/bin/python scripts/seed_threats.py >/dev/null)   # frontline threat — parity with deployed/make seed
 (cd backend && .venv/bin/python scripts/seed_unit_instances.py >/dev/null)
 (cd backend && .venv/bin/python scripts/seed_supply.py >/dev/null)
 
@@ -78,6 +79,13 @@ else
   bash backend/scripts/build_routing_graph.sh ||
     die "Routing graph build failed. Check osm2pgrouting is in the DB image and data/hohenfels-roads.osm exists (or the network is up for the OSM extract)."
 fi
+
+# 4c. Re-cost the routing graph from the current tile threat + enemy circles — the SAME idempotent
+# init the deployed containers run (startup_data.py). This is what was missing locally: without it
+# the SAFE routing graph (ways.safe_cost) never reflected the seeded/live threat, so local routing +
+# halt behaviour diverged from dev/prod. (Seeds tiles/threats/units/supply only if the DB is empty.)
+(cd backend && .venv/bin/python scripts/startup_data.py >/dev/null 2>&1) ||
+  info "startup_data annotate skipped (non-fatal)"
 
 # 5. Frontend deps + basemap
 [ -d frontend/node_modules ] || (info "Installing frontend deps (first run)…" && cd frontend && npm install)

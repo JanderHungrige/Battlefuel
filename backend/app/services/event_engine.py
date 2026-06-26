@@ -60,7 +60,7 @@ def road_for_event(event: str) -> RoadCondition | None:
     """Road impact from the event text: mines/destruction block, damage degrades, else none."""
     e = event.lower()
     if _BLOCK_RE.search(e) or "destroyed" in e:
-        return RoadCondition.BLOCKED
+        return RoadCondition.OBSTRUCTED
     if any(k in e for k in _DAMAGE_KEYS):
         return RoadCondition.DAMAGED
     return None

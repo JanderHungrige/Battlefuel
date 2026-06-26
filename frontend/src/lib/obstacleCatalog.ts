@@ -20,7 +20,7 @@ export const DEFAULT_OBSTACLE_TEMPLATE: ObstacleTemplate = {
   id: '',
   kind: 'minefield',
   label: 'Manual obstacle',
-  mutation: { road_condition: 'blocked' },
+  mutation: { road_condition: 'obstructed' },
 }
 
 export function catalogToObstacleTemplate(item: CombatEventCatalogItem): ObstacleTemplate {
@@ -32,10 +32,10 @@ export function catalogToObstacleTemplate(item: CombatEventCatalogItem): Obstacl
 
   if (/\b(ied|mine|minefield)\b/.test(e)) {
     kind = 'minefield'
-    mutation = { road_condition: 'blocked' }
+    mutation = { road_condition: 'obstructed' }
   } else if (e.includes('destroyed') || e.includes('crater') || e.includes('bridge')) {
     kind = 'crater'
-    mutation = { road_condition: 'blocked' }
+    mutation = { road_condition: 'obstructed' }
   } else if (
     e.includes('chokepoint') ||
     e.includes('bottleneck') ||

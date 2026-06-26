@@ -101,10 +101,10 @@ class TestAdvance:
         half = advance(_order(), fuel_l=18000, unit_type=_ARMOR, dt_game_s=30, speed_factor=0.5)
         assert half.progress_m == pytest.approx(full.progress_m / 2, rel=1e-6)
 
-    def test_blocked_speed_factor_makes_no_progress_but_burns_fuel(self) -> None:
+    def test_zero_speed_factor_makes_no_progress_but_burns_fuel(self) -> None:
         step = advance(_order(), fuel_l=18000, unit_type=_ARMOR, dt_game_s=30, speed_factor=0.0)
         assert step.progress_m == 0.0
-        assert step.fuel_l < 18000  # stuck on a blocked road still idles fuel
+        assert step.fuel_l < 18000  # a zero-speed step still idles fuel
 
     def test_fuel_factor_increases_burn(self) -> None:
         base = advance(_order(), fuel_l=18000, unit_type=_ARMOR, dt_game_s=30, fuel_factor=1.0)
@@ -198,9 +198,9 @@ class TestTick:
             assert moved.lat == pytest.approx(last[1], abs=1e-5)
             assert (moved.current_fuel_liters or 0) < 15000
 
-    async def test_tick_halts_on_blocked_tile_without_fuel_bleed(self) -> None:
-        """F1 (Wave 10): end-to-end — a unit on a blocked tile HALTS cleanly (no progress,
-        no idle fuel burn) instead of freezing while it bleeds fuel."""
+    async def test_tick_crawls_through_obstructed_tile(self) -> None:
+        """doc 101: an obstructed road is a passable crawl, not a halt — a unit on one keeps
+        moving (progress > 0, fuel burned) instead of halting. (Threat-5 is the only halt now.)"""
         async with _session() as session:
             try:
                 ways = (await session.execute(text("SELECT count(*) FROM ways"))).scalar_one()
@@ -237,7 +237,7 @@ class TestTick:
             before_l = fuel_before.current_fuel_liters if fuel_before.current_fuel_liters else cap
             try:
                 await session.execute(
-                    text("UPDATE tiles SET road_condition='blocked' WHERE h3_index = :c"),
+                    text("UPDATE tiles SET road_condition='obstructed' WHERE h3_index = :c"),
                     {"c": cell},
                 )
                 await session.commit()
@@ -245,13 +245,14 @@ class TestTick:
                 engine = SimEngine(ConnectionManager())
                 await engine.tick(session, dt_game_s=60)
 
-                halted = await orders.get(session, order.id)
-                assert halted is not None and halted.status is MoveOrderStatus.HALTED
-                assert halted.progress_m == 0.0  # never entered the block
+                moved = await orders.get(session, order.id)
+                assert moved is not None
+                assert moved.status is not MoveOrderStatus.HALTED  # crawls through, not halted
+                assert moved.progress_m > 0.0  # advanced (slowly) through the obstructed tile
                 after = await instances.get_instance(session, "inst-armor-1")
                 assert after is not None
                 after_l = after.current_fuel_liters if after.current_fuel_liters else cap
-                assert after_l == pytest.approx(before_l, abs=1e-6)  # halted -> no idle fuel bleed
+                assert after_l < before_l  # burned fuel while crawling
             finally:
                 await session.execute(
                     text("UPDATE tiles SET road_condition='clear' WHERE h3_index = :c"),
