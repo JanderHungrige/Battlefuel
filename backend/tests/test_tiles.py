@@ -14,11 +14,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.api.tiles import get_session
 from app.config import Settings
 from app.domain.theater import HOHENFELS
-from app.domain.tile import TerrainType, Tile
+from app.domain.tile import RoadCondition, TerrainType, Tile
 from app.main import create_app
 from app.providers.tiles import (
     DbTileProvider,
     UnknownTileProviderError,
+    _road_condition,
     build_tile_provider,
 )
 from app.services.tile_grid import DEFAULT_RESOLUTION, cell_center, generate_cells
@@ -49,6 +50,20 @@ class TestGrid:
         ring = Tile.boundary_for(cell)
         assert len(ring) >= 6
         assert all(len(pt) == 2 for pt in ring)
+
+
+class TestRoadConditionParse:
+    """`_to_tile` must tolerate legacy/stale road_condition values so one bad row can't 500 the
+    whole tiles endpoint (e.g. a pre-rename 'blocked' left by an older sim — see migration 0018)."""
+
+    def test_unknown_value_falls_back_to_clear(self) -> None:
+        assert _road_condition("blocked") is RoadCondition.CLEAR
+        assert _road_condition("garbage") is RoadCondition.CLEAR
+
+    def test_known_values_are_preserved(self) -> None:
+        assert _road_condition("clear") is RoadCondition.CLEAR
+        assert _road_condition("damaged") is RoadCondition.DAMAGED
+        assert _road_condition("obstructed") is RoadCondition.OBSTRUCTED
 
 
 class TestFactory:
