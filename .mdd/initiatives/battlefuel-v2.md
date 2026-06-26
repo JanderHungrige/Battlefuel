@@ -2,8 +2,8 @@
 id: battlefuel-v2
 title: BattleFuel v2 — Combat UX, Routing, Scenarios & Onboarding
 status: planned
-version: 10
-hash: 876de56f
+version: 11
+hash: f43df56e
 created: 2026-06-02
 ---
 
@@ -70,7 +70,7 @@ pass — track them as a checklist **in each wave doc** (not here — this is th
 | Wave 4 | waves/battlefuel-v2-wave-4.md | Events/chatter overhaul: catalog from combat_zone_events.csv; messages as "location – headline"; configurable arrival rate (default ≤1/15s); click-to-expand detail (heading, sector, est. threat, sender); supply/threat highlight toggles (yellow/red/adjustable threshold); supply events → advisor → create order; obstacle mode uses the same list via dropdown+search. | planned |
 | Wave 5 | waves/battlefuel-v2-wave-5.md | Tiles & panels: tile click shows last+highest threat, intel button (all tile messages), units-in-tile; tile panel persistent + updates on route-point click; Unit Overview tab (area, threat, fuel, orders) with click-to-locate; unit-overview and advisor panels no longer overlap; the request-data flow rebuilt (fix the dead button → manual entry + request → async values via chatter → apply, status "update requested: <ts>" + re-request). | planned |
 | Wave 6 | waves/battlefuel-v2-wave-6.md | Routing/movement UX (engine from Wave 1): Esc exits the current mode; smaller movement ticks; multiple routes (primary bold + lighter alternatives); manual route planning with fuel results; precise free-waypoint vs move-to-area modes; on/off road choice surfaced in the UI; remove manually-added obstacles; manually add fuel depots. | superseded → Wave 10 |
-| Wave 7 | waves/battlefuel-v2-wave-7.md | Scenario builder: build and save a custom start setting — place units, set their attributes, and reload the saved scenario. | planned |
+| Wave 7 | waves/battlefuel-v2-wave-7.md | Scenario builder: build and save a custom start setting — place units, set their attributes, and reload the saved scenario. | superseded → Wave 22 |
 | Wave 8 | waves/battlefuel-v2-wave-8.md | Landing page (Eraneos + World Fuel branding from `company Logos/`, product pitch) plus a technical data-integration section explaining the DB/data model, expected columns/types, and how to add a new source (Excel connector / mapping table). Login deferred to TODO.md. | planned |
 | Wave 9 | waves/battlefuel-v2-wave-9.md | MGRS-native inspection (retire the hex tile from the UX): clicking selects the MGRS cell at the current precision and the panel shows its MGRS coordinate + aggregated situation (highest/last threat, terrain mix, road, intel, units-in-cell), with no hex/H3 vocabulary in the UI; aggregation runs client-side from live tile data; the backend MGRS-cell data layer is deferred to a future data wave; terrain routing stays on H3. | complete |
 | Wave 10 | waves/battlefuel-v2-wave-10.md | Routing & movement overhaul (absorbs Wave 6): a unit always reaches its destination and never freezes — Safe (route around threat, cross only if no alternative) vs Fast (shortest, crosses at a penalty) posture + a road/off-road/hybrid/direct travel mode (off-road carries a speed+fuel penalty); bold primary + lighter alternative routes with duration/fuel/threat and a warning when crossing a threat-level-5 sector; smooth small movement ticks; waypoint routing (Start → set points → Remove last → End → Confirm); hand-draw a passage the engine uses; add fuel depots; remove manual obstacles; Esc exits any mode; unit-symbol centre = route start. | complete |
@@ -80,10 +80,25 @@ pass — track them as a checklist **in each wave doc** (not here — this is th
 | Wave 14 | waves/battlefuel-v2-wave-14.md | Theater scenario — East/West frontline (immediate, 2026-06-08, build BEFORE Wave 13): reseed Hohenfels as a coherent East (OPFOR) vs West (NATO) battle split by an irregular N–S frontline (gaps + bulges); NATO combat units forward, depots + HQ in the rear, a few more frontline units; threats concentrated on the frontline with deeper-in sightings and a mostly-threat-filled East; slower threat tempo; light threats decay/disappear. | complete |
 | Wave 15 | waves/battlefuel-v2-wave-15.md | Branded landing page + faux security gate (immediate, 2026-06-08, build BETWEEN W14 and W13): a modern landing page with BattleFuel hero, "Powered by" Eraneos + World Fuel logos, a pretend "USER SECURITY ACCESS: APPROVED" clearance panel, and an "Enter BattleFuel" button that reveals the map app; gate shows once per browser session. (Delivers W8's landing-page portion — W8 reduced to the data-integration guide.) | complete |
 | Wave 16 | waves/battlefuel-v2-wave-16.md | Routing safety (immediate, 2026-06-08, build BEFORE Wave 13): SAFE genuinely diverges from FAST — avoids enemy troops via an echelon-scaled danger circle around each OPFOR unit, avoids high-threat tiles, and takes longer OFF-ROAD detours around danger when the only road runs through it (FAST stays short/exposed); plus per-leg waypoint modes (each manual leg picks its own road/offroad/hybrid/direct, changing one leg re-plans only that leg). | complete |
+| Wave 17 | waves/battlefuel-v2-wave-17.md | OF-8 selection-marker bug fixes: switching OF-8→OF-4 hides the purple locate circle with the depots; confirming a fuel run deselects the supply unit + clears its circle (parity with the OF-4 move-order confirm). | planned |
+| Wave 18 | waves/battlefuel-v2-wave-18.md | Road-routing fidelity: snap to the nearest POINT on the nearest road (not a far vertex) + measure the true closest road to the target; straight dashed stubs join unit→first-road-point and last-road-point→target; off-road "no route" → straight line; off-road speed+fuel penalty tuned; ROAD-mode SAFE sticks to the road network (reverses the W16 auto-detour for road mode). | planned |
+| Wave 19 | waves/battlefuel-v2-wave-19.md | True hybrid routing: ONE composed route — stub to a road, follow roads while they help most (fast) / safest (safe), then break off-road to the target; prefer a direct route on short trips when it wins. (Today "hybrid" just picks the better WHOLE road-or-off-road route.) | planned |
+| Wave 20 | waves/battlefuel-v2-wave-20.md | Routing graph visibility + manual roads/paths: a top-row checkbox overlays the graph network (nodes+edges); OF-4 "Add road"/"Add path" tools draw a solid road / dotted path with remove-last-waypoint + stop, and on stop a popup connects first/last/both/none endpoints to the nearest graph node — drawn geometry enters the routing graph. | planned |
+| Wave 21 | waves/battlefuel-v2-wave-21.md | Multi-resolution threat model: threats colour their OWN grid size regardless of the displayed grid (500 m threat → 500 m cell on a 1 km view), nested highest-wins; routing-edge penalties read threat at the right resolution via grid code (decompose to base cells, max); an enemy unit paints a 500 m red danger circle. | planned |
+| Wave 22 | waves/battlefuel-v2-wave-22.md | Scenario creator (supersedes Wave 7): place/remove blue+red forces from a dropdown (tabs: fuel-related vs other troops), units default half-fuel, Shift/Ctrl multi-tile threat-set, opponents removable, save/load scenarios. | planned |
 | Advanced | waves/battlefuel-v2-advanced.md | 3D terrain elevation on the map with an on/off switch (offline DEM). | planned |
 
 > Item→wave traceability for every line of the original request is kept in
 > `.mdd/docs/` once each wave is planned; this table is the index.
+
+> **New batch (2026-06-26, requester brain-dump → W17–W22, version 11):** bugs first, then
+> routing, then threat/grid, then scenarios. Build order: **W17 (OF-8 marker bugs)** → **W18
+> (road-routing fidelity)** → **W19 (true hybrid)** → **W20 (graph visibility + manual roads)** →
+> **W21 (multi-resolution threat model)** → **W22 (scenario creator)**. Decisions: ROAD-mode SAFE
+> sticks to roads (reverses the W16 off-road auto-detour *for road mode only*; Hybrid keeps
+> best-of-both); the scenario creator supersedes the originally-planned **W7** (W7 → `superseded →
+> Wave 22`); the multi-resolution threat model decomposes each threat by its grid code into base
+> cells and takes the max (highest wins), so rendering and edge-penalty share one source.
 
 > **Build-order resequencing (2026-06-03, requester):** after Wave 3, build **Wave 9
 > (hex→MGRS inspection)** next, then the **routing/movement overhaul** (**Wave 10**, now
