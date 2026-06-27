@@ -115,6 +115,29 @@ class TestPgRouting:
 
 
 @pytest.mark.db
+class TestNearestPointSnapAndStubs:
+    """v2 Wave 18 F1+F2: route snaps to the nearest POINT on the nearest road (not a far vertex)
+    and draws straight stubs from the unit to that point and from the road exit to the target."""
+
+    async def test_offroad_endpoints_get_road_snap_points_and_stubs(self) -> None:
+        async with _session() as session:
+            await _require_graph(session)
+            # _A and _B are both off the road network (~120-160 m away).
+            path = await PgRoutingProvider().shortest_path(session, *_A, *_B, RouteMetric.FAST)
+            assert path is not None
+            # F1: the true nearest road points are reported for both ends.
+            assert path.road_entry is not None and path.road_exit is not None
+            # F2: geometry begins exactly at the unit and ends exactly at the destination.
+            assert path.geometry[0] == pytest.approx([_A[1], _A[0]], abs=1e-6)
+            assert path.geometry[-1] == pytest.approx([_B[1], _B[0]], abs=1e-6)
+            # The road join point differs from the unit (there is a real off-road stub here).
+            assert path.road_entry != path.geometry[0]
+            # Total distance exceeds the straight-line distance (stub + road).
+            straight = haversine_m(_A[1], _A[0], _B[1], _B[0])
+            assert path.distance_m >= straight
+
+
+@pytest.mark.db
 class TestResolveAlways:
     """Regression for the live 'never a route to that destination' bug (v2 Wave 1).
 

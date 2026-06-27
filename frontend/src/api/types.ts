@@ -155,6 +155,10 @@ export interface RouteOption {
   fuel_consumed_l: number
   fuel_remaining_l: number
   sufficient_fuel: boolean
+  // v2 Wave 18 F2: off-road stub join/leave points. When set, geometry[0]→road_entry and
+  // road_exit→geometry[-1] are off-road straight stubs (to be rendered dashed on the map).
+  road_entry?: number[] | null
+  road_exit?: number[] | null
 }
 
 export interface PlanRouteRequest {

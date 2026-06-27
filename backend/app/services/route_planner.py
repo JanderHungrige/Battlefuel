@@ -53,6 +53,8 @@ def build_option(
         fuel_consumed_l=round(fuel_consumed, 1),
         fuel_remaining_l=round(max(0.0, remaining), 1),
         sufficient_fuel=remaining >= 0,
+        road_entry=path.road_entry,
+        road_exit=path.road_exit,
     )
 
 
