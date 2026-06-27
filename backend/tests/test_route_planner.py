@@ -216,14 +216,15 @@ def _unit_and_instance() -> tuple[object, object]:
     return unit_type, inst
 
 
-class TestSafeAutoDetour:
-    """v2 Wave 16 F2: on a ROAD plan, SAFE auto-considers an off-road detour and takes it only
-    when the road is genuinely more dangerous; FAST stays on the short road."""
+class TestRoadSafeSticksToRoads:
+    """v2 Wave 18 F4: ROAD mode stays on roads for BOTH metrics — SAFE no longer auto-detours
+    off-road (reverses the v2 Wave 16 ROAD-mode detour). Off-road detours belong to HYBRID."""
 
-    async def test_safe_detours_offroad_when_road_is_dangerous(self) -> None:
+    async def test_road_safe_stays_on_road_even_when_dangerous(self) -> None:
         from app.domain.route import RouteMode
         from app.services.route_planner import plan_routes
 
+        # A clearly safer off-road option exists, but ROAD mode must ignore it.
         road = _FakeProvider(
             _leg(_ROAD_GEOM, distance=3000, effective=3000, fuel=3000, threat_max=5, threat_avg=4.0)
         )
@@ -235,27 +236,30 @@ class TestSafeAutoDetour:
             None, road, inst, unit_type, 49.23, 11.86, mode=RouteMode.ROAD, offroad=offroad
         )
         by_metric = {o.metric: o for o in opts}
-        assert by_metric[RouteMetric.FAST].threat_max == 5  # FAST stays on the exposed road
-        assert by_metric[RouteMetric.SAFE].threat_max == 0  # SAFE detours off-road around danger
-        assert by_metric[RouteMetric.SAFE].geometry == _OFF_GEOM
+        # Both metrics keep the road geometry; SAFE does NOT take the off-road detour.
+        assert by_metric[RouteMetric.FAST].geometry == _ROAD_GEOM
+        assert by_metric[RouteMetric.SAFE].geometry == _ROAD_GEOM
+        assert by_metric[RouteMetric.SAFE].threat_max == 5
 
-    async def test_safe_stays_on_a_clear_road(self) -> None:
+    async def test_hybrid_still_takes_the_safer_offroad_detour(self) -> None:
         from app.domain.route import RouteMode
         from app.services.route_planner import plan_routes
 
+        # Same inputs, HYBRID mode: best-of-both still applies, so SAFE detours off-road.
         road = _FakeProvider(
-            _leg(_ROAD_GEOM, distance=3000, effective=3000, fuel=3000, threat_max=0, threat_avg=0.0)
+            _leg(_ROAD_GEOM, distance=3000, effective=3000, fuel=3000, threat_max=5, threat_avg=4.0)
         )
         offroad = _FakeProvider(
             _leg(_OFF_GEOM, distance=6000, effective=6000, fuel=6000, threat_max=0, threat_avg=0.0)
         )
         unit_type, inst = _unit_and_instance()
         opts = await plan_routes(
-            None, road, inst, unit_type, 49.23, 11.86, mode=RouteMode.ROAD, offroad=offroad
+            None, road, inst, unit_type, 49.23, 11.86, mode=RouteMode.HYBRID, offroad=offroad
         )
-        safe = next(o for o in opts if o.metric is RouteMetric.SAFE)
-        # Equal threat → no needless detour: SAFE keeps the shorter road geometry.
-        assert safe.geometry == _ROAD_GEOM
+        by_metric = {o.metric: o for o in opts}
+        assert by_metric[RouteMetric.FAST].geometry == _ROAD_GEOM  # FAST: shorter road
+        assert by_metric[RouteMetric.SAFE].geometry == _OFF_GEOM  # SAFE: safer off-road
+        assert by_metric[RouteMetric.SAFE].threat_max == 0
 
 
 class TestPerLegModes:

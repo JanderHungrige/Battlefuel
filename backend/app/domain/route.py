@@ -46,6 +46,12 @@ class RoutePath(BaseModel):
     # real-distance route over the full graph (manual obstacles still excluded). Lets callers
     # surface a "degraded route" hint; the route is still valid and traversable.
     degraded: bool = Field(default=False, description="route used the full-graph distance fallback")
+    # v2 Wave 18 F2: the [lon, lat] point where the route joins / leaves the road network (the true
+    # nearest point on the nearest edge). When set, the segment from geometry[0] to road_entry and
+    # from road_exit to geometry[-1] are off-road straight stubs (rendered dashed). None when the
+    # route is wholly on-graph (legacy/fallback path) or has no off-road stub.
+    road_entry: list[float] | None = Field(default=None, description="[lon,lat] road join point")
+    road_exit: list[float] | None = Field(default=None, description="[lon,lat] road leave point")
 
 
 class RouteOption(BaseModel):
@@ -63,3 +69,7 @@ class RouteOption(BaseModel):
     fuel_consumed_l: float = Field(ge=0)
     fuel_remaining_l: float = Field(ge=0)
     sufficient_fuel: bool
+    # v2 Wave 18 F2: off-road stub join/leave points (see RoutePath). When set, geometry[0]→
+    # road_entry and road_exit→geometry[-1] are dashed off-road stubs in the UI.
+    road_entry: list[float] | None = None
+    road_exit: list[float] | None = None

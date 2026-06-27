@@ -47,6 +47,21 @@ ROAD_FUEL: Final[dict[RoadCondition, float]] = {
     RoadCondition.OBSTRUCTED: 1.6,
 }
 
+# Explicit "left the road" fuel penalty for off-road (terrain) movement (v2 Wave 18 F5). Driving
+# cross-country burns more than the bare terrain factor implies. The off-road SPEED penalty is
+# already carried by each unit's ``speed_offroad_kph`` (≈half road speed), so this is fuel-only to
+# avoid double-counting speed. Applied to the off-road fuel factor in the terrain router; this is
+# the single tunable source. (Live-sim off-road traversal is governed separately by the
+# mode-not-persisted known issue in TODO.md.)
+OFFROAD_FUEL_PENALTY: Final[float] = 1.25
+
+# Representative off-road speed factor for the short straight STUBS that join a unit to the nearest
+# road and the road to the destination (v2 Wave 18 Option 3). Off-road movement is ≈ half road
+# speed, so a stub's time-cost is its length / this factor (~2x a road metre). Used both to weight
+# the stub when CHOOSING the cheapest entry/exit edge (so a long stub to a far road loses to a
+# nearer road) and in the route's effective-distance (so the stub's slowness shows in the ETA).
+OFFROAD_STUB_SPEED_FACTOR: Final[float] = 0.5
+
 # How strongly threat inflates the "safe" cost: safe = time_cost * (1 + W * threat_level).
 THREAT_WEIGHT: Final[float] = 5.0
 # Sentinel cost for impassable edges (e.g. obstacle-filtered) — large but finite.

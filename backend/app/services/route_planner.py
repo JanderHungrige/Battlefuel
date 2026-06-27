@@ -53,6 +53,8 @@ def build_option(
         fuel_consumed_l=round(fuel_consumed, 1),
         fuel_remaining_l=round(max(0.0, remaining), 1),
         sufficient_fuel=remaining >= 0,
+        road_entry=path.road_entry,
+        road_exit=path.road_exit,
     )
 
 
@@ -117,11 +119,12 @@ async def plan_routes(
     speed; ``offroad`` and ``direct`` use the terrain / straight-line routers at off-road speed;
     ``hybrid`` returns, per metric, the better of the road and off-road options.
 
-    **SAFE auto-detour (v2 Wave 16):** on ``road`` and ``hybrid`` the SAFE metric *always* also
-    evaluates the off-road route and keeps whichever is safer (lower threat_max, then duration) —
-    so when the only road runs through threat/enemy danger, SAFE takes a longer cross-country
-    detour around it while FAST stays on the short, exposed road. ``offroad`` is injectable for
-    tests; it defaults to the terrain router.
+    **Road means road (v2 Wave 18 F4):** in ``road`` mode SAFE stays on the road network — it only
+    varies the route among roads, never auto-detours cross-country. (This reverses the v2 Wave 16
+    ROAD-mode off-road detour: off-road detours now belong to ``hybrid``.) Only ``hybrid`` evaluates
+    both the road and off-road option and keeps the better one (lower threat_max then duration for
+    SAFE; lower duration for FAST). ``offroad`` is injectable for tests; it defaults to the terrain
+    router.
     """
     road_kph = unit_type.movement.speed_road_kph
     offroad_kph = unit_type.movement.speed_offroad_kph
@@ -133,10 +136,9 @@ async def plan_routes(
     )
     options: list[RouteOption] = []
     for metric, label in _METRICS:
-        # Consider an off-road detour for HYBRID (both metrics) and for SAFE on a ROAD plan.
-        consider_offroad = mode is RouteMode.HYBRID or (
-            metric is RouteMetric.SAFE and mode is RouteMode.ROAD
-        )
+        # Consider an off-road detour only for HYBRID. ROAD mode stays on roads for both metrics
+        # (v2 Wave 18 F4 — "road means road"); off-road detours are a HYBRID concern now.
+        consider_offroad = mode is RouteMode.HYBRID
         if consider_offroad:
             road_opt = await _build_for_provider(
                 session,
