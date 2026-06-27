@@ -49,12 +49,20 @@ _OBSTACLE_FILTER = "(cell_h3 IS NULL OR cell_h3 NOT IN (SELECT h3_index FROM obs
 _PATH_SQL = text(
     """
     WITH src AS (
-        SELECT id FROM ways_vertices_pgr
-        ORDER BY the_geom <-> ST_SetSRID(ST_MakePoint(:slon, :slat), 4326) LIMIT 1
+        SELECT id FROM (
+            SELECT id, the_geom FROM ways_vertices_pgr
+            ORDER BY the_geom <-> ST_SetSRID(ST_MakePoint(:slon, :slat), 4326) LIMIT 20
+        ) c
+        ORDER BY c.the_geom::geography <-> ST_SetSRID(ST_MakePoint(:slon, :slat), 4326)::geography
+        LIMIT 1
     ),
     dst AS (
-        SELECT id FROM ways_vertices_pgr
-        ORDER BY the_geom <-> ST_SetSRID(ST_MakePoint(:dlon, :dlat), 4326) LIMIT 1
+        SELECT id FROM (
+            SELECT id, the_geom FROM ways_vertices_pgr
+            ORDER BY the_geom <-> ST_SetSRID(ST_MakePoint(:dlon, :dlat), 4326) LIMIT 20
+        ) c
+        ORDER BY c.the_geom::geography <-> ST_SetSRID(ST_MakePoint(:dlon, :dlat), 4326)::geography
+        LIMIT 1
     ),
     path AS (
         SELECT seq, node, edge FROM pgr_dijkstra(
@@ -100,19 +108,30 @@ _WITHPOINTS_SQL = text(
     WITH
     s AS (SELECT ST_SetSRID(ST_MakePoint(:slon, :slat), 4326) AS g),
     d AS (SELECT ST_SetSRID(ST_MakePoint(:dlon, :dlat), 4326) AS g),
+    -- v2 Wave 18 (Option 1): take the 20 nearest edges by the index-assisted planar <-> operator
+    -- (a candidate POOL), then re-rank by TRUE metres (geography). Ordering by raw lon/lat degrees
+    -- is anisotropic at this latitude (1° lon ≈ 73 km vs 1° lat ≈ 111 km), so it would pick an
+    -- east/west edge that is actually farther in metres than a north/south one — the "wrong road
+    -- past a threshold line" bug. The pool keeps the spatial index in play; the re-rank is exact.
     se AS (
         SELECT gid, the_geom, source, target,
                GREATEST(0.0, LEAST(1.0, ST_LineLocatePoint(the_geom, (SELECT g FROM s)))) AS f
-        FROM ways
-        WHERE COALESCE(time_cost, length_m) < :blocked AND {obstacle}
-        ORDER BY the_geom <-> (SELECT g FROM s) LIMIT 1
+        FROM (
+            SELECT gid, the_geom, source, target FROM ways
+            WHERE COALESCE(time_cost, length_m) < :blocked AND {obstacle}
+            ORDER BY the_geom <-> (SELECT g FROM s) LIMIT 20
+        ) cand
+        ORDER BY cand.the_geom::geography <-> (SELECT g FROM s)::geography LIMIT 1
     ),
     de AS (
         SELECT gid, the_geom, source, target,
                GREATEST(0.0, LEAST(1.0, ST_LineLocatePoint(the_geom, (SELECT g FROM d)))) AS f
-        FROM ways
-        WHERE COALESCE(time_cost, length_m) < :blocked AND {obstacle}
-        ORDER BY the_geom <-> (SELECT g FROM d) LIMIT 1
+        FROM (
+            SELECT gid, the_geom, source, target FROM ways
+            WHERE COALESCE(time_cost, length_m) < :blocked AND {obstacle}
+            ORDER BY the_geom <-> (SELECT g FROM d) LIMIT 20
+        ) cand
+        ORDER BY cand.the_geom::geography <-> (SELECT g FROM d)::geography LIMIT 1
     ),
     entry AS (SELECT ST_LineInterpolatePoint((SELECT the_geom FROM se), (SELECT f FROM se)) AS p),
     exitp AS (SELECT ST_LineInterpolatePoint((SELECT the_geom FROM de), (SELECT f FROM de)) AS p),

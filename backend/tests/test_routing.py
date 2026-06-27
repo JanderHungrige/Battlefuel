@@ -136,6 +136,17 @@ class TestNearestPointSnapAndStubs:
             straight = haversine_m(_A[1], _A[0], _B[1], _B[0])
             assert path.distance_m >= straight
 
+    async def test_snaps_to_true_nearest_road_by_metres_not_degrees(self) -> None:
+        # Option 1 regression guard: _B's true nearest road is ~92 m away; the old planar-degree
+        # ordering wrongly picked a ~124 m edge (lon/lat degrees are anisotropic at 49°N). The
+        # geography re-rank must pick the genuinely closest road.
+        async with _session() as session:
+            await _require_graph(session)
+            path = await PgRoutingProvider().shortest_path(session, *_A, *_B, RouteMetric.FAST)
+            assert path is not None and path.road_exit is not None
+            snap_m = haversine_m(path.road_exit[0], path.road_exit[1], _B[1], _B[0])
+            assert snap_m < 110  # ~92 m (true nearest); the planar bug would give ~124 m
+
 
 @pytest.mark.db
 class TestResolveAlways:
