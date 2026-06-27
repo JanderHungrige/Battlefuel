@@ -203,7 +203,7 @@ class TerrainRoutingProvider(RoutingProvider):
         from app.providers.enemy_units import build_enemy_unit_provider
         from app.providers.tiles import build_tile_provider
         from app.services.enemy_danger import enemy_threat_at
-        from app.services.terrain_router import terrain_path
+        from app.services.terrain_router import terrain_or_direct
 
         # Off-road SAFE must dodge enemies too (v2 Wave 16): fold the enemy-proximity threat into
         # each tile's threat for routing only (not persisted — display + decay are unaffected).
@@ -216,7 +216,9 @@ class TerrainRoutingProvider(RoutingProvider):
             )
             for t in tiles
         }
-        return terrain_path(tile_map, start_lat, start_lon, dest_lat, dest_lon, metric)
+        # Fall back to a straight line when the grid has no off-road path (v2 Wave 18 F3) instead
+        # of returning None → "no route to that destination".
+        return terrain_or_direct(tile_map, start_lat, start_lon, dest_lat, dest_lon, metric)
 
 
 class DirectRoutingProvider(RoutingProvider):
