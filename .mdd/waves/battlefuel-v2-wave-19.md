@@ -7,7 +7,7 @@ status: planned
 depends_on: battlefuel-v2-wave-18
 demo_state: "Hybrid produces ONE composed route, not a whole-route pick of road-or-off-road. For a unit in a field near a road heading to a target in another field, the hybrid route stubs cross-country to a road, follows roads for as long as that reduces travel time most (FAST) or is safest (SAFE), then breaks off-road again where cross-country reaches the target faster/safer — and for short trips it picks a direct route when that beats road+off-road. The composed route shows its segments (road vs off-road) and its duration/fuel/threat."
 created: 2026-06-26
-hash: 31adc6ef
+hash: 1f67d1d7
 ---
 
 # Wave 19: True hybrid routing
@@ -29,7 +29,7 @@ Mark `complete` only after ALL three gates pass (never on a localhost demo):
 ## Features
 | # | Feature | Doc | Status | Depends on |
 |---|---------|-----|--------|------------|
-| 1 | segmented-hybrid-router | — | planned | — |
+| 1 | segmented-hybrid-router | docs/110-segmented-hybrid-router.md | complete | — |
 | 2 | hybrid-direct-shortcut | — | planned | segmented-hybrid-router |
 | 3 | hybrid-route-segment-ui | — | planned | segmented-hybrid-router |
 

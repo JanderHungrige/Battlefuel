@@ -521,6 +521,44 @@ class DirectRoutingProvider(RoutingProvider):
         return direct_path(tile_map, start_lat, start_lon, dest_lat, dest_lon, metric)
 
 
+class HybridRoutingProvider(RoutingProvider):
+    """Road-aware segmented hybrid router (v2 Wave 19 F1): one A* over the H3 grid where cells that
+    carry a road cost ROAD speed and off-road cells are penalised. The route therefore **follows
+    roads** where they help, **cuts cross-country** where a shortcut beats the road despite the
+    off-road penalty, and on SAFE **leaves the road only to skirt high-threat cells** then rejoins —
+    instead of the old whole-route road-or-offroad pick that collapsed onto a straight line."""
+
+    async def shortest_path(
+        self,
+        session: AsyncSession,
+        start_lat: float,
+        start_lon: float,
+        dest_lat: float,
+        dest_lon: float,
+        metric: RouteMetric,
+    ) -> RoutePath | None:
+        from app.providers.enemy_units import build_enemy_unit_provider
+        from app.providers.tiles import build_tile_provider
+        from app.services.enemy_danger import enemy_threat_at
+        from app.services.terrain_router import hybrid_path
+
+        enemies = list(build_enemy_unit_provider().units())
+        tiles = await build_tile_provider().list_tiles(session)
+        tile_map = {
+            t.h3_index: (
+                t.terrain,
+                max(t.threat_level, enemy_threat_at(t.center_lat, t.center_lon, enemies)),
+            )
+            for t in tiles
+        }
+        # Cells carrying a road (edge midpoint cell) — the "is on a road" set for the A*.
+        rows = await session.execute(
+            text("SELECT DISTINCT cell_h3 FROM ways WHERE cell_h3 IS NOT NULL")
+        )
+        roads = frozenset(r[0] for r in rows)
+        return hybrid_path(tile_map, roads, start_lat, start_lon, dest_lat, dest_lon, metric)
+
+
 RoutingProviderBuilder = Callable[[], RoutingProvider]
 _REGISTRY: dict[str, RoutingProviderBuilder] = {}
 
@@ -548,16 +586,19 @@ def build_routing_provider(settings: Settings | None = None) -> RoutingProvider:
 register_routing_provider("pgrouting", PgRoutingProvider)
 register_routing_provider("terrain", TerrainRoutingProvider)
 register_routing_provider("direct", DirectRoutingProvider)
+register_routing_provider("hybrid", HybridRoutingProvider)
 
 
 def build_routing_provider_for_mode(
     mode: RouteMode, settings: Settings | None = None
 ) -> RoutingProvider:
     """Select the router for a travel mode: ``offroad`` → terrain A*, ``direct`` → straight
-    cross-country line, anything else → the configured road provider (pgRouting). ``hybrid`` is
-    composed in the planner from the road + off-road providers, so it is not a single provider."""
+    cross-country line, ``hybrid`` → the road-aware segmented A* (v2 Wave 19), anything else → the
+    configured road provider (pgRouting)."""
     if mode is RouteMode.OFFROAD:
         return _REGISTRY["terrain"]()
     if mode is RouteMode.DIRECT:
         return _REGISTRY["direct"]()
+    if mode is RouteMode.HYBRID:
+        return _REGISTRY["hybrid"]()
     return build_routing_provider(settings)
