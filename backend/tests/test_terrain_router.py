@@ -7,11 +7,12 @@ adjacency and hex-center geometry are exact and the assertions are deterministic
 from __future__ import annotations
 
 import h3
+import pytest
 
 from app.domain.route import RouteMetric
 from app.domain.tile import TerrainType
 from app.services.sim import haversine_m
-from app.services.terrain_router import terrain_path
+from app.services.terrain_router import terrain_or_direct, terrain_path
 
 _RES = 8  # DEFAULT_RESOLUTION — the theater tile resolution
 _CENTER = h3.latlng_to_cell(49.21, 11.84, _RES)
@@ -158,3 +159,53 @@ class TestDirectPath:
         lat, lon = _latlng(_START)
         assert direct_path(_region_tiles(), lat, lon, lat, lon, RouteMetric.FAST) is None
         assert direct_path({}, 49.21, 11.84, 49.22, 11.84, RouteMetric.FAST) is None
+
+
+class TestTerrainOrDirect:
+    """F3 (Wave 18, doc 107): off-road routing falls back to a straight line when no terrain path
+    exists, instead of surfacing 'no route to that destination'."""
+
+    def test_uses_terrain_path_when_one_exists(self) -> None:
+        # Connected region → a real A* terrain path, not the fallback (degraded stays False).
+        tiles = _region_tiles()
+        s_lat, s_lon = _latlng(_START)
+        d_lat, d_lon = _latlng(_DEST)
+        path = terrain_or_direct(tiles, s_lat, s_lon, d_lat, d_lon, RouteMetric.FAST)
+        assert path is not None
+        assert path.degraded is False
+        assert len(path.geometry) >= 2
+
+    def test_falls_back_to_straight_line_when_unreachable(self) -> None:
+        # Two cells 3 rings apart with nothing between them: A* can't traverse, so we draw a
+        # straight line (flagged degraded) rather than returning None.
+        far = max(h3.grid_disk(_CENTER, 3), key=lambda c: _dist_between(c, _CENTER))
+        tiles: dict[str, tuple] = {_CENTER: (TerrainType.OPEN, 0), far: (TerrainType.OPEN, 0)}
+        s_lat, s_lon = _latlng(_CENTER)
+        d_lat, d_lon = _latlng(far)
+        assert terrain_path(tiles, s_lat, s_lon, d_lat, d_lon, RouteMetric.FAST) is None
+        path = terrain_or_direct(tiles, s_lat, s_lon, d_lat, d_lon, RouteMetric.FAST)
+        assert path is not None  # no longer "no route"
+        assert path.degraded is True  # flagged as the straight-line fallback
+        assert path.geometry == [[s_lon, s_lat], [d_lon, d_lat]]
+
+    def test_none_only_when_even_a_line_is_impossible(self) -> None:
+        assert terrain_or_direct({}, 49.21, 11.84, 49.22, 11.84, RouteMetric.FAST) is None
+
+
+class TestOffroadFuelPenalty:
+    """F5 (Wave 18, doc 109): off-road movement carries an explicit fuel penalty on top of the
+    terrain factor (the speed penalty is the unit's speed_offroad_kph, applied in the planner)."""
+
+    def test_offroad_fuel_distance_includes_the_penalty(self) -> None:
+        from app.services.cost_model import OFFROAD_FUEL_PENALTY
+
+        assert OFFROAD_FUEL_PENALTY > 1.0  # it is a penalty
+        s_lat, s_lon = _latlng(_START)
+        d_lat, d_lon = _latlng(_DEST)
+        # OPEN terrain: speed factor 1.0 -> effective == real distance; fuel factor 1.0 x penalty.
+        tiles = _region_tiles(TerrainType.OPEN)
+        path = terrain_path(tiles, s_lat, s_lon, d_lat, d_lon, RouteMetric.FAST)
+        assert path is not None
+        expected_fuel = OFFROAD_FUEL_PENALTY * path.effective_distance_m
+        assert path.fuel_distance_m == pytest.approx(expected_fuel)
+        assert path.fuel_distance_m > path.effective_distance_m  # thirstier than time alone

@@ -22,6 +22,7 @@ import h3
 from app.domain.route import RouteMetric, RoutePath
 from app.domain.tile import TerrainType
 from app.services.cost_model import (
+    OFFROAD_FUEL_PENALTY,
     TERRAIN_FUEL,
     TERRAIN_SPEED,
     TileFactors,
@@ -37,10 +38,15 @@ TileMap = Mapping[str, TileInfo]
 
 
 def _terrain_factors(terrain: TerrainType) -> TileFactors:
-    """Off-road factors: terrain only, no road-condition multiplier (the unit is off the roads)."""
+    """Off-road factors: terrain only, no road-condition multiplier (the unit is off the roads).
+
+    Fuel carries an explicit off-road penalty (``OFFROAD_FUEL_PENALTY``, v2 Wave 18 F5) on top of
+    the terrain factor — cross-country burns more. Speed is the bare terrain factor here; the
+    off-road speed penalty is applied once, via each unit's ``speed_offroad_kph`` in the planner.
+    """
     return TileFactors(
         speed_factor=TERRAIN_SPEED.get(terrain, 1.0),
-        fuel_factor=TERRAIN_FUEL.get(terrain, 1.0),
+        fuel_factor=TERRAIN_FUEL.get(terrain, 1.0) * OFFROAD_FUEL_PENALTY,
     )
 
 
@@ -200,3 +206,25 @@ def terrain_path(
         threat_avg=threat_avg,
         degraded=False,
     )
+
+
+def terrain_or_direct(
+    tiles: TileMap,
+    start_lat: float,
+    start_lon: float,
+    dest_lat: float,
+    dest_lon: float,
+    metric: RouteMetric,
+) -> RoutePath | None:
+    """Off-road path, falling back to a straight line when no terrain path exists (v2 Wave 18 F3).
+
+    Returns the A* terrain path; when that is ``None`` (the destination is unreachable over the
+    grid) it draws a **direct straight line** instead of surfacing "no route to that destination".
+    The fallback route is flagged ``degraded``. Returns ``None`` only when even a direct line is
+    impossible (no tiles / identical start and destination).
+    """
+    path = terrain_path(tiles, start_lat, start_lon, dest_lat, dest_lon, metric)
+    if path is not None:
+        return path
+    direct = direct_path(tiles, start_lat, start_lon, dest_lat, dest_lon, metric)
+    return direct.model_copy(update={"degraded": True}) if direct is not None else None

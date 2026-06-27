@@ -3,7 +3,7 @@ id: battlefuel-v2
 title: BattleFuel v2 — Combat UX, Routing, Scenarios & Onboarding
 status: planned
 version: 11
-hash: f43df56e
+hash: da5c6122
 created: 2026-06-02
 ---
 
@@ -80,7 +80,7 @@ pass — track them as a checklist **in each wave doc** (not here — this is th
 | Wave 14 | waves/battlefuel-v2-wave-14.md | Theater scenario — East/West frontline (immediate, 2026-06-08, build BEFORE Wave 13): reseed Hohenfels as a coherent East (OPFOR) vs West (NATO) battle split by an irregular N–S frontline (gaps + bulges); NATO combat units forward, depots + HQ in the rear, a few more frontline units; threats concentrated on the frontline with deeper-in sightings and a mostly-threat-filled East; slower threat tempo; light threats decay/disappear. | complete |
 | Wave 15 | waves/battlefuel-v2-wave-15.md | Branded landing page + faux security gate (immediate, 2026-06-08, build BETWEEN W14 and W13): a modern landing page with BattleFuel hero, "Powered by" Eraneos + World Fuel logos, a pretend "USER SECURITY ACCESS: APPROVED" clearance panel, and an "Enter BattleFuel" button that reveals the map app; gate shows once per browser session. (Delivers W8's landing-page portion — W8 reduced to the data-integration guide.) | complete |
 | Wave 16 | waves/battlefuel-v2-wave-16.md | Routing safety (immediate, 2026-06-08, build BEFORE Wave 13): SAFE genuinely diverges from FAST — avoids enemy troops via an echelon-scaled danger circle around each OPFOR unit, avoids high-threat tiles, and takes longer OFF-ROAD detours around danger when the only road runs through it (FAST stays short/exposed); plus per-leg waypoint modes (each manual leg picks its own road/offroad/hybrid/direct, changing one leg re-plans only that leg). | complete |
-| Wave 17 | waves/battlefuel-v2-wave-17.md | OF-8 selection-marker bug fixes: switching OF-8→OF-4 hides the purple locate circle with the depots; confirming a fuel run deselects the supply unit + clears its circle (parity with the OF-4 move-order confirm). | planned |
+| Wave 17 | waves/battlefuel-v2-wave-17.md | OF-8 selection-marker bug fixes: switching OF-8→OF-4 hides the purple locate circle with the depots; confirming a fuel run deselects the supply unit + clears its circle (parity with the OF-4 move-order confirm). | complete |
 | Wave 18 | waves/battlefuel-v2-wave-18.md | Road-routing fidelity: snap to the nearest POINT on the nearest road (not a far vertex) + measure the true closest road to the target; straight dashed stubs join unit→first-road-point and last-road-point→target; off-road "no route" → straight line; off-road speed+fuel penalty tuned; ROAD-mode SAFE sticks to the road network (reverses the W16 auto-detour for road mode). | planned |
 | Wave 19 | waves/battlefuel-v2-wave-19.md | True hybrid routing: ONE composed route — stub to a road, follow roads while they help most (fast) / safest (safe), then break off-road to the target; prefer a direct route on short trips when it wins. (Today "hybrid" just picks the better WHOLE road-or-off-road route.) | planned |
 | Wave 20 | waves/battlefuel-v2-wave-20.md | Routing graph visibility + manual roads/paths: a top-row checkbox overlays the graph network (nodes+edges); OF-4 "Add road"/"Add path" tools draw a solid road / dotted path with remove-last-waypoint + stop, and on stop a popup connects first/last/both/none endpoints to the nearest graph node — drawn geometry enters the routing graph. | planned |

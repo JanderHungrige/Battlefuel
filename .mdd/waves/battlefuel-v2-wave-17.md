@@ -3,11 +3,11 @@ id: battlefuel-v2-wave-17
 title: "Wave 17: OF-8 selection-marker bug fixes"
 initiative: battlefuel-v2
 initiative_version: 11
-status: in_progress
+status: complete
 depends_on: none
 demo_state: "Two OF-8 selection-marker bugs are gone: (1) selecting a fuel depot on OF-8 activates the purple locate circle, and switching to OF-4 now hides that circle together with the depots (today it lingers while the depots disappear); (2) creating + confirming a fuel run deselects the supply unit and clears its locate circle — matching the OF-4 move-order confirmation behaviour (today the icon moves with the confirmed order but the circle stays and becomes fully visible)."
 created: 2026-06-26
-hash: 90e85664
+hash: 3e3854b2
 ---
 
 # Wave 17: OF-8 selection-marker bug fixes
@@ -22,9 +22,9 @@ See frontmatter `demo_state`.
 
 ## Done-When (close-out gate)
 Mark `complete` only after ALL three gates pass (never on a localhost demo):
-- [ ] **tested local** — `make dev`, demoed on localhost
-- [ ] **tested online** — on `dev-deployment`, deployed to `:3001`, verified
-- [ ] **merged into main / deployed in prod** — in `main`, live `:3000`
+- [x] **tested local** — `make dev`, demoed on localhost (after a dev-DB road_condition reset)
+- [x] **tested online** — on `dev-deployment`, deployed to `:3001`, verified
+- [x] **merged into main / deployed in prod** — in `main`, live `:3000` (prod merge `74949e0`, 2026-06-27)
 
 ## Features
 | # | Feature | Doc | Status | Depends on |
