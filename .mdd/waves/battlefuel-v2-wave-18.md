@@ -3,11 +3,11 @@ id: battlefuel-v2-wave-18
 title: "Wave 18: Road-routing fidelity — nearest-road snapping, straight stubs, off-road fallback"
 initiative: battlefuel-v2
 initiative_version: 11
-status: planned
+status: complete
 depends_on: battlefuel-v2-wave-17
 demo_state: "Road routes look right and reach the actual closest road. The engine snaps the start and destination to the nearest POINT on the nearest road edge (not a far-away graph vertex), so routing no longer feels random; a straight dashed stub joins the unit to its first road point and the last road point to the target (when either is off-road); choosing off-road to an unreachable point draws a straight line instead of 'no route to that destination'; off-road carries a real speed + fuel penalty; and in ROAD mode SAFEST sticks to the road network until closest to the point (no surprise cross-country detour — that now belongs to Hybrid)."
 created: 2026-06-26
-hash: 277d04fb
+hash: da77551c
 ---
 
 # Wave 18: Road-routing fidelity
@@ -23,20 +23,26 @@ See frontmatter `demo_state`.
 
 ## Done-When (close-out gate)
 Mark `complete` only after ALL three gates pass (never on a localhost demo):
-- [ ] **tested local** — `make dev`, demoed on localhost
-- [ ] **tested online** — on `dev-deployment`, deployed to `:3001`, verified
-- [ ] **merged into main / deployed in prod** — in `main`, live `:3000`
+- [x] **tested local** — `make dev`, demoed on localhost
+- [x] **tested online** — on `dev-deployment`, deployed to `:3001`, verified
+- [x] **merged into main / deployed in prod** — in `main`, live `:3000` (prod merge `743ee00`, 2026-06-27)
 
 ## Features
 | # | Feature | Doc | Status | Depends on |
 |---|---------|-----|--------|------------|
-| 1 | nearest-road-point-snap | — | planned | — |
-| 2 | road-stub-geometry | — | planned | nearest-road-point-snap |
-| 3 | offroad-no-route-straight-line | — | planned | — |
-| 4 | road-safe-stick-to-roads | — | planned | — |
-| 5 | offroad-penalty-tuning | — | planned | — |
+| 1 | nearest-road-point-snap | docs/105-nearest-road-point-snap.md | complete | — |
+| 2 | road-stub-geometry | docs/106-road-stub-geometry.md | complete | nearest-road-point-snap |
+| 3 | offroad-no-route-straight-line | docs/107-offroad-no-route-straight-line.md | complete | — |
+| 4 | road-safe-stick-to-roads | docs/108-road-safe-stick-to-roads.md | complete | — |
+| 5 | offroad-penalty-tuning | docs/109-offroad-penalty-tuning.md | complete | — |
 
 Build order: 1 → 2; 3, 4, 5 independent.
+
+**Build status (2026-06-27):** all 5 features + snap Options 1-3 (true-metres ranking,
+lowest-total-cost edge choice via `pgr_withPointsCost`, realistic off-road stub cost) built + green
+(backend ruff/mypy, routing/planner/move/cost suites; frontend tsc + 302 tests). In prod
+(`743ee00`). Residual polish: dashed stub *styling* in MapView (verified at live gate). **Hybrid
+"best-of-both in one route" is W19** (current hybrid is a whole-route road-or-offroad pick).
 
 ### Current state (code investigation 2026-06-26)
 - **Snap is to nearest VERTEX, not nearest point.** `app/providers/routing.py` `_PATH_SQL`
