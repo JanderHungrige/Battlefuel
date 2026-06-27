@@ -135,17 +135,52 @@ class TestNearestPointSnapAndStubs:
             # Total distance exceeds the straight-line distance (stub + road).
             straight = haversine_m(_A[1], _A[0], _B[1], _B[0])
             assert path.distance_m >= straight
+            # Option 3: the off-road stubs are priced above road rate, so the time-proxy
+            # (effective) exceeds the raw distance.
+            assert path.effective_distance_m > path.distance_m
 
-    async def test_snaps_to_true_nearest_road_by_metres_not_degrees(self) -> None:
-        # Option 1 regression guard: _B's true nearest road is ~92 m away; the old planar-degree
-        # ordering wrongly picked a ~124 m edge (lon/lat degrees are anisotropic at 49°N). The
-        # geography re-rank must pick the genuinely closest road.
+    async def _build_with(self, session: AsyncSession, selector: object) -> object:
+        """Run an endpoint selector (_NEAREST_SQL / _CHOOSE_SQL) then the geometry query, returning
+        the geometry row — lets tests compare the two selection strategies head to head."""
+        from app.providers.routing import _BLOCKED_COST, _WITHPOINTS_SQL, _primary_edges
+        from app.services.cost_model import OFFROAD_FUEL_PENALTY, OFFROAD_STUB_SPEED_FACTOR
+
+        base = {
+            "slon": _A[1], "slat": _A[0], "dlon": _B[1], "dlat": _B[0],
+            "blocked": _BLOCKED_COST, "edges": _primary_edges(RouteMetric.FAST),
+            "stub_speed": OFFROAD_STUB_SPEED_FACTOR, "fuel_pen": OFFROAD_FUEL_PENALTY,
+        }
+        sel = (await session.execute(selector, base)).first()  # type: ignore[arg-type]
+        assert sel is not None
+        gp = {
+            **base, "se_gid": sel.se_gid, "se_frac": float(sel.se_frac),
+            "de_gid": sel.de_gid, "de_frac": float(sel.de_frac),
+        }
+        return (await session.execute(_WITHPOINTS_SQL, gp)).one()
+
+    async def test_nearest_selector_uses_true_metres_not_degrees(self) -> None:
+        # Option 1: the nearest selector ranks by TRUE metres. _B's nearest road is ~92 m away; the
+        # old planar-degree ordering wrongly picked a ~124 m edge (degrees are anisotropic at 49°N).
+        from app.providers.routing import _NEAREST_SQL, _point_from_geojson
+
         async with _session() as session:
             await _require_graph(session)
-            path = await PgRoutingProvider().shortest_path(session, *_A, *_B, RouteMetric.FAST)
-            assert path is not None and path.road_exit is not None
-            snap_m = haversine_m(path.road_exit[0], path.road_exit[1], _B[1], _B[0])
+            row = await self._build_with(session, _NEAREST_SQL)
+            exit_pt = _point_from_geojson(row.exit_pt)  # type: ignore[attr-defined]
+            assert exit_pt is not None
+            snap_m = haversine_m(exit_pt[0], exit_pt[1], _B[1], _B[0])
             assert snap_m < 110  # ~92 m (true nearest); the planar bug would give ~124 m
+
+    async def test_route_cost_pick_is_never_longer_than_nearest(self) -> None:
+        # Option 2: choosing the lowest-total-cost candidate pair never yields a longer total route
+        # than the plain nearest snap (it trades a slightly farther snap for a shorter road).
+        from app.providers.routing import _CHOOSE_SQL, _NEAREST_SQL
+
+        async with _session() as session:
+            await _require_graph(session)
+            route_cost = await self._build_with(session, _CHOOSE_SQL)
+            nearest = await self._build_with(session, _NEAREST_SQL)
+            assert route_cost.distance_m <= nearest.distance_m + 1.0  # type: ignore[attr-defined]
 
 
 @pytest.mark.db

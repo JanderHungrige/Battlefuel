@@ -29,6 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings, get_settings
 from app.domain.route import RouteMetric, RouteMode, RoutePath
+from app.services.cost_model import OFFROAD_FUEL_PENALTY, OFFROAD_STUB_SPEED_FACTOR
 
 logger = logging.getLogger(__name__)
 
@@ -108,30 +109,15 @@ _WITHPOINTS_SQL = text(
     WITH
     s AS (SELECT ST_SetSRID(ST_MakePoint(:slon, :slat), 4326) AS g),
     d AS (SELECT ST_SetSRID(ST_MakePoint(:dlon, :dlat), 4326) AS g),
-    -- v2 Wave 18 (Option 1): take the 20 nearest edges by the index-assisted planar <-> operator
-    -- (a candidate POOL), then re-rank by TRUE metres (geography). Ordering by raw lon/lat degrees
-    -- is anisotropic at this latitude (1° lon ≈ 73 km vs 1° lat ≈ 111 km), so it would pick an
-    -- east/west edge that is actually farther in metres than a north/south one — the "wrong road
-    -- past a threshold line" bug. The pool keeps the spatial index in play; the re-rank is exact.
+    -- The start/dest edges + snap fractions are chosen upstream (Option 1 nearest-by-metres or
+    -- Option 2 lowest-total-route-cost) and passed in as :se_gid/:se_frac, :de_gid/:de_frac.
     se AS (
-        SELECT gid, the_geom, source, target,
-               GREATEST(0.0, LEAST(1.0, ST_LineLocatePoint(the_geom, (SELECT g FROM s)))) AS f
-        FROM (
-            SELECT gid, the_geom, source, target FROM ways
-            WHERE COALESCE(time_cost, length_m) < :blocked AND {obstacle}
-            ORDER BY the_geom <-> (SELECT g FROM s) LIMIT 20
-        ) cand
-        ORDER BY cand.the_geom::geography <-> (SELECT g FROM s)::geography LIMIT 1
+        SELECT gid, the_geom, source, target, CAST(:se_frac AS double precision) AS f
+        FROM ways WHERE gid = :se_gid
     ),
     de AS (
-        SELECT gid, the_geom, source, target,
-               GREATEST(0.0, LEAST(1.0, ST_LineLocatePoint(the_geom, (SELECT g FROM d)))) AS f
-        FROM (
-            SELECT gid, the_geom, source, target FROM ways
-            WHERE COALESCE(time_cost, length_m) < :blocked AND {obstacle}
-            ORDER BY the_geom <-> (SELECT g FROM d) LIMIT 20
-        ) cand
-        ORDER BY cand.the_geom::geography <-> (SELECT g FROM d)::geography LIMIT 1
+        SELECT gid, the_geom, source, target, CAST(:de_frac AS double precision) AS f
+        FROM ways WHERE gid = :de_gid
     ),
     entry AS (SELECT ST_LineInterpolatePoint((SELECT the_geom FROM se), (SELECT f FROM se)) AS p),
     exitp AS (SELECT ST_LineInterpolatePoint((SELECT the_geom FROM de), (SELECT f FROM de)) AS p),
@@ -191,13 +177,109 @@ _WITHPOINTS_SQL = text(
             ARRAY[(SELECT g FROM s), (SELECT g FROM road), (SELECT g FROM d)]
         )) AS geom,
         (SELECT dist FROM road) + s_m + d_m AS distance_m,
-        (SELECT eff FROM road) + s_m + d_m AS effective_distance_m,
-        (SELECT fuel FROM road) + s_m + d_m AS fuel_distance_m,
+        (SELECT eff FROM road) + (s_m + d_m) / :stub_speed AS effective_distance_m,
+        (SELECT fuel FROM road) + (s_m + d_m) * :fuel_pen AS fuel_distance_m,
         (SELECT tmax FROM road) AS threat_max,
         (SELECT tavg FROM road) AS threat_avg,
         ST_AsGeoJSON((SELECT p FROM entry)) AS entry_pt,
         ST_AsGeoJSON((SELECT p FROM exitp)) AS exit_pt
     FROM stub
+    """.replace("{obstacle}", _OBSTACLE_FILTER)
+)
+
+
+# v2 Wave 18 Option 1: choose the start/dest edge = nearest by TRUE metres. Take the 20 nearest by
+# the index-assisted planar <-> (candidate pool — keeps the spatial index in play), then re-rank by
+# geography. Raw lon/lat degrees are anisotropic at 49°N (1° lon ≈ 73 km vs 1° lat ≈ 111 km), so
+# the planar nearest can be farther in metres — the "wrong road past a threshold line" bug.
+_NEAREST_SQL = text(
+    """
+    WITH
+    s AS (SELECT ST_SetSRID(ST_MakePoint(:slon, :slat), 4326) AS g),
+    d AS (SELECT ST_SetSRID(ST_MakePoint(:dlon, :dlat), 4326) AS g),
+    se AS (
+        SELECT gid,
+               GREATEST(0.001, LEAST(0.999, ST_LineLocatePoint(the_geom, (SELECT g FROM s)))) AS f
+        FROM (
+            SELECT gid, the_geom FROM ways
+            WHERE COALESCE(time_cost, length_m) < :blocked AND {obstacle}
+            ORDER BY the_geom <-> (SELECT g FROM s) LIMIT 20
+        ) c ORDER BY c.the_geom::geography <-> (SELECT g FROM s)::geography LIMIT 1
+    ),
+    de AS (
+        SELECT gid,
+               GREATEST(0.001, LEAST(0.999, ST_LineLocatePoint(the_geom, (SELECT g FROM d)))) AS f
+        FROM (
+            SELECT gid, the_geom FROM ways
+            WHERE COALESCE(time_cost, length_m) < :blocked AND {obstacle}
+            ORDER BY the_geom <-> (SELECT g FROM d) LIMIT 20
+        ) c ORDER BY c.the_geom::geography <-> (SELECT g FROM d)::geography LIMIT 1
+    )
+    SELECT (SELECT gid FROM se) AS se_gid, (SELECT f FROM se) AS se_frac,
+           (SELECT gid FROM de) AS de_gid, (SELECT f FROM de) AS de_frac
+    """.replace("{obstacle}", _OBSTACLE_FILTER)
+)
+
+
+# v2 Wave 18 Option 2: choose the start/dest edge by lowest TOTAL route cost, not just nearest. The
+# single nearest edge can be a dead-end spur pointing away, forcing a U-turn. Take the 5 nearest
+# (true metres) at each end as candidates, get the on-road cost for every pair via
+# pgr_withPointsCost, and pick the pair minimizing (route cost + both off-road stub lengths). For
+# FAST the cost is the metre-scale time-proxy (comparable to the stub metres); for SAFE it is
+# threat-weighted, so the stub is a minor tie-break (SAFE rightly prefers the safe road).
+_CHOOSE_SQL = text(
+    """
+    WITH
+    s AS (SELECT ST_SetSRID(ST_MakePoint(:slon, :slat), 4326) AS g),
+    d AS (SELECT ST_SetSRID(ST_MakePoint(:dlon, :dlat), 4326) AS g),
+    sc AS (
+        SELECT row_number() OVER () AS pid, gid, frac, stub_m FROM (
+            SELECT gid,
+                   GREATEST(0.001,
+                            LEAST(0.999, ST_LineLocatePoint(the_geom, (SELECT g FROM s)))) AS frac,
+                   ST_ClosestPoint(the_geom, (SELECT g FROM s))::geography
+                       <-> (SELECT g FROM s)::geography AS stub_m
+            FROM (
+                SELECT gid, the_geom FROM ways
+                WHERE COALESCE(time_cost, length_m) < :blocked AND {obstacle}
+                ORDER BY the_geom <-> (SELECT g FROM s) LIMIT 20
+            ) c ORDER BY stub_m LIMIT 5
+        ) q
+    ),
+    dc AS (
+        SELECT 100 + row_number() OVER () AS pid, gid, frac, stub_m FROM (
+            SELECT gid,
+                   GREATEST(0.001,
+                            LEAST(0.999, ST_LineLocatePoint(the_geom, (SELECT g FROM d)))) AS frac,
+                   ST_ClosestPoint(the_geom, (SELECT g FROM d))::geography
+                       <-> (SELECT g FROM d)::geography AS stub_m
+            FROM (
+                SELECT gid, the_geom FROM ways
+                WHERE COALESCE(time_cost, length_m) < :blocked AND {obstacle}
+                ORDER BY the_geom <-> (SELECT g FROM d) LIMIT 20
+            ) c ORDER BY stub_m LIMIT 5
+        ) q
+    ),
+    pts AS (
+        SELECT string_agg(format('(%s,%s,%s)', pid, gid, frac), ',') AS ps
+        FROM (SELECT pid, gid, frac FROM sc UNION ALL SELECT pid, gid, frac FROM dc) z
+    ),
+    cost AS (
+        SELECT start_pid, end_pid, agg_cost FROM pgr_withPointsCost(
+            :edges,
+            'SELECT * FROM (VALUES ' || (SELECT ps FROM pts) || ') t(pid,edge_id,fraction)',
+            (SELECT array_agg(-pid) FROM sc), (SELECT array_agg(-pid) FROM dc), directed := true
+        )
+    ),
+    best AS (
+        SELECT sc.gid AS se_gid, sc.frac AS se_frac, dc.gid AS de_gid, dc.frac AS de_frac,
+               cost.agg_cost + (sc.stub_m + dc.stub_m) / :stub_speed AS total
+        FROM cost
+        JOIN sc ON sc.pid = -cost.start_pid
+        JOIN dc ON dc.pid = -cost.end_pid
+        ORDER BY total LIMIT 1
+    )
+    SELECT se_gid, se_frac, de_gid, de_frac FROM best
     """.replace("{obstacle}", _OBSTACLE_FILTER)
 )
 
@@ -272,25 +354,31 @@ class PgRoutingProvider(RoutingProvider):
             "dlon": dest_lon,
             "dlat": dest_lat,
             "blocked": _BLOCKED_COST,
+            "stub_speed": OFFROAD_STUB_SPEED_FACTOR,  # v2 W18 Option 3: off-road stub time/select
+            "fuel_pen": OFFROAD_FUEL_PENALTY,
         }
-        # 1) Primary: snap to the nearest POINT on the nearest road + straight stubs (v2 Wave 18
-        #    F1/F2) over the blocked-/obstacle-aware metric graph.
-        row = await self._run_withpoints(session, params, _primary_edges(metric))
-        if row is not None:
-            coords = _coords_from_geojson(row.geom)
-            if coords:
-                return RoutePath(
-                    metric=metric,
-                    geometry=coords,
-                    distance_m=float(row.distance_m),
-                    effective_distance_m=float(row.effective_distance_m),
-                    fuel_distance_m=float(row.fuel_distance_m),
-                    threat_max=int(row.threat_max),
-                    threat_avg=float(row.threat_avg),
-                    degraded=False,
-                    road_entry=_point_from_geojson(row.entry_pt),
-                    road_exit=_point_from_geojson(row.exit_pt),
-                )
+        edges = _primary_edges(metric)
+        # 1) Primary: choose the start/dest road edge (Option 2 lowest-total-cost, else Option 1
+        #    nearest-by-metres), then build the on-road route + straight stubs from the chosen
+        #    point on the chosen edge (v2 Wave 18 F1/F2).
+        chosen = await self._choose_endpoints(session, params, edges)
+        if chosen is not None:
+            row = await self._run_geom(session, {**params, "edges": edges, **chosen})
+            if row is not None:
+                coords = _coords_from_geojson(row.geom)
+                if coords:
+                    return RoutePath(
+                        metric=metric,
+                        geometry=coords,
+                        distance_m=float(row.distance_m),
+                        effective_distance_m=float(row.effective_distance_m),
+                        fuel_distance_m=float(row.fuel_distance_m),
+                        threat_max=int(row.threat_max),
+                        threat_avg=float(row.threat_avg),
+                        degraded=False,
+                        road_entry=_point_from_geojson(row.entry_pt),
+                        road_exit=_point_from_geojson(row.exit_pt),
+                    )
         # 2) Legacy primary: vertex-snap dijkstra over the same metric graph (covers cases where the
         #    point couldn't be placed on an edge, e.g. the nearest edge is filtered out).
         row = await self._run(session, params, _primary_edges(metric))
@@ -330,23 +418,43 @@ class PgRoutingProvider(RoutingProvider):
         """Run the snap → dijkstra → build query for one edge set; returns the single result row."""
         return (await session.execute(_PATH_SQL, {**params, "edges": edges_sql})).one()
 
-    async def _run_withpoints(
+    async def _choose_endpoints(
         self, session: AsyncSession, params: Mapping[str, object], edges_sql: str
-    ) -> Row[Any] | None:
-        """Run the nearest-point withPoints query; ``None`` if it errored (falls back to dijkstra).
+    ) -> dict[str, object] | None:
+        """Pick the start/dest road edge + snap fraction: Option 2 (lowest total route cost) first,
+        falling back to Option 1 (nearest by metres). Returns the bind params for the geometry query
+        (``se_gid``/``se_frac``/``de_gid``/``de_frac``), or ``None`` if no road edge is reachable.
 
-        pgr_withPoints can raise when the snapped point sits exactly on a vertex or the nearest
-        edge is isolated; we treat any failure as "use the legacy path" rather than failing the
-        whole request, so routing is never less robust than before. The attempt runs inside a
-        SAVEPOINT so a failure rolls back only the failed statement, never the caller's transaction.
-        """
+        Each query runs in a SAVEPOINT so a pgRouting failure (e.g. a degenerate candidate set)
+        rolls back only that statement and we drop to the next strategy — never less robust."""
+        for sql in (_CHOOSE_SQL, _NEAREST_SQL):
+            try:
+                async with session.begin_nested():
+                    r = (await session.execute(sql, {**params, "edges": edges_sql})).first()
+            except SQLAlchemyError as exc:
+                logger.warning("routing: endpoint selection failed (%s); trying next strategy", exc)
+                continue
+            if r is not None and r.se_gid is not None and r.de_gid is not None:
+                return {
+                    "se_gid": r.se_gid,
+                    "se_frac": float(r.se_frac),
+                    "de_gid": r.de_gid,
+                    "de_frac": float(r.de_frac),
+                }
+        return None
+
+    async def _run_geom(
+        self, session: AsyncSession, gparams: Mapping[str, object]
+    ) -> Row[Any] | None:
+        """Build the withPoints on-road geometry + stubs for the chosen edges; ``None`` if it errors
+        (then shortest_path drops to the legacy vertex-snap dijkstra). Runs in a SAVEPOINT."""
         try:
             async with session.begin_nested():
-                return (
-                    await session.execute(_WITHPOINTS_SQL, {**params, "edges": edges_sql})
-                ).one()
+                return (await session.execute(_WITHPOINTS_SQL, gparams)).one()
         except SQLAlchemyError as exc:
-            logger.warning("routing: withPoints snap failed (%s); falling back to vertex snap", exc)
+            logger.warning(
+                "routing: withPoints geometry failed (%s); falling back to vertex snap", exc
+            )
             return None
 
 
