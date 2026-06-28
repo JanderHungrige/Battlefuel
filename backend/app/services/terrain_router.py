@@ -14,7 +14,7 @@ keeps this module deterministically unit-testable with a hand-built tile map.
 from __future__ import annotations
 
 import heapq
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from itertools import pairwise
 
 import h3
@@ -23,6 +23,7 @@ from app.domain.route import RouteMetric, RoutePath
 from app.domain.tile import TerrainType
 from app.services.cost_model import (
     OFFROAD_FUEL_PENALTY,
+    OFFROAD_STUB_SPEED_FACTOR,
     TERRAIN_FUEL,
     TERRAIN_SPEED,
     TileFactors,
@@ -36,6 +37,10 @@ from app.services.tile_grid import DEFAULT_RESOLUTION
 TileInfo = tuple[TerrainType, int]
 TileMap = Mapping[str, TileInfo]
 
+# Per-cell cost factors, given (terrain, h3 cell). Lets one A* serve pure off-road (terrain only)
+# and the road-aware hybrid (cheap on road cells, penalised off them) — v2 Wave 19.
+FactorsFn = Callable[[TerrainType, str], TileFactors]
+
 
 def _terrain_factors(terrain: TerrainType) -> TileFactors:
     """Off-road factors: terrain only, no road-condition multiplier (the unit is off the roads).
@@ -48,6 +53,11 @@ def _terrain_factors(terrain: TerrainType) -> TileFactors:
         speed_factor=TERRAIN_SPEED.get(terrain, 1.0),
         fuel_factor=TERRAIN_FUEL.get(terrain, 1.0) * OFFROAD_FUEL_PENALTY,
     )
+
+
+def _terrain_only(terrain: TerrainType, _cell: str) -> TileFactors:
+    """``FactorsFn`` for the pure off-road routers (terrain factors, cell ignored)."""
+    return _terrain_factors(terrain)
 
 
 def _lonlat(cell: str) -> list[float]:
@@ -70,17 +80,39 @@ def _neighbors(tiles: TileMap, cell: str) -> Iterator[str]:
             yield n
 
 
-def _step_cost(tiles: TileMap, frm: str, to: str, metric: RouteMetric) -> float:
-    """Search cost of stepping into ``to``: terrain time-proxy, threat-weighted when SAFE."""
+def _hybrid_factors(roads: frozenset[str]) -> FactorsFn:
+    """Road-aware factors for the hybrid router (v2 Wave 19). A cell carrying a road travels at
+    ROAD speed (factor 1.0); a cell off the road network travels at terrain speed scaled by the
+    off-road penalty (``OFFROAD_STUB_SPEED_FACTOR``) so roads are genuinely preferred — without it,
+    open terrain (TERRAIN_SPEED 1.0) is as cheap as a road and hybrid collapses onto a straight
+    cross-country line. Off-road cells also carry the off-road fuel penalty."""
+
+    def factors(terrain: TerrainType, cell: str) -> TileFactors:
+        if cell in roads:
+            return TileFactors(speed_factor=1.0, fuel_factor=1.0)
+        return TileFactors(
+            speed_factor=TERRAIN_SPEED.get(terrain, 1.0) * OFFROAD_STUB_SPEED_FACTOR,
+            fuel_factor=TERRAIN_FUEL.get(terrain, 1.0) * OFFROAD_FUEL_PENALTY,
+        )
+
+    return factors
+
+
+def _step_cost(
+    tiles: TileMap, frm: str, to: str, metric: RouteMetric, factors_fn: FactorsFn
+) -> float:
+    """Search cost of stepping into ``to``: time-proxy from ``factors_fn``, threat-weighted SAFE."""
     a, b = _lonlat(frm), _lonlat(to)
     terrain, threat = tiles[to]
-    time_cost = edge_time_cost(haversine_m(a[0], a[1], b[0], b[1]), _terrain_factors(terrain))
+    time_cost = edge_time_cost(haversine_m(a[0], a[1], b[0], b[1]), factors_fn(terrain, to))
     if metric is RouteMetric.SAFE:
         return safe_edge_cost(time_cost, threat)
     return time_cost
 
 
-def _a_star(tiles: TileMap, start: str, dest: str, metric: RouteMetric) -> list[str] | None:
+def _a_star(
+    tiles: TileMap, start: str, dest: str, metric: RouteMetric, factors_fn: FactorsFn
+) -> list[str] | None:
     """A* from ``start`` to ``dest``; admissible straight-line heuristic. None if unreachable."""
     dest_c = _lonlat(dest)
 
@@ -97,7 +129,7 @@ def _a_star(tiles: TileMap, start: str, dest: str, metric: RouteMetric) -> list[
         if current == dest:
             break
         for nxt in _neighbors(tiles, current):
-            new_cost = cost_so_far[current] + _step_cost(tiles, current, nxt, metric)
+            new_cost = cost_so_far[current] + _step_cost(tiles, current, nxt, metric, factors_fn)
             if nxt not in cost_so_far or new_cost < cost_so_far[nxt]:
                 cost_so_far[nxt] = new_cost
                 came_from[nxt] = current
@@ -114,12 +146,14 @@ def _a_star(tiles: TileMap, start: str, dest: str, metric: RouteMetric) -> list[
     return path
 
 
-def _cost_over_cells(path: list[str], tiles: TileMap) -> tuple[float, float, float, int, float]:
+def _cost_over_cells(
+    path: list[str], tiles: TileMap, factors_fn: FactorsFn
+) -> tuple[float, float, float, int, float]:
     """Accumulate (distance, effective, fuel, threat_max, threat_avg) along an ordered cell list."""
     distance_m = effective_m = fuel_m = 0.0
     for frm, to in pairwise(path):
         a, b = _lonlat(frm), _lonlat(to)
-        factors = _terrain_factors(tiles[to][0])
+        factors = factors_fn(tiles[to][0], to)
         step_d = haversine_m(a[0], a[1], b[0], b[1])
         step_t = edge_time_cost(step_d, factors)
         distance_m += step_d
@@ -189,13 +223,98 @@ def terrain_path(
     dest = _nearest_cell(tiles, dest_lat, dest_lon)
     if start == dest:
         return None
-    path = _a_star(tiles, start, dest, metric)
+    path = _a_star(tiles, start, dest, metric, _terrain_only)
     if path is None or len(path) < 2:
         return None
-    distance_m, effective_m, fuel_m, threat_max, threat_avg = _cost_over_cells(path, tiles)
+    distance_m, effective_m, fuel_m, threat_max, threat_avg = _cost_over_cells(
+        path, tiles, _terrain_only
+    )
     geometry = [_lonlat(c) for c in path]
     geometry[0] = [start_lon, start_lat]  # anchor exactly at the unit centre
     geometry[-1] = [dest_lon, dest_lat]  # anchor exactly at the clicked point
+    return RoutePath(
+        metric=metric,
+        geometry=geometry,
+        distance_m=distance_m,
+        effective_distance_m=effective_m,
+        fuel_distance_m=fuel_m,
+        threat_max=threat_max,
+        threat_avg=threat_avg,
+        degraded=False,
+    )
+
+
+def hybrid_cell_path(
+    tiles: TileMap,
+    roads: frozenset[str],
+    start_lat: float,
+    start_lon: float,
+    dest_lat: float,
+    dest_lon: float,
+    metric: RouteMetric,
+) -> list[str] | None:
+    """The ordered H3 cells of the road-aware hybrid A* (v2 Wave 19 F1), or ``None``. Exposed so the
+    provider can re-draw road runs with real ``ways`` geometry while keeping this decision."""
+    if not tiles:
+        return None
+    start = _nearest_cell(tiles, start_lat, start_lon)
+    dest = _nearest_cell(tiles, dest_lat, dest_lon)
+    if start == dest:
+        return None
+    path = _a_star(tiles, start, dest, metric, _hybrid_factors(roads))
+    if path is None or len(path) < 2:
+        return None
+    return path
+
+
+def cells_to_route(
+    cells: list[str], tiles: TileMap, roads: frozenset[str], metric: RouteMetric
+) -> RoutePath:
+    """Build a `RoutePath` for an ordered cell run using the hybrid (road-aware) factors + hex
+    geometry (v2 Wave 19). Used for the off-road runs of the stitched hybrid route; road runs are
+    drawn from the real ways graph instead. ``cells`` must have at least one cell."""
+    fn = _hybrid_factors(roads)
+    distance_m, effective_m, fuel_m, threat_max, threat_avg = _cost_over_cells(cells, tiles, fn)
+    return RoutePath(
+        metric=metric,
+        geometry=[_lonlat(c) for c in cells],
+        distance_m=distance_m,
+        effective_distance_m=effective_m,
+        fuel_distance_m=fuel_m,
+        threat_max=threat_max,
+        threat_avg=threat_avg,
+        degraded=False,
+    )
+
+
+def hybrid_path(
+    tiles: TileMap,
+    roads: frozenset[str],
+    start_lat: float,
+    start_lon: float,
+    dest_lat: float,
+    dest_lon: float,
+    metric: RouteMetric,
+) -> RoutePath | None:
+    """Road-aware A* over the H3 grid — the true segmented hybrid (v2 Wave 19 F1).
+
+    One search over the terrain grid where cells carrying a road cost ROAD speed and off-road cells
+    are penalised (``OFFROAD_STUB_SPEED_FACTOR``). The result naturally **follows roads** where they
+    help, **cuts cross-country** where a shortcut beats the road despite the off-road penalty, and
+    on SAFE **leaves the road only to skirt high-threat cells** then rejoins. ``roads`` is the
+    set of H3 cells touched by the road graph. Endpoints are anchored at the exact start/dest.
+
+    Geometry is hex-centre granularity (coarser than the pure-road geometry); the route conveys the
+    road-vs-shortcut shape. Returns ``None`` if start == dest cell or the grid is empty.
+    """
+    path = hybrid_cell_path(tiles, roads, start_lat, start_lon, dest_lat, dest_lon, metric)
+    if path is None:
+        return None
+    fn = _hybrid_factors(roads)
+    distance_m, effective_m, fuel_m, threat_max, threat_avg = _cost_over_cells(path, tiles, fn)
+    geometry = [_lonlat(c) for c in path]
+    geometry[0] = [start_lon, start_lat]
+    geometry[-1] = [dest_lon, dest_lat]
     return RoutePath(
         metric=metric,
         geometry=geometry,

@@ -521,6 +521,99 @@ class DirectRoutingProvider(RoutingProvider):
         return direct_path(tile_map, start_lat, start_lon, dest_lat, dest_lon, metric)
 
 
+class HybridRoutingProvider(RoutingProvider):
+    """Road-aware segmented hybrid router (v2 Wave 19 F1): one A* over the H3 grid where cells that
+    carry a road cost ROAD speed and off-road cells are penalised. The route therefore **follows
+    roads** where they help, **cuts cross-country** where a shortcut beats the road despite the
+    off-road penalty, and on SAFE **leaves the road only to skirt high-threat cells** then rejoins —
+    instead of the old whole-route road-or-offroad pick that collapsed onto a straight line."""
+
+    async def shortest_path(
+        self,
+        session: AsyncSession,
+        start_lat: float,
+        start_lon: float,
+        dest_lat: float,
+        dest_lon: float,
+        metric: RouteMetric,
+    ) -> RoutePath | None:
+        from app.providers.enemy_units import build_enemy_unit_provider
+        from app.providers.tiles import build_tile_provider
+        from app.services.enemy_danger import enemy_threat_at
+        from app.services.terrain_router import hybrid_cell_path, hybrid_path
+
+        enemies = list(build_enemy_unit_provider().units())
+        tiles = await build_tile_provider().list_tiles(session)
+        tile_map = {
+            t.h3_index: (
+                t.terrain,
+                max(t.threat_level, enemy_threat_at(t.center_lat, t.center_lon, enemies)),
+            )
+            for t in tiles
+        }
+        # Cells carrying a road (edge midpoint cell) — the "is on a road" set for the A*.
+        rows = await session.execute(
+            text("SELECT DISTINCT cell_h3 FROM ways WHERE cell_h3 IS NOT NULL")
+        )
+        roads = frozenset(r[0] for r in rows)
+        cells = hybrid_cell_path(tile_map, roads, start_lat, start_lon, dest_lat, dest_lon, metric)
+        if cells is None:
+            return None
+        # Build the route from real legs: each maximal run of ROAD cells is routed on the real ways
+        # graph (so hybrid visibly hugs streets, reusing the W18 nearest-point snap + stubs); each
+        # OFF-ROAD run keeps terrain cost + hex geometry. stitch_paths sums cost so distance/ETA/
+        # fuel match the drawn line (v2 Wave 19 — road-geometry stitch).
+        stitched = await self._stitch_hybrid_route(
+            session, cells, roads, tile_map, (start_lat, start_lon), (dest_lat, dest_lon), metric
+        )
+        if stitched is not None:
+            return stitched
+        # Stitch failed (e.g. a road leg couldn't resolve) — fall back to the hex-geometry route.
+        return hybrid_path(tile_map, roads, start_lat, start_lon, dest_lat, dest_lon, metric)
+
+    async def _stitch_hybrid_route(
+        self,
+        session: AsyncSession,
+        cells: list[str],
+        roads: frozenset[str],
+        tile_map: object,
+        start: tuple[float, float],
+        dest: tuple[float, float],
+        metric: RouteMetric,
+    ) -> RoutePath | None:
+        """Walk the A* cell path; route each ROAD run on the real ways graph and each OFF-ROAD run
+        over the terrain, then stitch the legs into one RoutePath (summed cost + concatenated
+        geometry). Endpoints anchored at the exact start/destination."""
+        from app.services.route_planner import stitch_paths
+        from app.services.terrain_router import _lonlat, cells_to_route
+
+        road_provider = PgRoutingProvider()
+        legs: list[RoutePath] = []
+        n = len(cells)
+        i = 0
+        while i < n:
+            on_road = cells[i] in roads
+            j = i
+            while j < n and (cells[j] in roads) == on_road:
+                j += 1
+            p0 = list(start[::-1]) if i == 0 else _lonlat(cells[i])  # [lon, lat]
+            p1 = list(dest[::-1]) if j == n else _lonlat(cells[j - 1])
+            leg: RoutePath | None = None
+            if on_road and p0 != p1:
+                leg = await road_provider.shortest_path(session, p0[1], p0[0], p1[1], p1[0], metric)
+            if leg is None:
+                leg = cells_to_route(cells[i:j], tile_map, roads, metric)  # type: ignore[arg-type]
+            legs.append(leg)
+            i = j
+        stitched = stitch_paths(legs)
+        if stitched is None or not stitched.geometry:
+            return None
+        geom = [list(p) for p in stitched.geometry]
+        geom[0] = list(start[::-1])  # anchor exactly at the unit / destination
+        geom[-1] = list(dest[::-1])
+        return stitched.model_copy(update={"geometry": geom, "metric": metric})
+
+
 RoutingProviderBuilder = Callable[[], RoutingProvider]
 _REGISTRY: dict[str, RoutingProviderBuilder] = {}
 
@@ -548,16 +641,19 @@ def build_routing_provider(settings: Settings | None = None) -> RoutingProvider:
 register_routing_provider("pgrouting", PgRoutingProvider)
 register_routing_provider("terrain", TerrainRoutingProvider)
 register_routing_provider("direct", DirectRoutingProvider)
+register_routing_provider("hybrid", HybridRoutingProvider)
 
 
 def build_routing_provider_for_mode(
     mode: RouteMode, settings: Settings | None = None
 ) -> RoutingProvider:
     """Select the router for a travel mode: ``offroad`` → terrain A*, ``direct`` → straight
-    cross-country line, anything else → the configured road provider (pgRouting). ``hybrid`` is
-    composed in the planner from the road + off-road providers, so it is not a single provider."""
+    cross-country line, ``hybrid`` → the road-aware segmented A* (v2 Wave 19), anything else → the
+    configured road provider (pgRouting)."""
     if mode is RouteMode.OFFROAD:
         return _REGISTRY["terrain"]()
     if mode is RouteMode.DIRECT:
         return _REGISTRY["direct"]()
+    if mode is RouteMode.HYBRID:
+        return _REGISTRY["hybrid"]()
     return build_routing_provider(settings)
