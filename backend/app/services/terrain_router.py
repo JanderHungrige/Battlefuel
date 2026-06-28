@@ -244,6 +244,49 @@ def terrain_path(
     )
 
 
+def hybrid_cell_path(
+    tiles: TileMap,
+    roads: frozenset[str],
+    start_lat: float,
+    start_lon: float,
+    dest_lat: float,
+    dest_lon: float,
+    metric: RouteMetric,
+) -> list[str] | None:
+    """The ordered H3 cells of the road-aware hybrid A* (v2 Wave 19 F1), or ``None``. Exposed so the
+    provider can re-draw road runs with real ``ways`` geometry while keeping this decision."""
+    if not tiles:
+        return None
+    start = _nearest_cell(tiles, start_lat, start_lon)
+    dest = _nearest_cell(tiles, dest_lat, dest_lon)
+    if start == dest:
+        return None
+    path = _a_star(tiles, start, dest, metric, _hybrid_factors(roads))
+    if path is None or len(path) < 2:
+        return None
+    return path
+
+
+def cells_to_route(
+    cells: list[str], tiles: TileMap, roads: frozenset[str], metric: RouteMetric
+) -> RoutePath:
+    """Build a `RoutePath` for an ordered cell run using the hybrid (road-aware) factors + hex
+    geometry (v2 Wave 19). Used for the off-road runs of the stitched hybrid route; road runs are
+    drawn from the real ways graph instead. ``cells`` must have at least one cell."""
+    fn = _hybrid_factors(roads)
+    distance_m, effective_m, fuel_m, threat_max, threat_avg = _cost_over_cells(cells, tiles, fn)
+    return RoutePath(
+        metric=metric,
+        geometry=[_lonlat(c) for c in cells],
+        distance_m=distance_m,
+        effective_distance_m=effective_m,
+        fuel_distance_m=fuel_m,
+        threat_max=threat_max,
+        threat_avg=threat_avg,
+        degraded=False,
+    )
+
+
 def hybrid_path(
     tiles: TileMap,
     roads: frozenset[str],
@@ -264,16 +307,10 @@ def hybrid_path(
     Geometry is hex-centre granularity (coarser than the pure-road geometry); the route conveys the
     road-vs-shortcut shape. Returns ``None`` if start == dest cell or the grid is empty.
     """
-    if not tiles:
-        return None
-    start = _nearest_cell(tiles, start_lat, start_lon)
-    dest = _nearest_cell(tiles, dest_lat, dest_lon)
-    if start == dest:
+    path = hybrid_cell_path(tiles, roads, start_lat, start_lon, dest_lat, dest_lon, metric)
+    if path is None:
         return None
     fn = _hybrid_factors(roads)
-    path = _a_star(tiles, start, dest, metric, fn)
-    if path is None or len(path) < 2:
-        return None
     distance_m, effective_m, fuel_m, threat_max, threat_avg = _cost_over_cells(path, tiles, fn)
     geometry = [_lonlat(c) for c in path]
     geometry[0] = [start_lon, start_lat]

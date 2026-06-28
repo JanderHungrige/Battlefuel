@@ -23,8 +23,6 @@ phase: all
 mdd_version: 11
 tags: [routing, hybrid, terrain, astar, roads, segmented]
 path: Routing/Hybrid
-known_issues:
-  - "Geometry is hex-centre granularity (coarser than the pure-road geometry). Conveys the road-vs-shortcut shape; smoother true-road geometry for road segments is a possible follow-up if the hex path looks too jagged at the live gate."
 ---
 
 # 110 — Segmented hybrid router (road-aware A*)
@@ -55,8 +53,19 @@ One **road-aware A\*** over the H3 grid (`terrain_router.hybrid_path`):
   the provider, costed at **road speed** (its effective-distance is already road-speed-equivalent
   because off-road cells are inflated in the A* cost). The unused `offroad` param was removed.
 
-Verified A→B: FAST = 4.6 km road-heavy (crosses threat for speed); SAFE = 12.5 km, detours off-road
-to drop threat_max 5→2 and `effective > distance` (the off-road segments cost extra time).
+### Road-geometry stitch (2026-06-28, requester re-test)
+
+The first cut drew road runs as hex-centre-to-hex-centre, so a route that *used* a road still
+*looked* like cross-country ("more like off-road than hybrid"). Fix: the A* still **decides** the
+road-vs-off-road split (`hybrid_cell_path`), then `HybridRoutingProvider._stitch_hybrid_route` walks
+the cell path and, for each maximal **road run**, routes it on the **real ways graph**
+(`PgRoutingProvider`, reusing the W18 nearest-point snap + stubs) so it draws the actual street;
+each **off-road run** stays terrain cost + hex geometry (`cells_to_route`). The legs are combined
+with `stitch_paths`, so `distance`/ETA/fuel match the drawn line. Endpoints anchored at the exact
+unit/destination. Falls back to the hex `hybrid_path` if a road leg can't resolve.
+
+Verified A→B: FAST = 208-pt road-hugging line, `distance ≈ geometry length` (5880 ≈ 5870 m); SAFE =
+longer, lower-threat (threat_max 3 vs 4) with off-road detours stitched between road runs.
 
 ## Test
 
