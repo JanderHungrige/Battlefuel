@@ -556,6 +556,10 @@ class HybridRoutingProvider(RoutingProvider):
             text("SELECT DISTINCT cell_h3 FROM ways WHERE cell_h3 IS NOT NULL")
         )
         roads = frozenset(r[0] for r in rows)
+        from app.services.cost_model import OFFROAD_STUB_SPEED_FACTOR
+        from app.services.route_planner import pick_better_path
+        from app.services.terrain_router import direct_path
+
         cells = hybrid_cell_path(tile_map, roads, start_lat, start_lon, dest_lat, dest_lon, metric)
         if cells is None:
             return None
@@ -563,13 +567,22 @@ class HybridRoutingProvider(RoutingProvider):
         # graph (so hybrid visibly hugs streets, reusing the W18 nearest-point snap + stubs); each
         # OFF-ROAD run keeps terrain cost + hex geometry. stitch_paths sums cost so distance/ETA/
         # fuel match the drawn line (v2 Wave 19 — road-geometry stitch).
-        stitched = await self._stitch_hybrid_route(
+        hybrid = await self._stitch_hybrid_route(
             session, cells, roads, tile_map, (start_lat, start_lon), (dest_lat, dest_lon), metric
         )
-        if stitched is not None:
-            return stitched
-        # Stitch failed (e.g. a road leg couldn't resolve) — fall back to the hex-geometry route.
-        return hybrid_path(tile_map, roads, start_lat, start_lon, dest_lat, dest_lon, metric)
+        if hybrid is None:
+            # Stitch failed (e.g. a road leg couldn't resolve) — fall back to hex geometry.
+            hybrid = hybrid_path(tile_map, roads, start_lat, start_lon, dest_lat, dest_lon, metric)
+        # F2: on a short leg a clean straight line can beat going to a road and back — take the
+        # direct route when it wins on the active metric (FAST: less time; SAFE: not more threat).
+        # Direct is fully off-road, so put it on the hybrid's road-equivalent footing first (the
+        # hybrid A* slows off-road cells by OFFROAD_STUB_SPEED_FACTOR) — otherwise direct's terrain
+        # speed looks as fast as a road and wins every time (the "hybrid == direct" bug).
+        direct = direct_path(tile_map, start_lat, start_lon, dest_lat, dest_lon, metric)
+        if direct is not None:
+            eff = direct.effective_distance_m / OFFROAD_STUB_SPEED_FACTOR
+            direct = direct.model_copy(update={"effective_distance_m": eff})
+        return pick_better_path(metric, hybrid, direct)
 
     async def _stitch_hybrid_route(
         self,

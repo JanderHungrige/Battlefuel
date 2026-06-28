@@ -58,6 +58,19 @@ def build_option(
     )
 
 
+def pick_better_path(metric: RouteMetric, *paths: RoutePath | None) -> RoutePath | None:
+    """Pick the best of several candidate `RoutePath`s (v2 Wave 19 F2). FAST → lowest effective
+    distance (the time-proxy); SAFE → lowest threat_max, then effective. ``None`` inputs are
+    skipped; returns ``None`` only when every candidate is missing. Used by the hybrid provider to
+    take a clean direct line over the road-aware composition when direct wins on a short leg."""
+    candidates = [p for p in paths if p is not None]
+    if not candidates:
+        return None
+    if metric is RouteMetric.SAFE:
+        return min(candidates, key=lambda p: (p.threat_max, p.effective_distance_m))
+    return min(candidates, key=lambda p: p.effective_distance_m)
+
+
 def pick_route_option(
     metric: RouteMetric, road: RouteOption | None, offroad: RouteOption | None
 ) -> RouteOption | None:
