@@ -39,6 +39,7 @@ import { LOGISTIC_SITE_TYPES, logisticSiteLabel } from './lib/logisticSite'
 import { shouldRefuelOnClick } from './lib/refuelOnClick'
 import { canShow, type Role } from './roles'
 import { useObstacleOps } from './hooks/useObstacleOps'
+import { useRoutingGraph } from './hooks/useRoutingGraph'
 import { useSimSocket } from './hooks/useSimSocket'
 import { useAdviceMarker } from './hooks/useAdviceMarker'
 import { useAdvisor } from './hooks/useAdvisor'
@@ -117,6 +118,9 @@ export default function App() {
   )
   // Map-cell hover detail toggle (unify F6): off (default) → grid number only.
   const [hoverDetails, setHoverDetails] = useState(false)
+  // Routing-graph overlay toggle (v2 Wave 20 F2) — fetched once when first enabled.
+  const [showGraph, setShowGraph] = useState(false)
+  const routingGraph = useRoutingGraph(showGraph)
   // Seed hostile force merged with live chatter-driven sightings (v2 Wave 4 F6); dedup by id,
   // a dynamic sighting wins over a seed unit with the same id.
   const allEnemyUnits = useMemo(() => {
@@ -519,6 +523,16 @@ export default function App() {
             Fuel bars
           </label>
         )}
+        {theater && (
+          <label className="info-bars-toggle" data-testid="graph-overlay-toggle">
+            <input
+              type="checkbox"
+              checked={showGraph}
+              onChange={(e) => setShowGraph(e.target.checked)}
+            />
+            Graph
+          </label>
+        )}
         <span className="spacer" />
         {theater && <TourButton role={role} actions={tourActions} onEnd={clear} />}
         <span className="attribution">{OSM_ATTRIBUTION}</span>
@@ -534,6 +548,7 @@ export default function App() {
               units={units}
               unitTypes={unitTypes}
               routeGeometry={planning.routeGeometry}
+              routingGraph={routingGraph}
               destination={planning.destination}
               planning={selectedUnitId !== null}
               livePositions={livePositions}

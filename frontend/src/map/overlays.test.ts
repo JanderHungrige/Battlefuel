@@ -9,6 +9,8 @@ import {
   depotsToGeoJSON,
   enemyUnitsToGeoJSON,
   destinationToGeoJSON,
+  graphEdgesToGeoJSON,
+  graphNodesToGeoJSON,
   obstaclesToGeoJSON,
   paddedBounds,
   routeToGeoJSON,
@@ -186,6 +188,24 @@ describe('depotsToGeoJSON', () => {
       name: 'Main Supply Point',
       icon: 'depot:2-4', // diesel 50% → 2/4, jp8 100% → 4/4
     })
+  })
+})
+
+describe('routing-graph overlay (v2 Wave 20 F2)', () => {
+  it('edges become LineString features carrying threat, skipping degenerate ones', () => {
+    const fc = graphEdgesToGeoJSON([
+      { gid: 1, geometry: [[11.8, 49.2], [11.81, 49.21]], threat_level: 3 },
+      { gid: 2, geometry: [[11.8, 49.2]], threat_level: 0 }, // <2 points → dropped
+    ])
+    expect(fc.features).toHaveLength(1)
+    expect(fc.features[0].geometry.type).toBe('LineString')
+    expect(fc.features[0].properties).toEqual({ threat: 3 })
+  })
+
+  it('nodes become Point features', () => {
+    const fc = graphNodesToGeoJSON([{ id: 7, point: [11.85, 49.22] }])
+    expect(fc.features).toHaveLength(1)
+    expect(fc.features[0].geometry).toEqual({ type: 'Point', coordinates: [11.85, 49.22] })
   })
 })
 
