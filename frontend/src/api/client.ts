@@ -33,6 +33,7 @@ import type {
   RendezvousPlanResponse,
   RendezvousResponse,
   RouteOption,
+  RoutingGraph,
   ScheduleRendezvousRequest,
   SupplyOverview,
   Theater,
@@ -85,6 +86,8 @@ export const api = {
       current_fuel_liters: currentFuelLiters,
     }),
   getEnemyUnits: (): Promise<EnemyUnit[]> => getJson<EnemyUnit[]>('/enemy-units'),
+  // The pgRouting graph (edges + vertices) for the optional map overlay (v2 Wave 20 F1).
+  getRoutingGraph: (): Promise<RoutingGraph> => getJson<RoutingGraph>('/routing-graph'),
   getUnitTypes: (): Promise<UnitType[]> => getJson<UnitType[]>('/units'),
   getUnitType: (id: string): Promise<UnitType> => getJson<UnitType>(`/units/${id}`),
 
