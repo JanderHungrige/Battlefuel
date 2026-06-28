@@ -22,6 +22,7 @@ import type {
   DepotFuel,
   EnemyUnit,
   Obstacle,
+  RoutingGraph,
   Theater,
   Tile,
   UnitInstance,
@@ -36,6 +37,8 @@ import {
   depotsToGeoJSON,
   enemyUnitsToGeoJSON,
   destinationToGeoJSON,
+  graphEdgesToGeoJSON,
+  graphNodesToGeoJSON,
   obstaclesToGeoJSON,
   paddedBounds,
   routeToGeoJSON,
@@ -67,6 +70,8 @@ export interface MapViewProps {
   hoverDetails: boolean
   enemyUnits: EnemyUnit[]
   depots: DepotFuel[]
+  /** Routing-graph overlay (v2 Wave 20 F2): null/undefined → hidden; set → draw edges + nodes. */
+  routingGraph?: RoutingGraph | null
   /** When set, mark + ease the map to this point (locate a depot / truck / etc.). v2 Wave 11. */
   locatePoint?: { lat: number; lon: number } | null
   /** Proposed fuel-run routes to preview (v2 Wave 12): selected drawn bold, others lighter. */
@@ -145,6 +150,22 @@ function initLayers(map: maplibregl.Map): void {
     source: 'tiles',
     // Crisp neighbour separation on the light base — a clear mid-grey hairline.
     paint: { 'line-color': '#6b7280', 'line-width': 0.8, 'line-opacity': 0.7 },
+  })
+  // Routing-graph overlay (v2 Wave 20 F2): the pgRouting edges + vertices, hidden until toggled.
+  // Drawn low in the stack (just above tiles) so units/routes stay on top.
+  map.addSource('graph-edges', { type: 'geojson', data: EMPTY })
+  map.addLayer({
+    id: 'graph-edges-line',
+    type: 'line',
+    source: 'graph-edges',
+    paint: { 'line-color': '#7c3aed', 'line-width': 1.2, 'line-opacity': 0.5 },
+  })
+  map.addSource('graph-nodes', { type: 'geojson', data: EMPTY })
+  map.addLayer({
+    id: 'graph-nodes-circle',
+    type: 'circle',
+    source: 'graph-nodes',
+    paint: { 'circle-radius': 2.2, 'circle-color': '#7c3aed', 'circle-opacity': 0.7 },
   })
   // Yellow highlight border for the sector referenced by a clicked chatter message.
   // Sector locate-highlight (chatter / supply / advice): the MGRS square of the referenced location
@@ -863,6 +884,12 @@ export function MapView(props: MapViewProps) {
     if (readyRef.current && mapRef.current)
       setData(mapRef.current, 'active-routes', activeRoutesToGeoJSON(props.activeRoutes))
   }, [props.activeRoutes])
+  useEffect(() => {
+    if (!(readyRef.current && mapRef.current)) return
+    const g = props.routingGraph
+    setData(mapRef.current, 'graph-edges', g ? graphEdgesToGeoJSON(g.edges) : EMPTY)
+    setData(mapRef.current, 'graph-nodes', g ? graphNodesToGeoJSON(g.nodes) : EMPTY)
+  }, [props.routingGraph])
   useEffect(() => {
     if (readyRef.current && mapRef.current)
       setData(mapRef.current, 'route', routeToGeoJSON(props.routeGeometry))
