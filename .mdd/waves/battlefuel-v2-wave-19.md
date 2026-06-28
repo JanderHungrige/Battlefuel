@@ -7,7 +7,7 @@ status: planned
 depends_on: battlefuel-v2-wave-18
 demo_state: "Hybrid produces ONE composed route, not a whole-route pick of road-or-off-road. For a unit in a field near a road heading to a target in another field, the hybrid route stubs cross-country to a road, follows roads for as long as that reduces travel time most (FAST) or is safest (SAFE), then breaks off-road again where cross-country reaches the target faster/safer — and for short trips it picks a direct route when that beats road+off-road. The composed route shows its segments (road vs off-road) and its duration/fuel/threat."
 created: 2026-06-26
-hash: 76bbb0cf
+hash: 54eea8c1
 ---
 
 # Wave 19: True hybrid routing
@@ -31,9 +31,20 @@ Mark `complete` only after ALL three gates pass (never on a localhost demo):
 |---|---------|-----|--------|------------|
 | 1 | segmented-hybrid-router | docs/110-segmented-hybrid-router.md | complete | — |
 | 2 | hybrid-direct-shortcut | docs/111-hybrid-direct-shortcut.md | complete | segmented-hybrid-router |
-| 3 | hybrid-route-segment-ui | — | planned | segmented-hybrid-router |
+| 3 | hybrid-route-segment-ui | — | deferred | segmented-hybrid-router |
 
 Build order: 1 → 2 → 3.
+
+**Build status (2026-06-28):** F1 + F2 built + green, on dev (`:3001`).
+- F1 (doc 110): road-aware A* + real-road-geometry stitch — hybrid follows streets, cuts
+  cross-country shortcuts, SAFE skirts threat off-road then rejoins.
+- F2 (doc 111): takes a clean direct line when it beats the road composition on a short leg.
+- **F3 (hybrid-route-segment-ui) DEFERRED** → batched routing-UI polish (with W18's pending dashed
+  stub styling), verified at the live gate. Rationale: after F1's stitch the **road segments are
+  already drawn as real streets and off-road segments as straight lines**, so road-vs-off-road is
+  visually distinct by *shape* already; explicit off-road *dashing* + duration/fuel/threat (already
+  shown on RouteOption) is refinement, not the core goal. MapView route-layer rendering is opaque /
+  jsdom-mocked. Revisit with the W18 dashed-stub polish.
 
 ### Current state (code investigation 2026-06-26)
 - **Hybrid = whole-route pick, not a stitch.** `route_planner.pick_route_option` chooses the
