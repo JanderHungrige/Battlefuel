@@ -20,6 +20,7 @@ import {
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type {
   DepotFuel,
+  DrawnEdge,
   EnemyUnit,
   Obstacle,
   RoutingGraph,
@@ -35,6 +36,10 @@ import {
   adviceArrowToGeoJSON,
   cellThreatToGeoJSON,
   depotsToGeoJSON,
+  drawnEdgeNodesToGeoJSON,
+  drawnEdgesToGeoJSON,
+  drawnLineToGeoJSON,
+  drawnVerticesToGeoJSON,
   enemyUnitsToGeoJSON,
   destinationToGeoJSON,
   graphEdgesToGeoJSON,
@@ -114,6 +119,20 @@ export interface MapViewProps {
   dimDepots?: boolean
   /** Fade the purple locate halo when the entity it marks is itself dimmed (fix 99). */
   locateDimmed?: boolean
+  /** Draw-graph tool (v2 Wave 20 F3): 'road' solid / 'path' dotted / null off. */
+  drawMode?: 'road' | 'path' | null
+  /** Waypoints of the line being drawn (lat/lon). */
+  drawPoints?: { lat: number; lon: number }[]
+  /** A click in draw mode drops a waypoint here. */
+  onDrawWaypoint?: (lat: number, lon: number) => void
+  /** Edit-graph mode (v2 Wave 20 F5): show the drawn edges as a selectable overlay. */
+  editGraph?: boolean
+  /** Operator-drawn edges to render in edit mode (null → overlay hidden). */
+  drawnEdges?: DrawnEdge[] | null
+  /** The currently-selected drawn-edge id (rendered red). */
+  selectedDrawnId?: string | null
+  /** A click in edit mode selects the drawn edge/node under it, or null to deselect. */
+  onSelectDrawn?: (id: string | null) => void
   onClearSelection: () => void
 }
 
@@ -450,6 +469,80 @@ function initLayers(map: maplibregl.Map): void {
       'line-opacity': ['case', ['get', 'selected'], 0.95, 0.35],
     },
   })
+
+  // Draw-graph tool (v2 Wave 20 F3): the line being hand-authored, on top of everything. One source
+  // feeds a solid layer (road) and a dotted layer (path); the active mode toggles their visibility.
+  map.addSource('draw-line', { type: 'geojson', data: EMPTY })
+  map.addLayer({
+    id: 'draw-line',
+    type: 'line',
+    source: 'draw-line',
+    layout: { 'line-cap': 'round', 'line-join': 'round', visibility: 'none' },
+    paint: { 'line-color': '#ff7a1a', 'line-width': 3, 'line-opacity': 0.9 },
+  })
+  map.addLayer({
+    id: 'draw-line-path',
+    type: 'line',
+    source: 'draw-line',
+    layout: { 'line-cap': 'round', 'line-join': 'round', visibility: 'none' },
+    paint: { 'line-color': '#ff7a1a', 'line-width': 3, 'line-opacity': 0.9, 'line-dasharray': [2, 2] },
+  })
+  map.addSource('draw-vertices', { type: 'geojson', data: EMPTY })
+  map.addLayer({
+    id: 'draw-vertices',
+    type: 'circle',
+    source: 'draw-vertices',
+    layout: { visibility: 'none' },
+    paint: {
+      'circle-radius': 4,
+      'circle-color': '#ff7a1a',
+      'circle-stroke-width': 1.5,
+      'circle-stroke-color': '#0e1116',
+    },
+  })
+
+  // Edit-graph overlay (v2 Wave 20 F5): the persisted drawn edges, selectable. Base orange, the
+  // selected edge/node drawn red on a filtered top layer (same pattern as units-selected).
+  map.addSource('drawn-edges', { type: 'geojson', data: EMPTY })
+  map.addLayer({
+    id: 'drawn-edges',
+    type: 'line',
+    source: 'drawn-edges',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#ff7a1a', 'line-width': 3, 'line-opacity': 0.85 },
+  })
+  map.addLayer({
+    id: 'drawn-edges-sel',
+    type: 'line',
+    source: 'drawn-edges',
+    filter: ['==', ['get', 'id'], ''],
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#ef4444', 'line-width': 5, 'line-opacity': 0.95 },
+  })
+  map.addSource('drawn-edge-nodes', { type: 'geojson', data: EMPTY })
+  map.addLayer({
+    id: 'drawn-edge-nodes',
+    type: 'circle',
+    source: 'drawn-edge-nodes',
+    paint: {
+      'circle-radius': 4,
+      'circle-color': '#ff7a1a',
+      'circle-stroke-width': 1.5,
+      'circle-stroke-color': '#0e1116',
+    },
+  })
+  map.addLayer({
+    id: 'drawn-edge-nodes-sel',
+    type: 'circle',
+    source: 'drawn-edge-nodes',
+    filter: ['==', ['get', 'id'], ''],
+    paint: {
+      'circle-radius': 5.5,
+      'circle-color': '#ef4444',
+      'circle-stroke-width': 1.5,
+      'circle-stroke-color': '#0e1116',
+    },
+  })
 }
 
 function syncRouteLines(
@@ -693,6 +786,21 @@ function wireReadout(map: maplibregl.Map, el: HTMLElement): void {
 function wireInteraction(map: maplibregl.Map, propsRef: { current: MapViewProps }): void {
   map.on('click', (e) => {
     const p = propsRef.current
+    // Edit-graph mode (v2 Wave 20 F5): a click selects the drawn edge/node under it, or deselects.
+    // Takes precedence over select/inspect/plan; drawn-only (queries only the drawn overlay layers).
+    if (p.editGraph && p.onSelectDrawn) {
+      const hit = map.queryRenderedFeatures(e.point, {
+        layers: ['drawn-edge-nodes', 'drawn-edges'],
+      })
+      p.onSelectDrawn(hit.length > 0 ? String(hit[0].properties?.id) : null)
+      return
+    }
+    // Draw-graph tool (v2 Wave 20 F3): while drawing, every click drops a waypoint and takes
+    // precedence over select/inspect/plan.
+    if (p.drawMode && p.onDrawWaypoint) {
+      p.onDrawWaypoint(e.lngLat.lat, e.lngLat.lng)
+      return
+    }
     if (p.depotMode) {
       p.onPlaceDepot(e.lngLat.lat, e.lngLat.lng)
       return
@@ -894,6 +1002,34 @@ export function MapView(props: MapViewProps) {
     if (readyRef.current && mapRef.current)
       setData(mapRef.current, 'route', routeToGeoJSON(props.routeGeometry))
   }, [props.routeGeometry])
+  // Draw-graph tool (v2 Wave 20 F3): push the in-progress line + vertices and toggle the solid
+  // (road) / dotted (path) layer by mode.
+  useEffect(() => {
+    if (!(readyRef.current && mapRef.current)) return
+    const map = mapRef.current
+    const mode = props.drawMode ?? null
+    const pts = props.drawPoints ?? []
+    setData(map, 'draw-line', drawnLineToGeoJSON(pts))
+    setData(map, 'draw-vertices', drawnVerticesToGeoJSON(pts))
+    map.setLayoutProperty('draw-line', 'visibility', mode === 'road' ? 'visible' : 'none')
+    map.setLayoutProperty('draw-line-path', 'visibility', mode === 'path' ? 'visible' : 'none')
+    map.setLayoutProperty('draw-vertices', 'visibility', mode ? 'visible' : 'none')
+  }, [props.drawMode, props.drawPoints])
+  // Edit-graph overlay (v2 Wave 20 F5): push the drawn edges + their end nodes (or EMPTY when the
+  // overlay is off), and filter the red selected-element layers to the chosen drawn-edge id.
+  useEffect(() => {
+    if (!(readyRef.current && mapRef.current)) return
+    const map = mapRef.current
+    const edges = props.editGraph ? (props.drawnEdges ?? []) : []
+    setData(map, 'drawn-edges', drawnEdgesToGeoJSON(edges))
+    setData(map, 'drawn-edge-nodes', drawnEdgeNodesToGeoJSON(edges))
+  }, [props.editGraph, props.drawnEdges])
+  useEffect(() => {
+    if (!(readyRef.current && mapRef.current)) return
+    const sel = props.selectedDrawnId ?? ''
+    mapRef.current.setFilter('drawn-edges-sel', ['==', ['get', 'id'], sel])
+    mapRef.current.setFilter('drawn-edge-nodes-sel', ['==', ['get', 'id'], sel])
+  }, [props.selectedDrawnId])
   useEffect(() => {
     if (readyRef.current && mapRef.current)
       setData(mapRef.current, 'destination', destinationToGeoJSON(props.destination))

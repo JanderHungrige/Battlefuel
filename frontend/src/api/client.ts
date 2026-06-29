@@ -14,6 +14,8 @@ import type {
   CreateWaypointMoveOrderRequest,
   CombatEventCatalogItem,
   ConfirmLaunchResponse,
+  CreateDrawnEdgeRequest,
+  DrawnEdge,
   FuelRunResponse,
   MoveRefuelOption,
   MoveRefuelOptionsRequest,
@@ -127,6 +129,12 @@ export const api = {
     postJson<Obstacle>('/obstacles', { lat, lon, kind }),
   deleteObstacle: (id: string): Promise<{ id: string; status: string }> =>
     deleteJson<{ id: string; status: string }>(`/obstacles/${id}`),
+  // Operator-drawn road/path injected into the routing graph (v2 Wave 20 F4).
+  listDrawnEdges: (): Promise<DrawnEdge[]> => getJson<DrawnEdge[]>('/drawn-edges'),
+  createDrawnEdge: (req: CreateDrawnEdgeRequest): Promise<DrawnEdge> =>
+    postJson<DrawnEdge>('/drawn-edges', req),
+  deleteDrawnEdge: (id: string): Promise<{ id: string; status: string }> =>
+    deleteJson<{ id: string; status: string }>(`/drawn-edges/${id}`),
   patchTile: (h3Index: string, mutation: TileMutationRequest): Promise<Tile> =>
     patchJson<Tile>(`/tiles/${h3Index}`, mutation),
 

@@ -176,6 +176,22 @@ export interface RoutingGraph {
   nodes: GraphNode[]
 }
 
+// Operator-drawn road/path injected into the routing graph (v2 Wave 20 F4).
+export type DrawKind = 'road' | 'path'
+export type DrawConnect = 'first' | 'last' | 'both' | 'none'
+export interface CreateDrawnEdgeRequest {
+  kind: DrawKind
+  coordinates: number[][] // [lon, lat] pairs, >= 2
+  connect: DrawConnect
+}
+export interface DrawnEdge {
+  id: string
+  kind: DrawKind
+  coordinates: number[][]
+  connect_start: boolean
+  connect_end: boolean
+}
+
 export interface PlanRouteRequest {
   instance_id: string
   dest_lat: number

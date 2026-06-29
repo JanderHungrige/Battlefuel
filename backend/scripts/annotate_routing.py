@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 
 from app.db import get_session_maker
+from app.services.drawn_graph import inject_drawn_edges
 from app.services.routing_graph import annotate_ways
 
 
@@ -16,6 +17,9 @@ async def main() -> None:
     async with get_session_maker()() as session:
         count = await annotate_ways(session)
         print(f"Annotated {count} ways.")
+        # osm2pgrouting --clean wiped the graph — restore operator-drawn edges (v2 Wave 20 F4).
+        injected = await inject_drawn_edges(session)
+        print(f"Injected {injected} drawn-edge rows.")
 
 
 if __name__ == "__main__":

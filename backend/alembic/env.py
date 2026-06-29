@@ -15,9 +15,10 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 from app.config import get_settings
 from app.db import Base
-from app.models import move_order as _move_order  # noqa: F401  (registers move_orders)
 
 # Import model modules so their tables register on Base.metadata for autogenerate.
+from app.models import drawn_edge as _drawn_edge  # noqa: F401  (registers drawn_edges)
+from app.models import move_order as _move_order  # noqa: F401  (registers move_orders)
 from app.models import tile as _tile  # noqa: F401  (registers the tiles table)
 from app.models import unit_instance as _unit_instance  # noqa: F401  (registers unit_instances)
 
