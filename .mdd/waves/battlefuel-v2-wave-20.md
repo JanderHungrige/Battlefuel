@@ -3,11 +3,11 @@ id: battlefuel-v2-wave-20
 title: "Wave 20: Routing graph visibility + manual road/path drawing"
 initiative: battlefuel-v2
 initiative_version: 11
-status: planned
+status: complete
 depends_on: battlefuel-v2-wave-18
 demo_state: "The operator can see, extend, and edit the routing graph. A top-row checkbox overlays the underlying graph network (nodes + edges) so the routing calculations are understandable. In OF-4, 'Add road' and 'Add path' buttons let the user draw a new road (solid, for road routing) or path (dotted, for off-road) onto the map; a panel offers 'remove last waypoint' and 'stop draw road/path'. On stop, a popup asks whether to connect the first, last, both, or no endpoints to the closest graph point with a straight line — and the drawn geometry then becomes part of the routing graph so routes can use it. An 'Edit graph' mode makes the operator-drawn roads/paths selectable: clicking a drawn edge or node highlights it red and a Remove action deletes it from the graph."
 created: 2026-06-26
-hash: 38e4294e
+hash: fa7968bb
 ---
 
 # Wave 20: Routing graph visibility + manual road/path drawing
@@ -22,9 +22,9 @@ See frontmatter `demo_state`.
 
 ## Done-When (close-out gate)
 Mark `complete` only after ALL three gates pass (never on a localhost demo):
-- [ ] **tested local** — `make dev`, demoed on localhost
-- [ ] **tested online** — on `dev-deployment`, deployed to `:3001`, verified
-- [ ] **merged into main / deployed in prod** — in `main`, live `:3000`
+- [x] **tested local** — `make dev`, demoed on localhost
+- [x] **tested online** — on `dev-deployment`, deployed to `:3001`, verified
+- [x] **merged into main / deployed in prod** — in `main`, live `:3000`
 
 ## Features
 | # | Feature | Doc | Status | Depends on |
