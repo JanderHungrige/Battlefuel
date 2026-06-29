@@ -1,11 +1,12 @@
 // Pure helpers that turn API data into GeoJSON for the map overlays, plus the
 // terrain colour scheme. Kept free of MapLibre/canvas so they are unit-testable.
 
-import type { FeatureCollection } from 'geojson'
+import type { Feature, FeatureCollection } from 'geojson'
 import { cellToLatLng } from 'h3-js'
 import type {
   BBox,
   DepotFuel,
+  DrawnEdge,
   EnemyUnit,
   GraphEdge,
   GraphNode,
@@ -269,6 +270,37 @@ export function drawnVerticesToGeoJSON(points: { lat: number; lon: number }[]): 
       properties: {},
     })),
   }
+}
+
+/** Persisted drawn edges (v2 Wave 20 F5) → one LineString per edge carrying its id + kind. */
+export function drawnEdgesToGeoJSON(edges: DrawnEdge[]): FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: edges
+      .filter((e) => e.coordinates.length >= 2)
+      .map((e) => ({
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates: e.coordinates },
+        properties: { id: e.id, kind: e.kind },
+      })),
+  }
+}
+
+/** Drawn-edge end nodes (v2 Wave 20 F5) → first + last vertex per edge, carrying the owning id. */
+export function drawnEdgeNodesToGeoJSON(edges: DrawnEdge[]): FeatureCollection {
+  const features: Feature[] = []
+  for (const e of edges) {
+    if (e.coordinates.length < 1) continue
+    const ends = [e.coordinates[0], e.coordinates[e.coordinates.length - 1]]
+    for (const pt of ends) {
+      features.push({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: pt },
+        properties: { id: e.id },
+      })
+    }
+  }
+  return { type: 'FeatureCollection', features }
 }
 
 /** Multiple active-route geometries → a LineString FeatureCollection. */

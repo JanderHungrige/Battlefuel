@@ -7,6 +7,8 @@ import {
   adviceArrowToGeoJSON,
   cellThreatToGeoJSON,
   depotsToGeoJSON,
+  drawnEdgeNodesToGeoJSON,
+  drawnEdgesToGeoJSON,
   drawnLineToGeoJSON,
   drawnVerticesToGeoJSON,
   enemyUnitsToGeoJSON,
@@ -323,6 +325,46 @@ describe('drawnVerticesToGeoJSON', () => {
     ])
     expect(fc.features).toHaveLength(2)
     expect(fc.features.map((f) => (f.geometry as { coordinates: number[] }).coordinates)).toEqual([
+      [11.8, 49.2],
+      [11.81, 49.21],
+    ])
+  })
+})
+
+describe('drawnEdgesToGeoJSON (edit overlay)', () => {
+  const edge = (id: string, coords: number[][]) => ({
+    id,
+    kind: 'road' as const,
+    coordinates: coords,
+    connect_start: true,
+    connect_end: false,
+  })
+
+  it('makes one LineString per edge carrying id + kind, dropping degenerate ones', () => {
+    const fc = drawnEdgesToGeoJSON([
+      edge('a', [
+        [11.8, 49.2],
+        [11.81, 49.21],
+      ]),
+      edge('b', [[11.8, 49.2]]), // <2 points → dropped
+    ])
+    expect(fc.features).toHaveLength(1)
+    expect(fc.features[0].geometry.type).toBe('LineString')
+    expect(fc.features[0].properties).toEqual({ id: 'a', kind: 'road' })
+  })
+
+  it('drawnEdgeNodesToGeoJSON emits the first + last vertex per edge, carrying the owning id', () => {
+    const fc = drawnEdgeNodesToGeoJSON([
+      edge('a', [
+        [11.8, 49.2],
+        [11.805, 49.205],
+        [11.81, 49.21],
+      ]),
+    ])
+    expect(fc.features).toHaveLength(2)
+    expect(fc.features.every((f) => f.properties?.id === 'a')).toBe(true)
+    const pts = fc.features.map((f) => (f.geometry as { coordinates: number[] }).coordinates)
+    expect(pts).toEqual([
       [11.8, 49.2],
       [11.81, 49.21],
     ])
