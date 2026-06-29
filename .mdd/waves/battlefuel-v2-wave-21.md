@@ -32,7 +32,7 @@ Mark `complete` only after ALL three gates pass (never on a localhost demo):
 |---|---------|-----|--------|------------|
 | 1 | threat-grid-code-model | docs/119-threat-grid-code-model.md | complete | — |
 | 2 | threat-grid-decoupled-render | docs/120-threat-grid-decoupled-render.md | complete | threat-grid-code-model |
-| 3 | threat-edge-penalty-by-resolution | — | planned | threat-grid-code-model |
+| 3 | threat-edge-penalty-by-resolution | docs/121-threat-edge-penalty-by-resolution.md | complete | threat-grid-code-model |
 | 4 | enemy-danger-circle-render | — | planned | threat-grid-decoupled-render |
 
 Build order: 1 → {2, 3}; 4 after 2.
