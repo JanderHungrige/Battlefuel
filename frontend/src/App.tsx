@@ -40,8 +40,10 @@ import { shouldRefuelOnClick } from './lib/refuelOnClick'
 import { canShow, type Role } from './roles'
 import { useObstacleOps } from './hooks/useObstacleOps'
 import { useDrawGraph } from './hooks/useDrawGraph'
+import { useDrawnEdges } from './hooks/useDrawnEdges'
 import { DrawGraphPanel } from './components/DrawGraphPanel'
 import { ConnectGraphPopup } from './components/ConnectGraphPopup'
+import { DrawnEdgeEditPanel } from './components/DrawnEdgeEditPanel'
 import { useRoutingGraph } from './hooks/useRoutingGraph'
 import { useSimSocket } from './hooks/useSimSocket'
 import { useAdviceMarker } from './hooks/useAdviceMarker'
@@ -129,6 +131,17 @@ export default function App() {
   // Draw-graph tool (v2 Wave 20 F3): hand-author a road/path onto the map (OF-4).
   const draw = useDrawGraph()
   const [drawBusy, setDrawBusy] = useState(false)
+  // Edit-graph mode (v2 Wave 20 F5/F6): select + remove operator-drawn edges (OF-4, drawn-only).
+  const [editGraph, setEditGraph] = useState(false)
+  const [selectedDrawnId, setSelectedDrawnId] = useState<string | null>(null)
+  // Bumped to refetch the drawn-edges edit overlay after a create (F4) / remove (F6).
+  const [drawnReload, setDrawnReload] = useState(0)
+  const [removeBusy, setRemoveBusy] = useState(false)
+  const drawnEdges = useDrawnEdges(editGraph, drawnReload)
+  const selectedDrawn = useMemo(
+    () => drawnEdges?.find((e) => e.id === selectedDrawnId) ?? null,
+    [drawnEdges, selectedDrawnId],
+  )
   // Seed hostile force merged with live chatter-driven sightings (v2 Wave 4 F6); dedup by id,
   // a dynamic sighting wins over a seed unit with the same id.
   const allEnemyUnits = useMemo(() => {
@@ -281,10 +294,43 @@ export default function App() {
       clear()
       setObstacleMode(false)
       setDepotMode(false)
+      setEditGraph(false)
+      setSelectedDrawnId(null)
       draw.start(kind)
     },
     [draw, clear],
   )
+
+  // Toggle Edit-graph mode (v2 Wave 20 F5): exclusive with drawing / obstacle / depot placement.
+  const toggleEditGraph = useCallback(() => {
+    setEditGraph((on) => {
+      const next = !on
+      if (next) {
+        clear()
+        setObstacleMode(false)
+        setDepotMode(false)
+        draw.cancel()
+      }
+      setSelectedDrawnId(null)
+      return next
+    })
+  }, [clear, draw])
+
+  // Remove the selected drawn edge (v2 Wave 20 F6): delete + re-inject, then refresh both overlays.
+  const removeDrawnEdge = useCallback(() => {
+    if (!selectedDrawnId) return
+    setRemoveBusy(true)
+    api
+      .deleteDrawnEdge(selectedDrawnId)
+      .then(() => {
+        pushChatter('Removed drawn edge from the routing graph', 'order')
+        setSelectedDrawnId(null)
+        setDrawnReload((n) => n + 1)
+        setGraphReload((n) => n + 1)
+      })
+      .catch((e: unknown) => pushChatter(`Could not remove drawn edge: ${errorMessage(e)}`, 'status'))
+      .finally(() => setRemoveBusy(false))
+  }, [selectedDrawnId, pushChatter])
 
   // Connect-drawn-to-graph (v2 Wave 20 F4): POST the finished line with the operator's connect
   // choice, inject it into the routing graph, then refresh the overlay so the new edge shows.
@@ -302,6 +348,7 @@ export default function App() {
         .then(() => {
           pushChatter(`Drawn ${fin.kind} added to the routing graph (connect: ${connect})`, 'order')
           setGraphReload((n) => n + 1)
+          setDrawnReload((n) => n + 1)
         })
         .catch((e: unknown) => pushChatter(`Could not add ${fin.kind}: ${errorMessage(e)}`, 'status'))
         .finally(() => {
@@ -482,6 +529,8 @@ export default function App() {
       setObstacleMode(false)
       setDepotMode(false)
       draw.cancel()
+      setEditGraph(false)
+      setSelectedDrawnId(null)
       clear()
     }
     window.addEventListener('keydown', onKey)
@@ -602,6 +651,15 @@ export default function App() {
             {draw.mode === 'path' ? '✏️ Drawing path' : 'Add path'}
           </button>
         )}
+        {theater && canShow(role, 'drawGraph') && (
+          <button
+            className={`mode-toggle${editGraph ? ' active' : ''}`}
+            data-testid="edit-graph-toggle"
+            onClick={toggleEditGraph}
+          >
+            {editGraph ? '🖉 Editing graph' : 'Edit graph'}
+          </button>
+        )}
         <span className="spacer" />
         {theater && <TourButton role={role} actions={tourActions} onEnd={clear} />}
         <span className="attribution">{OSM_ATTRIBUTION}</span>
@@ -680,6 +738,10 @@ export default function App() {
               drawMode={canShow(role, 'drawGraph') ? draw.mode : null}
               drawPoints={draw.points}
               onDrawWaypoint={draw.addPoint}
+              editGraph={canShow(role, 'drawGraph') && editGraph}
+              drawnEdges={drawnEdges}
+              selectedDrawnId={selectedDrawnId}
+              onSelectDrawn={setSelectedDrawnId}
               onPickDestination={(lat, lon) =>
                 planning.waypointMode
                   ? planning.addWaypoint(lat, lon)
@@ -805,6 +867,14 @@ export default function App() {
                 busy={drawBusy}
                 onConnect={submitDraw}
                 onCancel={draw.clearFinished}
+              />
+            )}
+            {canShow(role, 'drawGraph') && editGraph && selectedDrawn && (
+              <DrawnEdgeEditPanel
+                kind={selectedDrawn.kind}
+                busy={removeBusy}
+                onRemove={removeDrawnEdge}
+                onCancel={() => setSelectedDrawnId(null)}
               />
             )}
             {canShow(role, 'moveRoutes') && selectedUnit && (

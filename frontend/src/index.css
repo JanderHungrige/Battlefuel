@@ -1948,3 +1948,12 @@ body {
   opacity: 0.5;
   cursor: default;
 }
+
+/* Edit-graph remove button (v2 Wave 20 F6). */
+.draw-remove-btn {
+  border-color: #ef4444;
+  color: #ef4444;
+}
+.draw-remove-btn:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.12);
+}
