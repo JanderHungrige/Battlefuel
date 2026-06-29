@@ -5,9 +5,9 @@ initiative: battlefuel-v2
 initiative_version: 11
 status: planned
 depends_on: battlefuel-v2-wave-18
-demo_state: "The operator can see and extend the routing graph. A top-row checkbox overlays the underlying graph network (nodes + edges) so the routing calculations are understandable. In OF-4, 'Add road' and 'Add path' buttons let the user draw a new road (solid, for road routing) or path (dotted, for off-road) onto the map; a panel offers 'remove last waypoint' and 'stop draw road/path'. On stop, a popup asks whether to connect the first, last, both, or no endpoints to the closest graph point with a straight line — and the drawn geometry then becomes part of the routing graph so routes can use it."
+demo_state: "The operator can see, extend, and edit the routing graph. A top-row checkbox overlays the underlying graph network (nodes + edges) so the routing calculations are understandable. In OF-4, 'Add road' and 'Add path' buttons let the user draw a new road (solid, for road routing) or path (dotted, for off-road) onto the map; a panel offers 'remove last waypoint' and 'stop draw road/path'. On stop, a popup asks whether to connect the first, last, both, or no endpoints to the closest graph point with a straight line — and the drawn geometry then becomes part of the routing graph so routes can use it. An 'Edit graph' mode makes the operator-drawn roads/paths selectable: clicking a drawn edge or node highlights it red and a Remove action deletes it from the graph."
 created: 2026-06-26
-hash: 465ed315
+hash: 38e4294e
 ---
 
 # Wave 20: Routing graph visibility + manual road/path drawing
@@ -29,12 +29,22 @@ Mark `complete` only after ALL three gates pass (never on a localhost demo):
 ## Features
 | # | Feature | Doc | Status | Depends on |
 |---|---------|-----|--------|------------|
-| 1 | routing-graph-overlay-api | — | planned | — |
-| 2 | graph-network-toggle | — | planned | routing-graph-overlay-api |
-| 3 | draw-road-path-tool | — | planned | — |
-| 4 | connect-drawn-to-graph | — | planned | draw-road-path-tool, routing-graph-overlay-api |
+| 1 | routing-graph-overlay-api | [113](../docs/113-routing-graph-overlay-api.md) | complete | — |
+| 2 | graph-network-toggle | [114](../docs/114-graph-network-toggle.md) | complete | routing-graph-overlay-api |
+| 3 | draw-road-path-tool | [115](../docs/115-draw-road-path-tool.md) | complete | — |
+| 4 | connect-drawn-to-graph | [116](../docs/116-connect-drawn-to-graph.md) | complete | draw-road-path-tool, routing-graph-overlay-api |
+| 5 | select-graph-element | [117](../docs/117-select-graph-element.md) | complete | connect-drawn-to-graph |
+| 6 | remove-drawn-road-path | [118](../docs/118-remove-drawn-road-path.md) | complete | select-graph-element |
 
-Build order: 1 → 2; 3 → 4 (4 also needs 1's vertex data).
+Build order: 1 → 2; 3 → 4 (4 also needs 1's vertex data); 5 → 6 (graph editing, drawn-only).
+
+### Feature notes (requester 2026-06-29, follow-on)
+- **F5 select-graph-element** — a dedicated OF-4 "Edit graph" mode that renders the operator-drawn
+  roads/paths (`GET /drawn-edges`) as a selectable overlay; clicking a drawn edge or one of its end
+  nodes selects it and highlights it **red**. Click empty / Esc deselects. Drawn-only — base OSM
+  edges are not selectable. (Manual node-insert / edge-split, F7, was descoped per the requester.)
+- **F6 remove-drawn-road-path** — with a drawn edge selected, a **Remove** action deletes it
+  (`DELETE /drawn-edges/{id}` → re-inject), so it disappears from the routing graph.
 
 ### Current state (code investigation 2026-06-26)
 - **Graph lives in `ways` + `ways_vertices_pgr`** (osm2pgrouting), annotated by

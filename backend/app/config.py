@@ -56,6 +56,9 @@ class Settings(BaseSettings):
     # Provider the factory builds for manual obstacles (Wave 4 ships "db").
     obstacle_provider: str = "db"
 
+    # Provider the factory builds for operator-drawn graph edges (v2 Wave 20 ships "db").
+    drawn_edge_provider: str = "db"
+
     # Provider the factory builds for fuel depots + stock (Wave 5 ships "db").
     supply_provider: str = "db"
 

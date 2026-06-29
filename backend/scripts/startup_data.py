@@ -57,6 +57,7 @@ async def _seed_if_empty(session: AsyncSession) -> None:
 
 
 async def _annotate_if_graph(session: AsyncSession) -> None:
+    from app.services.drawn_graph import inject_drawn_edges
     from app.services.routing_graph import annotate_ways
 
     if await _ways_count(session) == 0:
@@ -64,6 +65,10 @@ async def _annotate_if_graph(session: AsyncSession) -> None:
         return
     n = await annotate_ways(session)
     logger.info("startup_data: annotated %d ways (tile threat + enemy circles)", n)
+    # Re-inject operator-drawn edges (v2 Wave 20 F4) — a reseed rebuilds the ways graph and wipes
+    # them; the drawn_edges table is the durable source of truth, so restore them here.
+    d = await inject_drawn_edges(session)
+    logger.info("startup_data: injected %d drawn-edge rows into the routing graph", d)
 
 
 async def main() -> None:
