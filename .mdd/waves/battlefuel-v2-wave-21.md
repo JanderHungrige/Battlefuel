@@ -3,11 +3,11 @@ id: battlefuel-v2-wave-21
 title: "Wave 21: Multi-resolution threat model — threat at its own grid size + enemy danger circles"
 initiative: battlefuel-v2
 initiative_version: 11
-status: planned
+status: in_progress
 depends_on: battlefuel-v2-wave-19
 demo_state: "Threat is decoupled from the displayed grid. A threat colours the grid that matches its OWN size/location regardless of the grid the operator is viewing — a 500 m threat colours its 500 m cell even on the 1 km grid (¼ of the cell), not the whole displayed cell. Nesting is highest-threat-wins: a 2 km level-2 threat containing a 500 m level-4 patch shows level 4 in that 500 m patch and level 2 around it. Routing-edge penalties read the threat at the correct resolution (an edge crossing a threatened cell gets that cell's penalty, derived from the threat's grid code). When an enemy unit appears, a 500 m-radius circle is drawn around it and all affected 500 m cells are coloured red."
 created: 2026-06-26
-hash: ba24006a
+hash: f030215d
 ---
 
 # Wave 21: Multi-resolution threat model
@@ -30,10 +30,10 @@ Mark `complete` only after ALL three gates pass (never on a localhost demo):
 ## Features
 | # | Feature | Doc | Status | Depends on |
 |---|---------|-----|--------|------------|
-| 1 | threat-grid-code-model | — | planned | — |
-| 2 | threat-grid-decoupled-render | — | planned | threat-grid-code-model |
-| 3 | threat-edge-penalty-by-resolution | — | planned | threat-grid-code-model |
-| 4 | enemy-danger-circle-render | — | planned | threat-grid-decoupled-render |
+| 1 | threat-grid-code-model | docs/119-threat-grid-code-model.md | complete | — |
+| 2 | threat-grid-decoupled-render | docs/120-threat-grid-decoupled-render.md | complete | threat-grid-code-model |
+| 3 | threat-edge-penalty-by-resolution | docs/121-threat-edge-penalty-by-resolution.md | complete | threat-grid-code-model |
+| 4 | enemy-danger-circle-render | docs/122-enemy-danger-circle-render.md | complete | threat-grid-decoupled-render |
 
 Build order: 1 → {2, 3}; 4 after 2.
 

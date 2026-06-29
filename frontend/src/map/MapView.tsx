@@ -36,6 +36,8 @@ import {
   adviceArrowToGeoJSON,
   cellThreatToGeoJSON,
   depotsToGeoJSON,
+  enemyDangerCellsToGeoJSON,
+  enemyDangerCirclesToGeoJSON,
   drawnEdgeNodesToGeoJSON,
   drawnEdgesToGeoJSON,
   drawnLineToGeoJSON,
@@ -208,6 +210,24 @@ function initLayers(map: maplibregl.Map): void {
       'fill-color': '#ff3030',
       'fill-opacity': ['interpolate', ['linear'], ['get', 'threat'], 0, 0, 1, 0.12, 5, 0.55],
     },
+  })
+
+  // Enemy danger zones (v2 Wave 21 F4): the 500 m MGRS cells covered by a hostile's danger circle,
+  // washed red, plus a dashed 500 m-radius ring per hostile. A display complement to the routing-side
+  // enemy danger (Wave 16). Drawn low (above tiles, below grid/units/routes) like the threat wash.
+  map.addSource('enemy-danger-cells', { type: 'geojson', data: EMPTY })
+  map.addLayer({
+    id: 'enemy-danger-cells',
+    type: 'fill',
+    source: 'enemy-danger-cells',
+    paint: { 'fill-color': '#ff2020', 'fill-opacity': 0.3 },
+  })
+  map.addSource('enemy-danger-rings', { type: 'geojson', data: EMPTY })
+  map.addLayer({
+    id: 'enemy-danger-rings',
+    type: 'line',
+    source: 'enemy-danger-rings',
+    paint: { 'line-color': '#d0021b', 'line-width': 1.6, 'line-opacity': 0.9, 'line-dasharray': [2, 1.5] },
   })
 
   // MGRS coordinate grid (Wave 2): lines + per-square labels (canvas-rasterized icon-image, so no
@@ -667,6 +687,9 @@ function syncEnemyUnits(map: maplibregl.Map, enemies: EnemyUnit[]): void {
     }
   }
   setData(map, 'enemy-units', enemyUnitsToGeoJSON(enemies))
+  // F4: the 500 m danger circle + washed cells around each hostile (display complement to W16).
+  setData(map, 'enemy-danger-cells', enemyDangerCellsToGeoJSON(enemies))
+  setData(map, 'enemy-danger-rings', enemyDangerCirclesToGeoJSON(enemies))
 }
 
 const DIESEL_COLOR = '#3a8f4f'
@@ -937,10 +960,10 @@ export function MapView(props: MapViewProps) {
       const p = propsRef.current
       initLayers(map)
       setData(map, 'tiles', tilesToGeoJSON(p.tiles))
-      setData(map, 'cell-threat', cellThreatToGeoJSON(p.tiles, p.gridPrecisionM))
+      setData(map, 'cell-threat', cellThreatToGeoJSON(p.tiles))
       syncUnits(map, p.units, p.unitTypes, p.livePositions)
       syncUnitFuelBars(map, p.units, p.unitTypes, p.livePositions, p.showUnitFuelBars ?? false)
-      map.setFilter('unit-fuel-bars', ['!=', ['get', 'id'], p.selectedUnitId ?? ' '])
+      map.setFilter('unit-fuel-bars', ['!=', ['get', 'id'], p.selectedUnitId ?? ''])
       map.setFilter('unit-fuel-bars-selected', ['==', ['get', 'id'], p.selectedUnitId ?? ''])
       syncEnemyUnits(map, p.enemyUnits)
       setData(map, 'active-routes', activeRoutesToGeoJSON(p.activeRoutes))
@@ -973,9 +996,11 @@ export function MapView(props: MapViewProps) {
     if (readyRef.current && mapRef.current) setData(mapRef.current, 'tiles', tilesToGeoJSON(props.tiles))
   }, [props.tiles])
   useEffect(() => {
+    // Threat renders at each threat's OWN grid code, not the displayed grid (v2 Wave 21 F2), so this
+    // no longer depends on gridPrecisionM — resizing the grid never rescales the threat wash.
     if (readyRef.current && mapRef.current)
-      setData(mapRef.current, 'cell-threat', cellThreatToGeoJSON(props.tiles, props.gridPrecisionM))
-  }, [props.tiles, props.gridPrecisionM])
+      setData(mapRef.current, 'cell-threat', cellThreatToGeoJSON(props.tiles))
+  }, [props.tiles])
   useEffect(() => {
     if (readyRef.current && mapRef.current) {
       syncUnits(mapRef.current, props.units, props.unitTypes, props.livePositions)

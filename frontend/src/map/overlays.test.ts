@@ -11,6 +11,8 @@ import {
   drawnEdgesToGeoJSON,
   drawnLineToGeoJSON,
   drawnVerticesToGeoJSON,
+  enemyDangerCellsToGeoJSON,
+  enemyDangerCirclesToGeoJSON,
   enemyUnitsToGeoJSON,
   destinationToGeoJSON,
   graphEdgesToGeoJSON,
@@ -259,6 +261,30 @@ describe('enemyUnitsToGeoJSON', () => {
   it('is empty when there are no enemy units', () => {
     expect(enemyUnitsToGeoJSON([]).features).toEqual([])
   })
+
+  it('draws a closed danger ring polygon per enemy', () => {
+    const fc = enemyDangerCirclesToGeoJSON([enemy])
+    expect(fc.features).toHaveLength(1)
+    const ring = (fc.features[0].geometry as { type: string; coordinates: number[][][] })
+    expect(ring.type).toBe('Polygon')
+    expect(ring.coordinates[0][0]).toEqual(ring.coordinates[0][ring.coordinates[0].length - 1])
+    expect(fc.features[0].properties).toMatchObject({ id: 'enemy-mech-1' })
+  })
+
+  it('washes the covered 500 m cells as square polygons', () => {
+    const fc = enemyDangerCellsToGeoJSON([enemy])
+    expect(fc.features.length).toBeGreaterThan(0)
+    for (const f of fc.features) {
+      expect(f.geometry.type).toBe('Polygon')
+      const ring = (f.geometry as { coordinates: number[][][] }).coordinates[0]
+      expect(ring).toHaveLength(5) // closed square
+    }
+  })
+
+  it('emits no danger geometry with no enemies', () => {
+    expect(enemyDangerCirclesToGeoJSON([]).features).toEqual([])
+    expect(enemyDangerCellsToGeoJSON([]).features).toEqual([])
+  })
 })
 
 describe('cellThreatToGeoJSON', () => {
@@ -277,11 +303,12 @@ describe('cellThreatToGeoJSON', () => {
   })
 
   it('emits one square per threatened MGRS cell, carrying the cell max threat', () => {
-    // Two tiles in the same 1km cell (close together) → one square with the max threat.
-    const fc = cellThreatToGeoJSON(
-      [tile(49.215, 11.835, 2), tile(49.2152, 11.8352, 4), tile(49.25, 11.88, 1)],
-      1000,
-    )
+    // Two tiles in the same 1km ambient cell (close together) → one square with the max threat.
+    const fc = cellThreatToGeoJSON([
+      tile(49.215, 11.835, 2),
+      tile(49.2152, 11.8352, 4),
+      tile(49.25, 11.88, 1),
+    ])
     expect(fc.features).toHaveLength(2) // two distinct cells
     const threats = fc.features.map((f) => f.properties?.threat).sort()
     expect(threats).toEqual([1, 4]) // first cell took max(2,4)=4
@@ -293,7 +320,30 @@ describe('cellThreatToGeoJSON', () => {
   })
 
   it('omits zero-threat cells', () => {
-    expect(cellThreatToGeoJSON([tile(49.21, 11.83, 0)], 1000).features).toEqual([])
+    expect(cellThreatToGeoJSON([tile(49.21, 11.83, 0)]).features).toEqual([])
+  })
+
+  it('paints a threat at its own grid code, independent of the displayed grid', () => {
+    // A located 500 m threat must paint a 500 m square (smaller than the 1 km ambient default).
+    const lonSpan = (f: { geometry: { coordinates: number[][][] } }): number => {
+      const lons = f.geometry.coordinates[0].map((p) => p[0])
+      return Math.max(...lons) - Math.min(...lons)
+    }
+    const ambient = cellThreatToGeoJSON([tile(49.215, 11.835, 3)]).features[0]
+    const located = cellThreatToGeoJSON([
+      {
+        ...tile(49.215, 11.835, 3),
+        last_event: {
+          headline: 'mine',
+          category: 'obstacle',
+          sender: 'recon',
+          supply_relevant: false,
+          at_game_s: 0,
+          precision_m: 500,
+        },
+      },
+    ]).features[0]
+    expect(lonSpan(located as never)).toBeLessThan(lonSpan(ambient as never) * 0.75)
   })
 })
 
