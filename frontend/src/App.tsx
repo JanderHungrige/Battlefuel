@@ -44,6 +44,8 @@ import { useDrawnEdges } from './hooks/useDrawnEdges'
 import { DrawGraphPanel } from './components/DrawGraphPanel'
 import { ConnectGraphPopup } from './components/ConnectGraphPopup'
 import { DrawnEdgeEditPanel } from './components/DrawnEdgeEditPanel'
+import { ForcePlacementPanel, type ForceSide } from './components/ForcePlacementPanel'
+import type { ForceTab } from './lib/forceCatalog'
 import { useRoutingGraph } from './hooks/useRoutingGraph'
 import { useSimSocket } from './hooks/useSimSocket'
 import { useAdviceMarker } from './hooks/useAdviceMarker'
@@ -70,7 +72,8 @@ export default function App() {
   // security check show on every page load / refresh.
   const [entered, setEntered] = useState(false)
   const [role, setRole] = useState<Role>('OF4')
-  const { theater, tiles, units, setUnits, unitTypes, enemyUnits, error } = useTheaterData()
+  const { theater, tiles, units, setUnits, unitTypes, enemyUnits, setEnemyUnits, error } =
+    useTheaterData()
 
   const [selectedCell, setSelectedCell] = useState<{ lat: number; lon: number } | null>(null)
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null)
@@ -107,6 +110,11 @@ export default function App() {
   const [depotMode, setDepotMode] = useState(false)
   // Site type for the next placed depot ('' = plain depot/marker); v2 Wave 11 F5.
   const [depotSiteType, setDepotSiteType] = useState('')
+  // Scenario creator force placement (v2 Wave 22 F1): mode + chosen side / tab / unit type.
+  const [forcePlaceMode, setForcePlaceMode] = useState(false)
+  const [forceSide, setForceSide] = useState<ForceSide>('blue')
+  const [forceTab, setForceTab] = useState<ForceTab>('troops')
+  const [forceTypeId, setForceTypeId] = useState<string | null>(null)
   // Supply entity the operator asked to locate on the map (v2 Wave 11 F5). Carries the entity id +
   // kind so the purple halo can fade with the entity (OF-8 per-tab dimming) and clear on delete.
   const [located, setLocated] = useState<
@@ -295,6 +303,7 @@ export default function App() {
       setObstacleMode(false)
       setDepotMode(false)
       setEditGraph(false)
+      setForcePlaceMode(false)
       setSelectedDrawnId(null)
       draw.start(kind)
     },
@@ -309,12 +318,76 @@ export default function App() {
         clear()
         setObstacleMode(false)
         setDepotMode(false)
+        setForcePlaceMode(false)
         draw.cancel()
       }
       setSelectedDrawnId(null)
       return next
     })
   }, [clear, draw])
+
+  // Toggle scenario force-placement (v2 Wave 22 F1): exclusive with the other map-edit modes.
+  const toggleForcePlace = useCallback(() => {
+    setForcePlaceMode((on) => {
+      const next = !on
+      if (next) {
+        clear()
+        setObstacleMode(false)
+        setDepotMode(false)
+        setEditGraph(false)
+        setSelectedDrawnId(null)
+        draw.cancel()
+      }
+      return next
+    })
+  }, [clear, draw])
+
+  // Place the selected force at a clicked point: blue → unit instance, red → hostile (v2 Wave 22 F1).
+  const placeForce = useCallback(
+    (lat: number, lon: number) => {
+      if (!forceTypeId) {
+        pushChatter('Pick a unit type before placing', 'status')
+        return
+      }
+      const req = { unit_type_id: forceTypeId, lat, lon }
+      if (forceSide === 'blue') {
+        api
+          .placeUnitInstance(req)
+          .then((u) => {
+            setUnits((prev) => [...prev, u])
+            pushChatter(`Placed ${u.name}`, 'order')
+          })
+          .catch((e: unknown) => pushChatter(`Place failed: ${String(e)}`, 'status'))
+      } else {
+        api
+          .placeEnemyUnit(req)
+          .then((en) => {
+            setEnemyUnits((prev) => [...prev, en])
+            pushChatter(`Placed ${en.name}`, 'order')
+          })
+          .catch((e: unknown) => pushChatter(`Place failed: ${String(e)}`, 'status'))
+      }
+    },
+    [forceTypeId, forceSide, setUnits, setEnemyUnits, pushChatter],
+  )
+
+  // Remove a placed force clicked in placement mode (v2 Wave 22 F1).
+  const removeForce = useCallback(
+    (side: 'blue' | 'red', id: string) => {
+      if (side === 'blue') {
+        api
+          .removeUnitInstance(id)
+          .then(() => setUnits((prev) => prev.filter((u) => u.id !== id)))
+          .catch((e: unknown) => pushChatter(`Remove failed: ${String(e)}`, 'status'))
+      } else {
+        api
+          .removeEnemyUnit(id)
+          .then(() => setEnemyUnits((prev) => prev.filter((en) => en.id !== id)))
+          .catch(() => pushChatter('Only operator-placed red forces can be removed', 'status'))
+      }
+    },
+    [setUnits, setEnemyUnits, pushChatter],
+  )
 
   // Remove the selected drawn edge (v2 Wave 20 F6): delete + re-inject, then refresh both overlays.
   const removeDrawnEdge = useCallback(() => {
@@ -583,7 +656,10 @@ export default function App() {
           <button
             className={`mode-toggle${obstacleMode ? ' active' : ''}`}
             data-testid="obstacle-mode-toggle"
-            onClick={() => setObstacleMode((m) => !m)}
+            onClick={() => {
+              setForcePlaceMode(false)
+              setObstacleMode((m) => !m)
+            }}
           >
             {obstacleMode ? '🚧 Obstacle mode: ON' : 'Obstacle mode'}
           </button>
@@ -592,7 +668,10 @@ export default function App() {
           <button
             className={`mode-toggle${depotMode ? ' active' : ''}`}
             data-testid="depot-mode-toggle"
-            onClick={() => setDepotMode((m) => !m)}
+            onClick={() => {
+              setForcePlaceMode(false)
+              setDepotMode((m) => !m)
+            }}
           >
             {depotMode ? '⛽ Add depot: ON' : 'Add depot'}
           </button>
@@ -660,6 +739,15 @@ export default function App() {
             {editGraph ? '🖉 Editing graph' : 'Edit graph'}
           </button>
         )}
+        {theater && (
+          <button
+            className={`mode-toggle${forcePlaceMode ? ' active' : ''}`}
+            data-testid="force-place-toggle"
+            onClick={toggleForcePlace}
+          >
+            {forcePlaceMode ? '🪖 Placing forces' : 'Place forces'}
+          </button>
+        )}
         <span className="spacer" />
         {theater && <TourButton role={role} actions={tourActions} onEnd={clear} />}
         <span className="attribution">{OSM_ATTRIBUTION}</span>
@@ -684,6 +772,9 @@ export default function App() {
               obstacleMode={obstacleActive}
               depotMode={depotMode && canShow(role, 'depotOverlay')}
               onPlaceDepot={placeDepot}
+              forcePlaceActive={forcePlaceMode}
+              onPlaceForce={placeForce}
+              onRemoveForce={removeForce}
               hoverDetails={hoverDetails}
               enemyUnits={allEnemyUnits}
               depots={canShow(role, 'depotOverlay') ? (supply.overview?.depots ?? []) : []}
@@ -850,6 +941,18 @@ export default function App() {
                 items={catalogItems}
                 selectedId={obstacleTemplate.id}
                 onSelect={setObstacleTemplate}
+              />
+            )}
+            {theater && forcePlaceMode && (
+              <ForcePlacementPanel
+                unitTypes={unitTypes}
+                side={forceSide}
+                onSide={setForceSide}
+                tab={forceTab}
+                onTab={setForceTab}
+                selectedTypeId={forceTypeId}
+                onSelectType={setForceTypeId}
+                onClose={toggleForcePlace}
               />
             )}
             {canShow(role, 'drawGraph') && draw.mode && (

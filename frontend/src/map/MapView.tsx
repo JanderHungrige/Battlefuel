@@ -100,6 +100,10 @@ export interface MapViewProps {
   onRemoveObstacle: (id: string) => void
   depotMode: boolean
   onPlaceDepot: (lat: number, lon: number) => void
+  /** Scenario force-placement mode (v2 Wave 22 F1): clicks place a force / remove a placed one. */
+  forcePlaceActive?: boolean
+  onPlaceForce?: (lat: number, lon: number) => void
+  onRemoveForce?: (side: 'blue' | 'red', id: string) => void
   /** Fuel-run target-pick mode (v2 Wave 12): clicking a unit picks it as the refuel target. */
   fuelRunPickMode?: boolean
   onPickFuelTarget?: (unitId: string) => void
@@ -822,6 +826,22 @@ function wireInteraction(map: maplibregl.Map, propsRef: { current: MapViewProps 
     // precedence over select/inspect/plan.
     if (p.drawMode && p.onDrawWaypoint) {
       p.onDrawWaypoint(e.lngLat.lat, e.lngLat.lng)
+      return
+    }
+    // Scenario force placement (v2 Wave 22 F1): click a placed unit/hostile to remove it, else
+    // place a new force at the point. Takes precedence over select/inspect/plan.
+    if (p.forcePlaceActive && p.onPlaceForce) {
+      const hitFriendly = map.queryRenderedFeatures(e.point, { layers: ['units'] })
+      if (hitFriendly.length > 0) {
+        p.onRemoveForce?.('blue', String(hitFriendly[0].properties?.id))
+        return
+      }
+      const hitHostile = map.queryRenderedFeatures(e.point, { layers: ['enemy-units'] })
+      if (hitHostile.length > 0) {
+        p.onRemoveForce?.('red', String(hitHostile[0].properties?.id))
+        return
+      }
+      p.onPlaceForce(e.lngLat.lat, e.lngLat.lng)
       return
     }
     if (p.depotMode) {
