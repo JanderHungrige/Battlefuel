@@ -35,6 +35,8 @@ import {
   adviceArrowToGeoJSON,
   cellThreatToGeoJSON,
   depotsToGeoJSON,
+  drawnLineToGeoJSON,
+  drawnVerticesToGeoJSON,
   enemyUnitsToGeoJSON,
   destinationToGeoJSON,
   graphEdgesToGeoJSON,
@@ -114,6 +116,12 @@ export interface MapViewProps {
   dimDepots?: boolean
   /** Fade the purple locate halo when the entity it marks is itself dimmed (fix 99). */
   locateDimmed?: boolean
+  /** Draw-graph tool (v2 Wave 20 F3): 'road' solid / 'path' dotted / null off. */
+  drawMode?: 'road' | 'path' | null
+  /** Waypoints of the line being drawn (lat/lon). */
+  drawPoints?: { lat: number; lon: number }[]
+  /** A click in draw mode drops a waypoint here. */
+  onDrawWaypoint?: (lat: number, lon: number) => void
   onClearSelection: () => void
 }
 
@@ -450,6 +458,37 @@ function initLayers(map: maplibregl.Map): void {
       'line-opacity': ['case', ['get', 'selected'], 0.95, 0.35],
     },
   })
+
+  // Draw-graph tool (v2 Wave 20 F3): the line being hand-authored, on top of everything. One source
+  // feeds a solid layer (road) and a dotted layer (path); the active mode toggles their visibility.
+  map.addSource('draw-line', { type: 'geojson', data: EMPTY })
+  map.addLayer({
+    id: 'draw-line',
+    type: 'line',
+    source: 'draw-line',
+    layout: { 'line-cap': 'round', 'line-join': 'round', visibility: 'none' },
+    paint: { 'line-color': '#ff7a1a', 'line-width': 3, 'line-opacity': 0.9 },
+  })
+  map.addLayer({
+    id: 'draw-line-path',
+    type: 'line',
+    source: 'draw-line',
+    layout: { 'line-cap': 'round', 'line-join': 'round', visibility: 'none' },
+    paint: { 'line-color': '#ff7a1a', 'line-width': 3, 'line-opacity': 0.9, 'line-dasharray': [2, 2] },
+  })
+  map.addSource('draw-vertices', { type: 'geojson', data: EMPTY })
+  map.addLayer({
+    id: 'draw-vertices',
+    type: 'circle',
+    source: 'draw-vertices',
+    layout: { visibility: 'none' },
+    paint: {
+      'circle-radius': 4,
+      'circle-color': '#ff7a1a',
+      'circle-stroke-width': 1.5,
+      'circle-stroke-color': '#0e1116',
+    },
+  })
 }
 
 function syncRouteLines(
@@ -693,6 +732,12 @@ function wireReadout(map: maplibregl.Map, el: HTMLElement): void {
 function wireInteraction(map: maplibregl.Map, propsRef: { current: MapViewProps }): void {
   map.on('click', (e) => {
     const p = propsRef.current
+    // Draw-graph tool (v2 Wave 20 F3): while drawing, every click drops a waypoint and takes
+    // precedence over select/inspect/plan.
+    if (p.drawMode && p.onDrawWaypoint) {
+      p.onDrawWaypoint(e.lngLat.lat, e.lngLat.lng)
+      return
+    }
     if (p.depotMode) {
       p.onPlaceDepot(e.lngLat.lat, e.lngLat.lng)
       return
@@ -894,6 +939,19 @@ export function MapView(props: MapViewProps) {
     if (readyRef.current && mapRef.current)
       setData(mapRef.current, 'route', routeToGeoJSON(props.routeGeometry))
   }, [props.routeGeometry])
+  // Draw-graph tool (v2 Wave 20 F3): push the in-progress line + vertices and toggle the solid
+  // (road) / dotted (path) layer by mode.
+  useEffect(() => {
+    if (!(readyRef.current && mapRef.current)) return
+    const map = mapRef.current
+    const mode = props.drawMode ?? null
+    const pts = props.drawPoints ?? []
+    setData(map, 'draw-line', drawnLineToGeoJSON(pts))
+    setData(map, 'draw-vertices', drawnVerticesToGeoJSON(pts))
+    map.setLayoutProperty('draw-line', 'visibility', mode === 'road' ? 'visible' : 'none')
+    map.setLayoutProperty('draw-line-path', 'visibility', mode === 'path' ? 'visible' : 'none')
+    map.setLayoutProperty('draw-vertices', 'visibility', mode ? 'visible' : 'none')
+  }, [props.drawMode, props.drawPoints])
   useEffect(() => {
     if (readyRef.current && mapRef.current)
       setData(mapRef.current, 'destination', destinationToGeoJSON(props.destination))

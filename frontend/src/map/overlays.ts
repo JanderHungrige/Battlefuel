@@ -244,6 +244,33 @@ export function graphNodesToGeoJSON(nodes: GraphNode[]): FeatureCollection {
   }
 }
 
+/** Draw-tool line (v2 Wave 20 F3) → a single LineString (empty until ≥2 waypoints). */
+export function drawnLineToGeoJSON(points: { lat: number; lon: number }[]): FeatureCollection {
+  if (points.length < 2) return { type: 'FeatureCollection', features: [] }
+  return {
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates: points.map((p) => [p.lon, p.lat]) },
+        properties: {},
+      },
+    ],
+  }
+}
+
+/** Draw-tool waypoints (v2 Wave 20 F3) → a Point per dropped vertex. */
+export function drawnVerticesToGeoJSON(points: { lat: number; lon: number }[]): FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: points.map((p) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [p.lon, p.lat] },
+      properties: {},
+    })),
+  }
+}
+
 /** Multiple active-route geometries → a LineString FeatureCollection. */
 export function activeRoutesToGeoJSON(geometries: number[][][]): FeatureCollection {
   return {

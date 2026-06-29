@@ -7,6 +7,8 @@ import {
   adviceArrowToGeoJSON,
   cellThreatToGeoJSON,
   depotsToGeoJSON,
+  drawnLineToGeoJSON,
+  drawnVerticesToGeoJSON,
   enemyUnitsToGeoJSON,
   destinationToGeoJSON,
   graphEdgesToGeoJSON,
@@ -290,5 +292,39 @@ describe('cellThreatToGeoJSON', () => {
 
   it('omits zero-threat cells', () => {
     expect(cellThreatToGeoJSON([tile(49.21, 11.83, 0)], 1000).features).toEqual([])
+  })
+})
+
+describe('drawnLineToGeoJSON', () => {
+  it('returns no feature for fewer than 2 points', () => {
+    expect(drawnLineToGeoJSON([]).features).toEqual([])
+    expect(drawnLineToGeoJSON([{ lat: 49.2, lon: 11.8 }]).features).toEqual([])
+  })
+
+  it('builds one [lon,lat] LineString from the waypoints', () => {
+    const fc = drawnLineToGeoJSON([
+      { lat: 49.2, lon: 11.8 },
+      { lat: 49.21, lon: 11.81 },
+    ])
+    expect(fc.features).toHaveLength(1)
+    expect(fc.features[0].geometry.type).toBe('LineString')
+    expect((fc.features[0].geometry as { coordinates: number[][] }).coordinates).toEqual([
+      [11.8, 49.2],
+      [11.81, 49.21],
+    ])
+  })
+})
+
+describe('drawnVerticesToGeoJSON', () => {
+  it('emits one [lon,lat] Point per waypoint', () => {
+    const fc = drawnVerticesToGeoJSON([
+      { lat: 49.2, lon: 11.8 },
+      { lat: 49.21, lon: 11.81 },
+    ])
+    expect(fc.features).toHaveLength(2)
+    expect(fc.features.map((f) => (f.geometry as { coordinates: number[] }).coordinates)).toEqual([
+      [11.8, 49.2],
+      [11.81, 49.21],
+    ])
   })
 })
