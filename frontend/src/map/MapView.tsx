@@ -937,10 +937,10 @@ export function MapView(props: MapViewProps) {
       const p = propsRef.current
       initLayers(map)
       setData(map, 'tiles', tilesToGeoJSON(p.tiles))
-      setData(map, 'cell-threat', cellThreatToGeoJSON(p.tiles, p.gridPrecisionM))
+      setData(map, 'cell-threat', cellThreatToGeoJSON(p.tiles))
       syncUnits(map, p.units, p.unitTypes, p.livePositions)
       syncUnitFuelBars(map, p.units, p.unitTypes, p.livePositions, p.showUnitFuelBars ?? false)
-      map.setFilter('unit-fuel-bars', ['!=', ['get', 'id'], p.selectedUnitId ?? ' '])
+      map.setFilter('unit-fuel-bars', ['!=', ['get', 'id'], p.selectedUnitId ?? ''])
       map.setFilter('unit-fuel-bars-selected', ['==', ['get', 'id'], p.selectedUnitId ?? ''])
       syncEnemyUnits(map, p.enemyUnits)
       setData(map, 'active-routes', activeRoutesToGeoJSON(p.activeRoutes))
@@ -973,9 +973,11 @@ export function MapView(props: MapViewProps) {
     if (readyRef.current && mapRef.current) setData(mapRef.current, 'tiles', tilesToGeoJSON(props.tiles))
   }, [props.tiles])
   useEffect(() => {
+    // Threat renders at each threat's OWN grid code, not the displayed grid (v2 Wave 21 F2), so this
+    // no longer depends on gridPrecisionM — resizing the grid never rescales the threat wash.
     if (readyRef.current && mapRef.current)
-      setData(mapRef.current, 'cell-threat', cellThreatToGeoJSON(props.tiles, props.gridPrecisionM))
-  }, [props.tiles, props.gridPrecisionM])
+      setData(mapRef.current, 'cell-threat', cellThreatToGeoJSON(props.tiles))
+  }, [props.tiles])
   useEffect(() => {
     if (readyRef.current && mapRef.current) {
       syncUnits(mapRef.current, props.units, props.unitTypes, props.livePositions)

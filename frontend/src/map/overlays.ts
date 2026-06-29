@@ -16,7 +16,8 @@ import type {
   UnitInstance,
 } from '../api/types'
 import { depotIconKey } from './depotSymbol'
-import { cellIdFor, squareCornersFromCenter } from './mgrsGrid'
+import { squareCornersFromCenter } from './mgrsGrid'
+import { threatSquares } from './threatGrid'
 
 // Light classic terrain tints — soft, distinct fills that read on the parchment basemap (45).
 export const TERRAIN_COLORS: Record<TerrainType, string> = {
@@ -114,33 +115,24 @@ export function enemyUnitsToGeoJSON(enemies: EnemyUnit[]): FeatureCollection {
 }
 
 /**
- * Ambient threat as shaded MGRS cells (v2 Wave 9, mgrs-threat-shading) — replaces the hex threat
- * wash. Groups tiles by their MGRS cell at `precisionM`, takes each cell's max threat, and emits one
- * square Polygon per cell with `threat > 0` (carrying `threat` for the opacity ramp).
+ * Threat as shaded MGRS squares at each threat's OWN grid-code size (v2 Wave 21,
+ * threat-grid-decoupled-render) — independent of the displayed grid. Each threatened tile emits one
+ * square of side = its grid code (`threatSquares`): a 500 m threat paints a 500 m square even on the
+ * 1 km grid. Features are ordered ascending by threat so a higher square paints OVER a lower one,
+ * giving highest-wins nesting (a 500 m level-4 patch shows through a 2 km level-2 area). Each feature
+ * carries `threat` for the opacity ramp.
  */
-export function cellThreatToGeoJSON(tiles: Tile[], precisionM: number): FeatureCollection {
-  const cells = new Map<string, { lat: number; lon: number; threat: number }>()
-  for (const t of tiles) {
-    const id = cellIdFor(t.center_lat, t.center_lon, precisionM)
-    const prev = cells.get(id)
-    if (prev === undefined) {
-      cells.set(id, { lat: t.center_lat, lon: t.center_lon, threat: t.threat_level })
-    } else if (t.threat_level > prev.threat) {
-      prev.threat = t.threat_level
-    }
-  }
+export function cellThreatToGeoJSON(tiles: Tile[]): FeatureCollection {
   return {
     type: 'FeatureCollection',
-    features: [...cells.values()]
-      .filter((c) => c.threat > 0)
-      .map((c) => ({
-        type: 'Feature',
-        geometry: {
-          type: 'Polygon',
-          coordinates: [squareCornersFromCenter(c.lat, c.lon, precisionM)],
-        },
-        properties: { threat: c.threat },
-      })),
+    features: threatSquares(tiles).map((s) => ({
+      type: 'Feature',
+      geometry: {
+        type: 'Polygon',
+        coordinates: [squareCornersFromCenter(s.lat, s.lon, s.precisionM)],
+      },
+      properties: { threat: s.threat },
+    })),
   }
 }
 

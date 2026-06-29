@@ -277,11 +277,12 @@ describe('cellThreatToGeoJSON', () => {
   })
 
   it('emits one square per threatened MGRS cell, carrying the cell max threat', () => {
-    // Two tiles in the same 1km cell (close together) → one square with the max threat.
-    const fc = cellThreatToGeoJSON(
-      [tile(49.215, 11.835, 2), tile(49.2152, 11.8352, 4), tile(49.25, 11.88, 1)],
-      1000,
-    )
+    // Two tiles in the same 1km ambient cell (close together) → one square with the max threat.
+    const fc = cellThreatToGeoJSON([
+      tile(49.215, 11.835, 2),
+      tile(49.2152, 11.8352, 4),
+      tile(49.25, 11.88, 1),
+    ])
     expect(fc.features).toHaveLength(2) // two distinct cells
     const threats = fc.features.map((f) => f.properties?.threat).sort()
     expect(threats).toEqual([1, 4]) // first cell took max(2,4)=4
@@ -293,7 +294,30 @@ describe('cellThreatToGeoJSON', () => {
   })
 
   it('omits zero-threat cells', () => {
-    expect(cellThreatToGeoJSON([tile(49.21, 11.83, 0)], 1000).features).toEqual([])
+    expect(cellThreatToGeoJSON([tile(49.21, 11.83, 0)]).features).toEqual([])
+  })
+
+  it('paints a threat at its own grid code, independent of the displayed grid', () => {
+    // A located 500 m threat must paint a 500 m square (smaller than the 1 km ambient default).
+    const lonSpan = (f: { geometry: { coordinates: number[][][] } }): number => {
+      const lons = f.geometry.coordinates[0].map((p) => p[0])
+      return Math.max(...lons) - Math.min(...lons)
+    }
+    const ambient = cellThreatToGeoJSON([tile(49.215, 11.835, 3)]).features[0]
+    const located = cellThreatToGeoJSON([
+      {
+        ...tile(49.215, 11.835, 3),
+        last_event: {
+          headline: 'mine',
+          category: 'obstacle',
+          sender: 'recon',
+          supply_relevant: false,
+          at_game_s: 0,
+          precision_m: 500,
+        },
+      },
+    ]).features[0]
+    expect(lonSpan(located as never)).toBeLessThan(lonSpan(ambient as never) * 0.75)
   })
 })
 
