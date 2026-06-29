@@ -11,6 +11,8 @@ import {
   drawnEdgesToGeoJSON,
   drawnLineToGeoJSON,
   drawnVerticesToGeoJSON,
+  enemyDangerCellsToGeoJSON,
+  enemyDangerCirclesToGeoJSON,
   enemyUnitsToGeoJSON,
   destinationToGeoJSON,
   graphEdgesToGeoJSON,
@@ -258,6 +260,30 @@ describe('enemyUnitsToGeoJSON', () => {
 
   it('is empty when there are no enemy units', () => {
     expect(enemyUnitsToGeoJSON([]).features).toEqual([])
+  })
+
+  it('draws a closed danger ring polygon per enemy', () => {
+    const fc = enemyDangerCirclesToGeoJSON([enemy])
+    expect(fc.features).toHaveLength(1)
+    const ring = (fc.features[0].geometry as { type: string; coordinates: number[][][] })
+    expect(ring.type).toBe('Polygon')
+    expect(ring.coordinates[0][0]).toEqual(ring.coordinates[0][ring.coordinates[0].length - 1])
+    expect(fc.features[0].properties).toMatchObject({ id: 'enemy-mech-1' })
+  })
+
+  it('washes the covered 500 m cells as square polygons', () => {
+    const fc = enemyDangerCellsToGeoJSON([enemy])
+    expect(fc.features.length).toBeGreaterThan(0)
+    for (const f of fc.features) {
+      expect(f.geometry.type).toBe('Polygon')
+      const ring = (f.geometry as { coordinates: number[][][] }).coordinates[0]
+      expect(ring).toHaveLength(5) // closed square
+    }
+  })
+
+  it('emits no danger geometry with no enemies', () => {
+    expect(enemyDangerCirclesToGeoJSON([]).features).toEqual([])
+    expect(enemyDangerCellsToGeoJSON([]).features).toEqual([])
   })
 })
 

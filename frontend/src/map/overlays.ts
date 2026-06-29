@@ -17,6 +17,7 @@ import type {
 } from '../api/types'
 import { depotIconKey } from './depotSymbol'
 import { squareCornersFromCenter } from './mgrsGrid'
+import { DANGER_CELL_M, ENEMY_DANGER_RADIUS_M, dangerCells, dangerCircle } from './enemyDanger'
 import { threatSquares } from './threatGrid'
 
 // Light classic terrain tints — soft, distinct fills that read on the parchment basemap (45).
@@ -132,6 +133,37 @@ export function cellThreatToGeoJSON(tiles: Tile[]): FeatureCollection {
         coordinates: [squareCornersFromCenter(s.lat, s.lon, s.precisionM)],
       },
       properties: { threat: s.threat },
+    })),
+  }
+}
+
+/**
+ * Enemy danger circles (v2 Wave 21, enemy-danger-circle-render) → one 500 m-radius ring Polygon per
+ * hostile unit, for the dashed red danger outline. A display complement to the routing-side enemy
+ * danger (Wave 16).
+ */
+export function enemyDangerCirclesToGeoJSON(enemies: EnemyUnit[]): FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: enemies.map((e) => ({
+      type: 'Feature',
+      geometry: { type: 'Polygon', coordinates: [dangerCircle(e.lat, e.lon, ENEMY_DANGER_RADIUS_M)] },
+      properties: { id: e.id },
+    })),
+  }
+}
+
+/**
+ * The 500 m MGRS cells covered by any enemy's danger circle (v2 Wave 21) → one red square Polygon
+ * per distinct cell (deduped across enemies), for the danger wash.
+ */
+export function enemyDangerCellsToGeoJSON(enemies: EnemyUnit[]): FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: dangerCells(enemies, ENEMY_DANGER_RADIUS_M, DANGER_CELL_M).map((c) => ({
+      type: 'Feature',
+      geometry: { type: 'Polygon', coordinates: [squareCornersFromCenter(c.lat, c.lon, DANGER_CELL_M)] },
+      properties: {},
     })),
   }
 }
