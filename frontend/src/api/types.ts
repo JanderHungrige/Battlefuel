@@ -161,6 +161,21 @@ export interface RouteOption {
   road_exit?: number[] | null
 }
 
+// The pgRouting network for the optional map overlay (v2 Wave 20 F1).
+export interface GraphEdge {
+  gid: number
+  geometry: number[][] // [lon, lat] polyline
+  threat_level: number
+}
+export interface GraphNode {
+  id: number
+  point: number[] // [lon, lat]
+}
+export interface RoutingGraph {
+  edges: GraphEdge[]
+  nodes: GraphNode[]
+}
+
 export interface PlanRouteRequest {
   instance_id: string
   dest_lat: number

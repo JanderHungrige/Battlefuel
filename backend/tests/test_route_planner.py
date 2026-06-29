@@ -220,46 +220,60 @@ class TestRoadSafeSticksToRoads:
     """v2 Wave 18 F4: ROAD mode stays on roads for BOTH metrics — SAFE no longer auto-detours
     off-road (reverses the v2 Wave 16 ROAD-mode detour). Off-road detours belong to HYBRID."""
 
-    async def test_road_safe_stays_on_road_even_when_dangerous(self) -> None:
+    async def test_road_safe_stays_on_road(self) -> None:
         from app.domain.route import RouteMode
         from app.services.route_planner import plan_routes
 
-        # A clearly safer off-road option exists, but ROAD mode must ignore it.
+        # ROAD mode uses only the injected road provider for both metrics — no off-road detour.
         road = _FakeProvider(
             _leg(_ROAD_GEOM, distance=3000, effective=3000, fuel=3000, threat_max=5, threat_avg=4.0)
         )
-        offroad = _FakeProvider(
-            _leg(_OFF_GEOM, distance=6000, effective=6000, fuel=6000, threat_max=0, threat_avg=0.0)
-        )
         unit_type, inst = _unit_and_instance()
-        opts = await plan_routes(
-            None, road, inst, unit_type, 49.23, 11.86, mode=RouteMode.ROAD, offroad=offroad
-        )
+        opts = await plan_routes(None, road, inst, unit_type, 49.23, 11.86, mode=RouteMode.ROAD)
         by_metric = {o.metric: o for o in opts}
-        # Both metrics keep the road geometry; SAFE does NOT take the off-road detour.
         assert by_metric[RouteMetric.FAST].geometry == _ROAD_GEOM
         assert by_metric[RouteMetric.SAFE].geometry == _ROAD_GEOM
         assert by_metric[RouteMetric.SAFE].threat_max == 5
 
-    async def test_hybrid_still_takes_the_safer_offroad_detour(self) -> None:
-        from app.domain.route import RouteMode
-        from app.services.route_planner import plan_routes
+    # HYBRID is no longer a whole-route road-or-offroad pick (v2 Wave 19) — it is the road-aware
+    # segmented A* in terrain_router.hybrid_path, unit-tested in test_terrain_router.py.
 
-        # Same inputs, HYBRID mode: best-of-both still applies, so SAFE detours off-road.
-        road = _FakeProvider(
-            _leg(_ROAD_GEOM, distance=3000, effective=3000, fuel=3000, threat_max=5, threat_avg=4.0)
+
+class TestPickBetterPath:
+    """v2 Wave 19 F2: the hybrid provider takes a clean direct line over the road composition when
+    direct wins — FAST by effective distance, SAFE by threat_max then effective."""
+
+    def _p(self, *, effective: float, threat_max: int) -> RoutePath:
+        return RoutePath(
+            metric=RouteMetric.FAST,
+            geometry=_GEOM,
+            distance_m=effective,
+            effective_distance_m=effective,
+            fuel_distance_m=effective,
+            threat_max=threat_max,
+            threat_avg=float(threat_max),
         )
-        offroad = _FakeProvider(
-            _leg(_OFF_GEOM, distance=6000, effective=6000, fuel=6000, threat_max=0, threat_avg=0.0)
-        )
-        unit_type, inst = _unit_and_instance()
-        opts = await plan_routes(
-            None, road, inst, unit_type, 49.23, 11.86, mode=RouteMode.HYBRID, offroad=offroad
-        )
-        by_metric = {o.metric: o for o in opts}
-        assert by_metric[RouteMetric.FAST].geometry == _ROAD_GEOM  # FAST: shorter road
-        assert by_metric[RouteMetric.SAFE].geometry == _OFF_GEOM  # SAFE: safer off-road
-        assert by_metric[RouteMetric.SAFE].threat_max == 0
+
+    def test_fast_picks_lowest_effective(self) -> None:
+        from app.services.route_planner import pick_better_path
+
+        longer = self._p(effective=1000, threat_max=5)
+        shorter = self._p(effective=600, threat_max=0)
+        assert pick_better_path(RouteMetric.FAST, longer, shorter) is shorter
+
+    def test_safe_prefers_lower_threat_even_if_longer(self) -> None:
+        from app.services.route_planner import pick_better_path
+
+        safe_long = self._p(effective=2000, threat_max=0)
+        short_dangerous = self._p(effective=500, threat_max=5)
+        assert pick_better_path(RouteMetric.SAFE, short_dangerous, safe_long) is safe_long
+
+    def test_skips_none_and_returns_none_when_empty(self) -> None:
+        from app.services.route_planner import pick_better_path
+
+        only = self._p(effective=1000, threat_max=0)
+        assert pick_better_path(RouteMetric.FAST, None, only, None) is only
+        assert pick_better_path(RouteMetric.FAST, None, None) is None
 
 
 class TestPerLegModes:

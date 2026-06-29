@@ -58,6 +58,19 @@ def build_option(
     )
 
 
+def pick_better_path(metric: RouteMetric, *paths: RoutePath | None) -> RoutePath | None:
+    """Pick the best of several candidate `RoutePath`s (v2 Wave 19 F2). FAST → lowest effective
+    distance (the time-proxy); SAFE → lowest threat_max, then effective. ``None`` inputs are
+    skipped; returns ``None`` only when every candidate is missing. Used by the hybrid provider to
+    take a clean direct line over the road-aware composition when direct wins on a short leg."""
+    candidates = [p for p in paths if p is not None]
+    if not candidates:
+        return None
+    if metric is RouteMetric.SAFE:
+        return min(candidates, key=lambda p: (p.threat_max, p.effective_distance_m))
+    return min(candidates, key=lambda p: p.effective_distance_m)
+
+
 def pick_route_option(
     metric: RouteMetric, road: RouteOption | None, offroad: RouteOption | None
 ) -> RouteOption | None:
@@ -111,24 +124,21 @@ async def plan_routes(
     dest_lon: float,
     *,
     mode: RouteMode = RouteMode.ROAD,
-    offroad: RoutingProvider | None = None,
 ) -> list[RouteOption]:
     """Compute fastest + safest route options from the unit's position to the destination.
 
     ``mode`` selects the router and the speed: ``road`` uses the injected road provider at road
     speed; ``offroad`` and ``direct`` use the terrain / straight-line routers at off-road speed;
-    ``hybrid`` returns, per metric, the better of the road and off-road options.
+    ``hybrid`` uses the **road-aware segmented A\*** (v2 Wave 19) — one route that follows roads but
+    cuts cross-country shortcuts and, on SAFE, skirts threat off-road then rejoins.
 
     **Road means road (v2 Wave 18 F4):** in ``road`` mode SAFE stays on the road network — it only
-    varies the route among roads, never auto-detours cross-country. (This reverses the v2 Wave 16
-    ROAD-mode off-road detour: off-road detours now belong to ``hybrid``.) Only ``hybrid`` evaluates
-    both the road and off-road option and keeps the better one (lower threat_max then duration for
-    SAFE; lower duration for FAST). ``offroad`` is injectable for tests; it defaults to the terrain
-    router.
+    varies the route among roads, never auto-detours cross-country. Off-road detours belong to
+    ``hybrid``. ``hybrid``'s effective-distance is already road-speed-equivalent (off-road cells are
+    inflated in the A* cost), so it is costed at road speed.
     """
     road_kph = unit_type.movement.speed_road_kph
     offroad_kph = unit_type.movement.speed_offroad_kph
-    offroad = offroad or build_routing_provider_for_mode(RouteMode.OFFROAD)
     start_fuel = (
         instance.current_fuel_liters
         if instance.current_fuel_liters is not None
@@ -136,38 +146,6 @@ async def plan_routes(
     )
     options: list[RouteOption] = []
     for metric, label in _METRICS:
-        # Consider an off-road detour only for HYBRID. ROAD mode stays on roads for both metrics
-        # (v2 Wave 18 F4 — "road means road"); off-road detours are a HYBRID concern now.
-        consider_offroad = mode is RouteMode.HYBRID
-        if consider_offroad:
-            road_opt = await _build_for_provider(
-                session,
-                routing,
-                instance,
-                unit_type,
-                dest_lat,
-                dest_lon,
-                metric,
-                label,
-                speed_kph=road_kph,
-                start_fuel_l=start_fuel,
-            )
-            off_opt = await _build_for_provider(
-                session,
-                offroad,
-                instance,
-                unit_type,
-                dest_lat,
-                dest_lon,
-                metric,
-                label,
-                speed_kph=offroad_kph,
-                start_fuel_l=start_fuel,
-            )
-            best = pick_route_option(metric, road_opt, off_opt)
-            if best is not None:
-                options.append(best)
-            continue
         provider = routing if mode is RouteMode.ROAD else build_routing_provider_for_mode(mode)
         speed_kph = offroad_kph if mode in (RouteMode.OFFROAD, RouteMode.DIRECT) else road_kph
         opt = await _build_for_provider(

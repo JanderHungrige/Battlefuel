@@ -7,6 +7,8 @@ import type {
   BBox,
   DepotFuel,
   EnemyUnit,
+  GraphEdge,
+  GraphNode,
   Obstacle,
   TerrainType,
   Tile,
@@ -213,6 +215,32 @@ export function adviceArrowToGeoJSON(
         properties: { part: 'head' },
       },
     ],
+  }
+}
+
+/** Routing-graph edges → a LineString FeatureCollection for the overlay (v2 Wave 20 F2). */
+export function graphEdgesToGeoJSON(edges: GraphEdge[]): FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: edges
+      .filter((e) => e.geometry.length >= 2)
+      .map((e) => ({
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates: e.geometry },
+        properties: { threat: e.threat_level },
+      })),
+  }
+}
+
+/** Routing-graph vertices → a Point FeatureCollection for the overlay (v2 Wave 20 F2). */
+export function graphNodesToGeoJSON(nodes: GraphNode[]): FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: nodes.map((n) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: n.point },
+      properties: {},
+    })),
   }
 }
 

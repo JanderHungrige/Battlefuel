@@ -192,6 +192,45 @@ class TestTerrainOrDirect:
         assert terrain_or_direct({}, 49.21, 11.84, 49.22, 11.84, RouteMetric.FAST) is None
 
 
+class TestHybridPath:
+    """F1 (Wave 19, doc 110): road-aware A* — road cells travel at road speed, off-road cells are
+    penalised, so hybrid follows roads but can cut cross-country and (SAFE) skirt threat."""
+
+    def test_road_cells_cost_less_time_than_off_road(self) -> None:
+        from app.services.terrain_router import hybrid_path
+
+        s_lat, s_lon = _latlng(_START)
+        d_lat, d_lon = _latlng(_DEST)
+        tiles = _region_tiles(TerrainType.OPEN)
+        on_road = hybrid_path(tiles, frozenset(tiles), s_lat, s_lon, d_lat, d_lon, RouteMetric.FAST)
+        off_road = hybrid_path(tiles, frozenset(), s_lat, s_lon, d_lat, d_lon, RouteMetric.FAST)
+        assert on_road is not None and off_road is not None
+        # Same geometry (uniform grid), but the off-road penalty makes the cross-country time
+        # strictly larger — so the A* prefers road cells whenever they are available.
+        assert on_road.distance_m == pytest.approx(off_road.distance_m)
+        assert on_road.effective_distance_m < off_road.effective_distance_m
+
+    def test_safe_hybrid_detours_off_a_high_threat_road_cell(self) -> None:
+        from app.services.terrain_router import hybrid_path
+
+        # All cells are road; the centre road cell is high-threat. FAST cuts through it (shortest);
+        # SAFE leaves the road to skirt it and rejoins.
+        n1 = _RING[0]
+        n1_lat, n1_lon = _latlng(n1)
+        opposite = max(_RING, key=lambda c: haversine_m(*_latlng(c)[::-1], n1_lon, n1_lat))
+        tiles: dict[str, tuple] = {_CENTER: (TerrainType.OPEN, 5)}
+        for c in _RING:
+            tiles[c] = (TerrainType.OPEN, 0)
+        roads = frozenset(tiles)
+        s_lat, s_lon = _latlng(n1)
+        d_lat, d_lon = _latlng(opposite)
+        fast = hybrid_path(tiles, roads, s_lat, s_lon, d_lat, d_lon, RouteMetric.FAST)
+        safe = hybrid_path(tiles, roads, s_lat, s_lon, d_lat, d_lon, RouteMetric.SAFE)
+        assert fast is not None and safe is not None
+        assert fast.threat_max == 5  # shortest path crosses the threatened centre
+        assert safe.threat_max == 0  # SAFE routes around it
+
+
 class TestOffroadFuelPenalty:
     """F5 (Wave 18, doc 109): off-road movement carries an explicit fuel penalty on top of the
     terrain factor (the speed penalty is the unit's speed_offroad_kph, applied in the planner)."""

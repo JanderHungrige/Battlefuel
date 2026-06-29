@@ -115,6 +115,33 @@ class TestPgRouting:
 
 
 @pytest.mark.db
+class TestHybridRouteStitch:
+    """v2 Wave 19 F1 (road-geometry stitch): the hybrid route draws road runs with the real ways
+    geometry (so it hugs streets) and the cost matches the drawn line."""
+
+    async def test_hybrid_route_hugs_roads_and_cost_matches_geometry(self) -> None:
+        async with _session() as session:
+            await _require_graph(session)
+            prov = build_routing_provider_for_mode(RouteMode.HYBRID)
+            path = await prov.shortest_path(session, *_A, *_B, RouteMetric.FAST)
+            assert path is not None
+            # Real road geometry stitched in → many points, not a handful of hex centres.
+            assert len(path.geometry) > 20
+            # stitch_paths summed the legs, so distance matches the drawn polyline.
+            glen = sum(
+                haversine_m(
+                    path.geometry[k][0], path.geometry[k][1],
+                    path.geometry[k + 1][0], path.geometry[k + 1][1],
+                )
+                for k in range(len(path.geometry) - 1)
+            )
+            assert path.distance_m == pytest.approx(glen, rel=0.05)
+            # Endpoints anchored exactly at the unit and the destination.
+            assert path.geometry[0] == pytest.approx([_A[1], _A[0]], abs=1e-6)
+            assert path.geometry[-1] == pytest.approx([_B[1], _B[0]], abs=1e-6)
+
+
+@pytest.mark.db
 class TestNearestPointSnapAndStubs:
     """v2 Wave 18 F1+F2: route snaps to the nearest POINT on the nearest road (not a far vertex)
     and draws straight stubs from the unit to that point and from the road exit to the target."""
