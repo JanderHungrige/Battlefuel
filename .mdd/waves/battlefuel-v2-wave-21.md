@@ -30,7 +30,7 @@ Mark `complete` only after ALL three gates pass (never on a localhost demo):
 ## Features
 | # | Feature | Doc | Status | Depends on |
 |---|---------|-----|--------|------------|
-| 1 | threat-grid-code-model | — | planned | — |
+| 1 | threat-grid-code-model | docs/119-threat-grid-code-model.md | complete | — |
 | 2 | threat-grid-decoupled-render | — | planned | threat-grid-code-model |
 | 3 | threat-edge-penalty-by-resolution | — | planned | threat-grid-code-model |
 | 4 | enemy-danger-circle-render | — | planned | threat-grid-decoupled-render |
