@@ -19,6 +19,7 @@ from app.api.advice_redistribution import router as advice_redistribution_router
 from app.api.advice_refuel import router as advice_refuel_router
 from app.api.buy_orders import router as buy_orders_router
 from app.api.combat_events import router as combat_events_router
+from app.api.drawn_edges import router as drawn_edges_router
 from app.api.enemy_units import router as enemy_units_router
 from app.api.fuel_platforms import router as fuel_platforms_router
 from app.api.fuel_runs import router as fuel_runs_router
@@ -79,6 +80,7 @@ def create_app(enable_sim: bool = False) -> FastAPI:
     api_v1.include_router(routing_graph_router)
     api_v1.include_router(move_orders_router)
     api_v1.include_router(obstacles_router)
+    api_v1.include_router(drawn_edges_router)
     api_v1.include_router(supply_router)
     api_v1.include_router(refuel_orders_router)
     api_v1.include_router(buy_orders_router)

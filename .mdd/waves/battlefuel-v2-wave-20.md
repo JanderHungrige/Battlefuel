@@ -31,8 +31,8 @@ Mark `complete` only after ALL three gates pass (never on a localhost demo):
 |---|---------|-----|--------|------------|
 | 1 | routing-graph-overlay-api | — | planned | — |
 | 2 | graph-network-toggle | — | planned | routing-graph-overlay-api |
-| 3 | draw-road-path-tool | — | planned | — |
-| 4 | connect-drawn-to-graph | — | planned | draw-road-path-tool, routing-graph-overlay-api |
+| 3 | draw-road-path-tool | [115](../docs/115-draw-road-path-tool.md) | complete | — |
+| 4 | connect-drawn-to-graph | [116](../docs/116-connect-drawn-to-graph.md) | complete | draw-road-path-tool, routing-graph-overlay-api |
 
 Build order: 1 → 2; 3 → 4 (4 also needs 1's vertex data).
 

@@ -1894,3 +1894,57 @@ body {
   font-size: 13px;
 }
 
+
+/* Draw-graph tool (v2 Wave 20 F3/F4): the active-draw panel + the connect-to-graph popup. */
+.draw-graph-panel {
+  border-color: #ff7a1a;
+}
+
+.connect-graph-popup {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 40;
+  width: 320px;
+  max-width: 90%;
+  padding: 16px 18px;
+  background: var(--panel);
+  border: 1px solid #ff7a1a;
+  border-radius: 8px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+}
+
+.connect-graph-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.connect-graph-hint {
+  margin: 0 0 12px;
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+.connect-graph-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.connect-graph-cancel {
+  width: 100%;
+  padding: 6px 10px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: inherit;
+  cursor: pointer;
+}
+
+.connect-graph-cancel:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

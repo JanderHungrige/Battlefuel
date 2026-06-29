@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { latLngToCell } from 'h3-js'
 import { api } from './api/client'
 import { errorMessage } from './api/errors'
-import type { ChatterMessage, Recommendation, TileMutationRequest } from './api/types'
+import type { ChatterMessage, DrawConnect, Recommendation, TileMutationRequest } from './api/types'
 import { AdvisorPanel } from './components/AdvisorPanel'
 import { ChatterLog } from './components/ChatterLog'
 import { ChatterFilterControls } from './components/ChatterFilterControls'
@@ -39,6 +39,9 @@ import { LOGISTIC_SITE_TYPES, logisticSiteLabel } from './lib/logisticSite'
 import { shouldRefuelOnClick } from './lib/refuelOnClick'
 import { canShow, type Role } from './roles'
 import { useObstacleOps } from './hooks/useObstacleOps'
+import { useDrawGraph } from './hooks/useDrawGraph'
+import { DrawGraphPanel } from './components/DrawGraphPanel'
+import { ConnectGraphPopup } from './components/ConnectGraphPopup'
 import { useRoutingGraph } from './hooks/useRoutingGraph'
 import { useSimSocket } from './hooks/useSimSocket'
 import { useAdviceMarker } from './hooks/useAdviceMarker'
@@ -120,7 +123,12 @@ export default function App() {
   const [hoverDetails, setHoverDetails] = useState(false)
   // Routing-graph overlay toggle (v2 Wave 20 F2) — fetched once when first enabled.
   const [showGraph, setShowGraph] = useState(false)
-  const routingGraph = useRoutingGraph(showGraph)
+  // Bumped after a drawn edge is injected so the overlay refetches and shows it (v2 Wave 20 F4).
+  const [graphReload, setGraphReload] = useState(0)
+  const routingGraph = useRoutingGraph(showGraph, graphReload)
+  // Draw-graph tool (v2 Wave 20 F3): hand-author a road/path onto the map (OF-4).
+  const draw = useDrawGraph()
+  const [drawBusy, setDrawBusy] = useState(false)
   // Seed hostile force merged with live chatter-driven sightings (v2 Wave 4 F6); dedup by id,
   // a dynamic sighting wins over a seed unit with the same id.
   const allEnemyUnits = useMemo(() => {
@@ -261,6 +269,48 @@ export default function App() {
     setRole(r)
     if (r !== 'OF8') setLocated(null)
   }, [])
+
+  // Toggle the draw-graph tool (v2 Wave 20 F3): same kind → exit; otherwise clear any other mode/
+  // selection and start drawing. Drawing is exclusive with obstacle/depot placement + planning.
+  const toggleDraw = useCallback(
+    (kind: 'road' | 'path') => {
+      if (draw.mode === kind) {
+        draw.cancel()
+        return
+      }
+      clear()
+      setObstacleMode(false)
+      setDepotMode(false)
+      draw.start(kind)
+    },
+    [draw, clear],
+  )
+
+  // Connect-drawn-to-graph (v2 Wave 20 F4): POST the finished line with the operator's connect
+  // choice, inject it into the routing graph, then refresh the overlay so the new edge shows.
+  const submitDraw = useCallback(
+    (connect: DrawConnect) => {
+      const fin = draw.finished
+      if (!fin) return
+      setDrawBusy(true)
+      api
+        .createDrawnEdge({
+          kind: fin.kind,
+          coordinates: fin.points.map((p) => [p.lon, p.lat]),
+          connect,
+        })
+        .then(() => {
+          pushChatter(`Drawn ${fin.kind} added to the routing graph (connect: ${connect})`, 'order')
+          setGraphReload((n) => n + 1)
+        })
+        .catch((e: unknown) => pushChatter(`Could not add ${fin.kind}: ${errorMessage(e)}`, 'status'))
+        .finally(() => {
+          setDrawBusy(false)
+          draw.clearFinished()
+        })
+    },
+    [draw, pushChatter],
+  )
 
   // Actions the "Take a tour" walkthrough drives so it can show gated controls: open the OF-4
   // Plan-move panel (select a demo unit), and open/close the OF-8 rendezvous planner.
@@ -431,11 +481,12 @@ export default function App() {
       if (e.key !== 'Escape') return
       setObstacleMode(false)
       setDepotMode(false)
+      draw.cancel()
       clear()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [clear])
+  }, [clear, draw])
 
   const ready = theater !== null
   // Obstacle placement is an OF-4 tactical tool; never active in the OF-8 supply view.
@@ -533,6 +584,24 @@ export default function App() {
             Graph
           </label>
         )}
+        {theater && canShow(role, 'drawGraph') && (
+          <button
+            className={`mode-toggle${draw.mode === 'road' ? ' active' : ''}`}
+            data-testid="draw-road-toggle"
+            onClick={() => toggleDraw('road')}
+          >
+            {draw.mode === 'road' ? '✏️ Drawing road' : 'Add road'}
+          </button>
+        )}
+        {theater && canShow(role, 'drawGraph') && (
+          <button
+            className={`mode-toggle${draw.mode === 'path' ? ' active' : ''}`}
+            data-testid="draw-path-toggle"
+            onClick={() => toggleDraw('path')}
+          >
+            {draw.mode === 'path' ? '✏️ Drawing path' : 'Add path'}
+          </button>
+        )}
         <span className="spacer" />
         {theater && <TourButton role={role} actions={tourActions} onEnd={clear} />}
         <span className="attribution">{OSM_ATTRIBUTION}</span>
@@ -608,6 +677,9 @@ export default function App() {
               onPickRendezvousSector={planRdv.pickSector}
               dimmedUnitIds={dimmedUnits}
               dimDepots={isOf8 && dimDepots(supplyTab)}
+              drawMode={canShow(role, 'drawGraph') ? draw.mode : null}
+              drawPoints={draw.points}
+              onDrawWaypoint={draw.addPoint}
               onPickDestination={(lat, lon) =>
                 planning.waypointMode
                   ? planning.addWaypoint(lat, lon)
@@ -716,6 +788,23 @@ export default function App() {
                 items={catalogItems}
                 selectedId={obstacleTemplate.id}
                 onSelect={setObstacleTemplate}
+              />
+            )}
+            {canShow(role, 'drawGraph') && draw.mode && (
+              <DrawGraphPanel
+                kind={draw.mode}
+                count={draw.points.length}
+                onRemoveLast={draw.removeLast}
+                onStop={draw.stop}
+                onCancel={draw.cancel}
+              />
+            )}
+            {canShow(role, 'drawGraph') && draw.finished && (
+              <ConnectGraphPopup
+                kind={draw.finished.kind}
+                busy={drawBusy}
+                onConnect={submitDraw}
+                onCancel={draw.clearFinished}
               />
             )}
             {canShow(role, 'moveRoutes') && selectedUnit && (
