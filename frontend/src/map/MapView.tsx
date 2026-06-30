@@ -1020,6 +1020,9 @@ export function MapView(props: MapViewProps) {
       // Frame the theater: constrain panning to its bbox (padded) so the operator can't drift off.
       maxBounds: paddedBounds(theater.bbox),
       attributionControl: { compact: true },
+      // Free Shift for multi-cell threat select (v2 Wave 22 F4) — MapLibre's box-zoom otherwise
+      // binds Shift+drag and swallows Shift-clicks.
+      boxZoom: false,
     })
     map.addControl(new maplibregl.NavigationControl(), 'top-right')
     map.on('load', () => {
