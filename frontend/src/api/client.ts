@@ -27,6 +27,7 @@ import type {
   FuelStock,
   MoveOrder,
   Obstacle,
+  PlaceForceRequest,
   PlanRendezvousRequest,
   PlanRouteRequest,
   PlanWaypointsRequest,
@@ -72,6 +73,8 @@ async function sendJson<T>(method: string, path: string, body?: unknown): Promis
   if (!res.ok) {
     throw new ApiError(res.status, `${method} ${path} failed: ${res.status}`)
   }
+  // 204 No Content (e.g. DELETE) has an empty body — res.json() would throw. Return void.
+  if (res.status === 204) return undefined as T
   return (await res.json()) as T
 }
 
@@ -88,6 +91,13 @@ export const api = {
       current_fuel_liters: currentFuelLiters,
     }),
   getEnemyUnits: (): Promise<EnemyUnit[]> => getJson<EnemyUnit[]>('/enemy-units'),
+  // Scenario creator force placement (v2 Wave 22 F1): place/remove blue (instances) + red (enemies).
+  placeUnitInstance: (req: PlaceForceRequest): Promise<UnitInstance> =>
+    postJson<UnitInstance>('/unit-instances', req),
+  removeUnitInstance: (id: string): Promise<void> => deleteJson<void>(`/unit-instances/${id}`),
+  placeEnemyUnit: (req: PlaceForceRequest): Promise<EnemyUnit> =>
+    postJson<EnemyUnit>('/enemy-units', req),
+  removeEnemyUnit: (id: string): Promise<void> => deleteJson<void>(`/enemy-units/${id}`),
   // The pgRouting graph (edges + vertices) for the optional map overlay (v2 Wave 20 F1).
   getRoutingGraph: (): Promise<RoutingGraph> => getJson<RoutingGraph>('/routing-graph'),
   getUnitTypes: (): Promise<UnitType[]> => getJson<UnitType[]>('/units'),

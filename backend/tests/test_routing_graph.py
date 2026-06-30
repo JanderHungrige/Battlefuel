@@ -6,6 +6,7 @@ from collections.abc import AsyncIterator
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -13,6 +14,8 @@ from app.api.routing_graph import _coords
 from app.config import Settings
 from app.db import get_session
 from app.main import create_app
+from app.services.routing_graph import _EDGE_SELECT, _load_threats, annotate_ways
+from app.services.threat_grid import threat_at
 
 
 class TestCoordsParse:
@@ -60,4 +63,62 @@ class TestRoutingGraphApi:
             assert len(body["nodes"][0]["point"]) == 2
         finally:
             await client.aclose()
+            await engine.dispose()
+
+
+@pytest.mark.db
+class TestThreatEdgePenaltyByResolution:
+    """v2 Wave 21 F3: an edge's stored threat is the highest-wins footprint threat at its midpoint,
+    read at the threat's own resolution — the SAME field the map colours, so cost matches colour."""
+
+    async def _session(self) -> tuple[AsyncSession, object]:
+        engine = create_async_engine(Settings().database_url)
+        maker = async_sessionmaker(engine, expire_on_commit=False)
+        return maker(), engine
+
+    async def test_stored_threat_matches_the_footprint_model(self) -> None:
+        try:
+            session, engine = await self._session()
+        except SQLAlchemyError as exc:
+            pytest.skip(f"database unavailable: {exc}")
+        try:
+            # Re-annotate from the current tile state (idempotent), then verify the wiring: every
+            # edge's persisted threat_level equals threat_at(midpoint) over the located threats.
+            try:
+                n = await annotate_ways(session, enemies=[])
+            except SQLAlchemyError as exc:
+                pytest.skip(f"routing graph not built: {exc}")
+            assert n > 0
+            threats = await _load_threats(session)
+            assert threats, "expected seeded threat tiles"
+            rows = (
+                await session.execute(
+                    text(
+                        _EDGE_SELECT.format(where="").replace(
+                            "FROM ways", "FROM ways WHERE threat_level IS NOT NULL"
+                        )
+                        + " ORDER BY gid LIMIT 200"
+                    )
+                )
+            ).all()
+            gids = [r[0] for r in rows]
+            stored = {
+                g: int(t)
+                for g, t in (
+                    await session.execute(
+                        text("SELECT gid, threat_level FROM ways WHERE gid = ANY(:g)"),
+                        {"g": gids},
+                    )
+                ).all()
+            }
+            mismatches = [
+                (gid, stored[gid], threat_at(ux, uy, threats))
+                for gid, _lat, _lon, ux, uy, _len in rows
+                if stored[gid] != threat_at(ux, uy, threats)
+            ]
+            assert not mismatches, f"edge threat != footprint model: {mismatches[:5]}"
+            # The footprint model paints threat beyond a single H3 cell, so SOME edge is threatened.
+            assert any(threat_at(ux, uy, threats) > 0 for _g, _la, _lo, ux, uy, _l in rows)
+        finally:
+            await session.close()
             await engine.dispose()

@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings, get_settings
@@ -27,6 +27,14 @@ class UnitInstanceProvider(ABC):
     @abstractmethod
     async def set_fuel(self, session: AsyncSession, instance_id: str, liters: float) -> None:
         """Set an instance's ``current_fuel_liters`` (the mutation path for fuel transfers)."""
+
+    @abstractmethod
+    async def create_instance(self, session: AsyncSession, instance: UnitInstance) -> UnitInstance:
+        """Persist a new placed instance (scenario creator, v2 Wave 22 F1). Returns it."""
+
+    @abstractmethod
+    async def delete_instance(self, session: AsyncSession, instance_id: str) -> bool:
+        """Remove a placed instance. True if one was deleted, False if the id was unknown."""
 
 
 def _to_instance(row: UnitInstanceRow) -> UnitInstance:
@@ -58,6 +66,31 @@ class DbUnitInstanceProvider(UnitInstanceProvider):
             .values(current_fuel_liters=liters)
         )
         await session.commit()
+
+    async def create_instance(self, session: AsyncSession, instance: UnitInstance) -> UnitInstance:
+        session.add(
+            UnitInstanceRow(
+                id=instance.id,
+                name=instance.name,
+                unit_type_id=instance.unit_type_id,
+                lat=instance.lat,
+                lon=instance.lon,
+                h3_index=instance.h3_index,
+                status=instance.status.value,
+                current_fuel_liters=instance.current_fuel_liters,
+            )
+        )
+        await session.commit()
+        return instance
+
+    async def delete_instance(self, session: AsyncSession, instance_id: str) -> bool:
+        result = await session.execute(
+            delete(UnitInstanceRow)
+            .where(UnitInstanceRow.id == instance_id)
+            .returning(UnitInstanceRow.id)
+        )
+        await session.commit()
+        return result.first() is not None
 
 
 InstanceProviderBuilder = Callable[[], UnitInstanceProvider]

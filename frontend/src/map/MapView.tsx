@@ -6,7 +6,15 @@ import { cellToLatLng } from 'h3-js'
 import maplibregl from 'maplibre-gl'
 import { Protocol } from 'pmtiles'
 import { useEffect, useRef } from 'react'
-import { LOCATE_HALO, LOCATE_HALO_RING, ROUTE, SELECTED_UNIT, SELECTED_UNIT_RING } from './colors'
+import {
+  FORCE_SELECT,
+  FORCE_SELECT_RING,
+  LOCATE_HALO,
+  LOCATE_HALO_RING,
+  ROUTE,
+  SELECTED_UNIT,
+  SELECTED_UNIT_RING,
+} from './colors'
 import { DEPOT_SIDC, GAUGE_SEGMENTS, depotGauges, depotIconKey } from './depotSymbol'
 import { fuelBarColor, fuelBarKey, fuelFraction } from './unitFuelBar'
 import {
@@ -36,6 +44,8 @@ import {
   adviceArrowToGeoJSON,
   cellThreatToGeoJSON,
   depotsToGeoJSON,
+  enemyDangerCellsToGeoJSON,
+  enemyDangerCirclesToGeoJSON,
   drawnEdgeNodesToGeoJSON,
   drawnEdgesToGeoJSON,
   drawnLineToGeoJSON,
@@ -98,6 +108,12 @@ export interface MapViewProps {
   onRemoveObstacle: (id: string) => void
   depotMode: boolean
   onPlaceDepot: (lat: number, lon: number) => void
+  /** Scenario force-placement mode (v2 Wave 22 F1): clicks place a force, or select a placed one. */
+  forcePlaceActive?: boolean
+  onPlaceForce?: (lat: number, lon: number) => void
+  onSelectForce?: (side: 'blue' | 'red', id: string) => void
+  /** The currently force-selected point (magenta halo), or null. */
+  forceSelectPoint?: { lat: number; lon: number } | null
   /** Fuel-run target-pick mode (v2 Wave 12): clicking a unit picks it as the refuel target. */
   fuelRunPickMode?: boolean
   onPickFuelTarget?: (unitId: string) => void
@@ -210,6 +226,24 @@ function initLayers(map: maplibregl.Map): void {
     },
   })
 
+  // Enemy danger zones (v2 Wave 21 F4): the 500 m MGRS cells covered by a hostile's danger circle,
+  // washed red, plus a dashed 500 m-radius ring per hostile. A display complement to the routing-side
+  // enemy danger (Wave 16). Drawn low (above tiles, below grid/units/routes) like the threat wash.
+  map.addSource('enemy-danger-cells', { type: 'geojson', data: EMPTY })
+  map.addLayer({
+    id: 'enemy-danger-cells',
+    type: 'fill',
+    source: 'enemy-danger-cells',
+    paint: { 'fill-color': '#ff2020', 'fill-opacity': 0.3 },
+  })
+  map.addSource('enemy-danger-rings', { type: 'geojson', data: EMPTY })
+  map.addLayer({
+    id: 'enemy-danger-rings',
+    type: 'line',
+    source: 'enemy-danger-rings',
+    paint: { 'line-color': '#d0021b', 'line-width': 1.6, 'line-opacity': 0.9, 'line-dasharray': [2, 1.5] },
+  })
+
   // MGRS coordinate grid (Wave 2): lines + per-square labels (canvas-rasterized icon-image, so no
   // glyphs are needed). Hidden until the MGRS layout is active.
   map.addSource('mgrs-grid', { type: 'geojson', data: EMPTY })
@@ -279,6 +313,22 @@ function initLayers(map: maplibregl.Map): void {
       'circle-color': ROUTE,
       'circle-stroke-width': 2,
       'circle-stroke-color': '#0e1116',
+    },
+  })
+
+  // Scenario force-selection halo (v2 Wave 22 F1): a magenta circle under the force selected for
+  // deletion (blue unit or red hostile). Own point source so it can mark either side.
+  map.addSource('force-select', { type: 'geojson', data: EMPTY })
+  map.addLayer({
+    id: 'force-select',
+    type: 'circle',
+    source: 'force-select',
+    paint: {
+      'circle-radius': 18,
+      'circle-color': FORCE_SELECT,
+      'circle-opacity': 0.45,
+      'circle-stroke-width': 2.5,
+      'circle-stroke-color': FORCE_SELECT_RING,
     },
   })
 
@@ -667,6 +717,9 @@ function syncEnemyUnits(map: maplibregl.Map, enemies: EnemyUnit[]): void {
     }
   }
   setData(map, 'enemy-units', enemyUnitsToGeoJSON(enemies))
+  // F4: the 500 m danger circle + washed cells around each hostile (display complement to W16).
+  setData(map, 'enemy-danger-cells', enemyDangerCellsToGeoJSON(enemies))
+  setData(map, 'enemy-danger-rings', enemyDangerCirclesToGeoJSON(enemies))
 }
 
 const DIESEL_COLOR = '#3a8f4f'
@@ -799,6 +852,23 @@ function wireInteraction(map: maplibregl.Map, propsRef: { current: MapViewProps 
     // precedence over select/inspect/plan.
     if (p.drawMode && p.onDrawWaypoint) {
       p.onDrawWaypoint(e.lngLat.lat, e.lngLat.lng)
+      return
+    }
+    // Scenario force placement (v2 Wave 22 F1): click a placed unit/hostile to SELECT it (magenta
+    // halo → "Delete unit" on the panel), else place a new force at the point. Takes precedence over
+    // select/inspect/plan.
+    if (p.forcePlaceActive && p.onPlaceForce) {
+      const hitFriendly = map.queryRenderedFeatures(e.point, { layers: ['units'] })
+      if (hitFriendly.length > 0) {
+        p.onSelectForce?.('blue', String(hitFriendly[0].properties?.id))
+        return
+      }
+      const hitHostile = map.queryRenderedFeatures(e.point, { layers: ['enemy-units'] })
+      if (hitHostile.length > 0) {
+        p.onSelectForce?.('red', String(hitHostile[0].properties?.id))
+        return
+      }
+      p.onPlaceForce(e.lngLat.lat, e.lngLat.lng)
       return
     }
     if (p.depotMode) {
@@ -937,10 +1007,10 @@ export function MapView(props: MapViewProps) {
       const p = propsRef.current
       initLayers(map)
       setData(map, 'tiles', tilesToGeoJSON(p.tiles))
-      setData(map, 'cell-threat', cellThreatToGeoJSON(p.tiles, p.gridPrecisionM))
+      setData(map, 'cell-threat', cellThreatToGeoJSON(p.tiles))
       syncUnits(map, p.units, p.unitTypes, p.livePositions)
       syncUnitFuelBars(map, p.units, p.unitTypes, p.livePositions, p.showUnitFuelBars ?? false)
-      map.setFilter('unit-fuel-bars', ['!=', ['get', 'id'], p.selectedUnitId ?? ' '])
+      map.setFilter('unit-fuel-bars', ['!=', ['get', 'id'], p.selectedUnitId ?? ''])
       map.setFilter('unit-fuel-bars-selected', ['==', ['get', 'id'], p.selectedUnitId ?? ''])
       syncEnemyUnits(map, p.enemyUnits)
       setData(map, 'active-routes', activeRoutesToGeoJSON(p.activeRoutes))
@@ -952,6 +1022,7 @@ export function MapView(props: MapViewProps) {
       setData(map, 'advice-arrow', adviceArrowToGeoJSON(p.adviceArrow?.from, p.adviceArrow?.to))
       setData(map, 'advice-dest', destinationToGeoJSON(p.adviceDest))
       setData(map, 'locate-marker', destinationToGeoJSON(p.locatePoint ?? null))
+      setData(map, 'force-select', destinationToGeoJSON(p.forceSelectPoint ?? null))
       syncFuelRunRoutes(map, p.fuelRunOptions, p.fuelRunMetric)
       wireInteraction(map, propsRef)
       wireHover(map)
@@ -973,9 +1044,11 @@ export function MapView(props: MapViewProps) {
     if (readyRef.current && mapRef.current) setData(mapRef.current, 'tiles', tilesToGeoJSON(props.tiles))
   }, [props.tiles])
   useEffect(() => {
+    // Threat renders at each threat's OWN grid code, not the displayed grid (v2 Wave 21 F2), so this
+    // no longer depends on gridPrecisionM — resizing the grid never rescales the threat wash.
     if (readyRef.current && mapRef.current)
-      setData(mapRef.current, 'cell-threat', cellThreatToGeoJSON(props.tiles, props.gridPrecisionM))
-  }, [props.tiles, props.gridPrecisionM])
+      setData(mapRef.current, 'cell-threat', cellThreatToGeoJSON(props.tiles))
+  }, [props.tiles])
   useEffect(() => {
     if (readyRef.current && mapRef.current) {
       syncUnits(mapRef.current, props.units, props.unitTypes, props.livePositions)
@@ -1064,6 +1137,11 @@ export function MapView(props: MapViewProps) {
     setData(mapRef.current, 'locate-marker', destinationToGeoJSON(p ?? null))
     if (p) mapRef.current.easeTo({ center: [p.lon, p.lat], duration: 600, zoom: 12 })
   }, [props.locatePoint])
+  useEffect(() => {
+    // Magenta halo on the force selected for deletion in the scenario creator (v2 Wave 22 F1).
+    if (readyRef.current && mapRef.current)
+      setData(mapRef.current, 'force-select', destinationToGeoJSON(props.forceSelectPoint ?? null))
+  }, [props.forceSelectPoint])
   useEffect(() => {
     if (readyRef.current && mapRef.current)
       setData(mapRef.current, 'rendezvous', destinationToGeoJSON(props.rendezvous))

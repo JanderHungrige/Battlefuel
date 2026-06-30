@@ -45,12 +45,15 @@ class TestEnemyUnitProviderFactory:
             build_enemy_unit_provider(Settings(enemy_unit_provider="nope"))
 
 
+@pytest.mark.db
 class TestEnemyUnitsApi:
-    def test_lists_seeded_enemy_units(self, client: TestClient) -> None:
+    def test_lists_seeded_opfor_from_the_db(self, client: TestClient) -> None:
+        # The demo OPFOR now live in placed_enemy_units (migration 0021) so they are deletable.
         resp = client.get("/api/v1/enemy-units")
         assert resp.status_code == 200
         body = resp.json()
-        assert len(body) == len(SeededEnemyUnitProvider().units())
-        first = body[0]
-        assert {"id", "name", "sidc", "lat", "lon"} <= set(first)
-        assert first["sidc"][3] == "6"  # hostile
+        by_id = {e["id"]: e for e in body}
+        for seeded in SeededEnemyUnitProvider().units():
+            assert seeded.id in by_id, f"seeded OPFOR {seeded.id} missing from /enemy-units"
+            assert by_id[seeded.id]["sidc"][3] == "6"  # hostile affiliation
+            assert {"id", "name", "sidc", "lat", "lon"} <= set(by_id[seeded.id])

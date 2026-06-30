@@ -104,6 +104,14 @@ export interface EnemyUnit {
   echelon: string | null
 }
 
+/** Place a force of a catalog unit type at a point (v2 Wave 22 F1, scenario creator). */
+export interface PlaceForceRequest {
+  unit_type_id: string
+  lat: number
+  lon: number
+  name?: string | null
+}
+
 export interface FuelProfile {
   fuel_type: string
   capacity_liters: number

@@ -29,9 +29,9 @@ Mark `complete` only after ALL three gates pass (never on a localhost demo):
 ## Features
 | # | Feature | Doc | Status | Depends on |
 |---|---------|-----|--------|------------|
-| 1 | scenario-force-placement | — | planned | — |
-| 2 | scenario-default-half-fuel | — | planned | scenario-force-placement |
-| 3 | opponents-removable | — | planned | — |
+| 1 | scenario-force-placement | docs/123-scenario-force-placement.md | complete | — |
+| 2 | scenario-default-half-fuel | docs/124-scenario-default-half-fuel.md | complete | scenario-force-placement |
+| 3 | opponents-removable | docs/125-opponents-removable.md | complete | — |
 | 4 | multi-tile-threat-select | — | planned | — |
 | 5 | scenario-save-load | — | planned | scenario-force-placement |
 
