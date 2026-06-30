@@ -42,9 +42,8 @@ mdd_version: 11
 tags: [scenario, force-placement, units, enemy-units, app6, of4]
 path: Scenario/Placement
 known_issues:
-  - "DELETE /enemy-units/{id} only removes operator-placed (DB) reds; the seeded demo OPFOR and chatter sightings are owned by their in-memory providers and 404 here. Making the seeded OPFOR removable is W22 F3 (opponents-removable)."
-  - "Placement mode lets a click remove a placed BLUE unit too (clicking its symbol), including seeded demo units — intended for the scenario creator. The App.tsx mode wiring + MapView placement are verified at the live make dev gate (jsdom mocks MapView)."
-  - "Placed reds feed SAFE routing + the W21 danger circles only after a re-annotation: annotate_ways runs on container boot, and annotate_cell on the next tile threat change — placing a red does not itself trigger a graph re-cost yet. Acceptable for a scenario-build step before play; a placement-time re-cost could be added later."
+  - "Removal UX (revised after F1): clicking a placed force in placement mode SELECTS it (magenta halo) and a 'Delete unit' button on the panel removes it — no accidental click-to-delete. DELETE works for blue instances and DB-placed reds; the seeded OPFOR are also DB rows now (migration 0021) so they delete too (see [[125-opponents-removable]]). 204 No Content handling was fixed in sendJson."
+  - "Placed/seeded reds feed SAFE routing + the W21 danger circles only after a re-annotation: annotate_ways runs on container boot, and annotate_cell on the next tile threat change — placing a red does not itself trigger a graph re-cost yet. Acceptable for a scenario-build step before play; a placement-time re-cost could be added later."
 ---
 
 # 123 — Scenario force placement

@@ -115,6 +115,8 @@ export default function App() {
   const [forceSide, setForceSide] = useState<ForceSide>('blue')
   const [forceTab, setForceTab] = useState<ForceTab>('troops')
   const [forceTypeId, setForceTypeId] = useState<string | null>(null)
+  // The force selected on the map for deletion (magenta halo + panel "Delete unit"); v2 W22 F1.
+  const [selectedForce, setSelectedForce] = useState<{ side: ForceSide; id: string } | null>(null)
   // Supply entity the operator asked to locate on the map (v2 Wave 11 F5). Carries the entity id +
   // kind so the purple halo can fade with the entity (OF-8 per-tab dimming) and clear on delete.
   const [located, setLocated] = useState<
@@ -328,6 +330,7 @@ export default function App() {
 
   // Toggle scenario force-placement (v2 Wave 22 F1): exclusive with the other map-edit modes.
   const toggleForcePlace = useCallback(() => {
+    setSelectedForce(null)
     setForcePlaceMode((on) => {
       const next = !on
       if (next) {
@@ -388,6 +391,30 @@ export default function App() {
     },
     [setUnits, setEnemyUnits, pushChatter],
   )
+
+  // Select a placed force on the map (magenta halo + panel Delete button); v2 Wave 22 F1.
+  const selectForce = useCallback(
+    (side: 'blue' | 'red', id: string) => setSelectedForce({ side, id }),
+    [],
+  )
+
+  // Delete the force selected on the map, then clear the selection (v2 Wave 22 F1).
+  const deleteSelectedForce = useCallback(() => {
+    if (!selectedForce) return
+    removeForce(selectedForce.side, selectedForce.id)
+    setSelectedForce(null)
+  }, [selectedForce, removeForce])
+
+  // The selected force's name + position, resolved from the live rosters (v2 Wave 22 F1).
+  const selectedForceEntity = useMemo(() => {
+    if (!selectedForce) return null
+    if (selectedForce.side === 'blue') {
+      const u = units.find((x) => x.id === selectedForce.id)
+      return u ? { name: u.name, lat: u.lat, lon: u.lon } : null
+    }
+    const en = allEnemyUnits.find((x) => x.id === selectedForce.id)
+    return en ? { name: en.name, lat: en.lat, lon: en.lon } : null
+  }, [selectedForce, units, allEnemyUnits])
 
   // Remove the selected drawn edge (v2 Wave 20 F6): delete + re-inject, then refresh both overlays.
   const removeDrawnEdge = useCallback(() => {
@@ -774,7 +801,8 @@ export default function App() {
               onPlaceDepot={placeDepot}
               forcePlaceActive={forcePlaceMode}
               onPlaceForce={placeForce}
-              onRemoveForce={removeForce}
+              onSelectForce={selectForce}
+              forceSelectPoint={selectedForceEntity}
               hoverDetails={hoverDetails}
               enemyUnits={allEnemyUnits}
               depots={canShow(role, 'depotOverlay') ? (supply.overview?.depots ?? []) : []}
@@ -952,6 +980,8 @@ export default function App() {
                 onTab={setForceTab}
                 selectedTypeId={forceTypeId}
                 onSelectType={setForceTypeId}
+                selectedForceName={selectedForceEntity?.name ?? null}
+                onDeleteSelected={deleteSelectedForce}
                 onClose={toggleForcePlace}
               />
             )}

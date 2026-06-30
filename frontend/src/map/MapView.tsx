@@ -6,7 +6,15 @@ import { cellToLatLng } from 'h3-js'
 import maplibregl from 'maplibre-gl'
 import { Protocol } from 'pmtiles'
 import { useEffect, useRef } from 'react'
-import { LOCATE_HALO, LOCATE_HALO_RING, ROUTE, SELECTED_UNIT, SELECTED_UNIT_RING } from './colors'
+import {
+  FORCE_SELECT,
+  FORCE_SELECT_RING,
+  LOCATE_HALO,
+  LOCATE_HALO_RING,
+  ROUTE,
+  SELECTED_UNIT,
+  SELECTED_UNIT_RING,
+} from './colors'
 import { DEPOT_SIDC, GAUGE_SEGMENTS, depotGauges, depotIconKey } from './depotSymbol'
 import { fuelBarColor, fuelBarKey, fuelFraction } from './unitFuelBar'
 import {
@@ -100,10 +108,12 @@ export interface MapViewProps {
   onRemoveObstacle: (id: string) => void
   depotMode: boolean
   onPlaceDepot: (lat: number, lon: number) => void
-  /** Scenario force-placement mode (v2 Wave 22 F1): clicks place a force / remove a placed one. */
+  /** Scenario force-placement mode (v2 Wave 22 F1): clicks place a force, or select a placed one. */
   forcePlaceActive?: boolean
   onPlaceForce?: (lat: number, lon: number) => void
-  onRemoveForce?: (side: 'blue' | 'red', id: string) => void
+  onSelectForce?: (side: 'blue' | 'red', id: string) => void
+  /** The currently force-selected point (magenta halo), or null. */
+  forceSelectPoint?: { lat: number; lon: number } | null
   /** Fuel-run target-pick mode (v2 Wave 12): clicking a unit picks it as the refuel target. */
   fuelRunPickMode?: boolean
   onPickFuelTarget?: (unitId: string) => void
@@ -303,6 +313,22 @@ function initLayers(map: maplibregl.Map): void {
       'circle-color': ROUTE,
       'circle-stroke-width': 2,
       'circle-stroke-color': '#0e1116',
+    },
+  })
+
+  // Scenario force-selection halo (v2 Wave 22 F1): a magenta circle under the force selected for
+  // deletion (blue unit or red hostile). Own point source so it can mark either side.
+  map.addSource('force-select', { type: 'geojson', data: EMPTY })
+  map.addLayer({
+    id: 'force-select',
+    type: 'circle',
+    source: 'force-select',
+    paint: {
+      'circle-radius': 18,
+      'circle-color': FORCE_SELECT,
+      'circle-opacity': 0.45,
+      'circle-stroke-width': 2.5,
+      'circle-stroke-color': FORCE_SELECT_RING,
     },
   })
 
@@ -828,17 +854,18 @@ function wireInteraction(map: maplibregl.Map, propsRef: { current: MapViewProps 
       p.onDrawWaypoint(e.lngLat.lat, e.lngLat.lng)
       return
     }
-    // Scenario force placement (v2 Wave 22 F1): click a placed unit/hostile to remove it, else
-    // place a new force at the point. Takes precedence over select/inspect/plan.
+    // Scenario force placement (v2 Wave 22 F1): click a placed unit/hostile to SELECT it (magenta
+    // halo → "Delete unit" on the panel), else place a new force at the point. Takes precedence over
+    // select/inspect/plan.
     if (p.forcePlaceActive && p.onPlaceForce) {
       const hitFriendly = map.queryRenderedFeatures(e.point, { layers: ['units'] })
       if (hitFriendly.length > 0) {
-        p.onRemoveForce?.('blue', String(hitFriendly[0].properties?.id))
+        p.onSelectForce?.('blue', String(hitFriendly[0].properties?.id))
         return
       }
       const hitHostile = map.queryRenderedFeatures(e.point, { layers: ['enemy-units'] })
       if (hitHostile.length > 0) {
-        p.onRemoveForce?.('red', String(hitHostile[0].properties?.id))
+        p.onSelectForce?.('red', String(hitHostile[0].properties?.id))
         return
       }
       p.onPlaceForce(e.lngLat.lat, e.lngLat.lng)
@@ -995,6 +1022,7 @@ export function MapView(props: MapViewProps) {
       setData(map, 'advice-arrow', adviceArrowToGeoJSON(p.adviceArrow?.from, p.adviceArrow?.to))
       setData(map, 'advice-dest', destinationToGeoJSON(p.adviceDest))
       setData(map, 'locate-marker', destinationToGeoJSON(p.locatePoint ?? null))
+      setData(map, 'force-select', destinationToGeoJSON(p.forceSelectPoint ?? null))
       syncFuelRunRoutes(map, p.fuelRunOptions, p.fuelRunMetric)
       wireInteraction(map, propsRef)
       wireHover(map)
@@ -1109,6 +1137,11 @@ export function MapView(props: MapViewProps) {
     setData(mapRef.current, 'locate-marker', destinationToGeoJSON(p ?? null))
     if (p) mapRef.current.easeTo({ center: [p.lon, p.lat], duration: 600, zoom: 12 })
   }, [props.locatePoint])
+  useEffect(() => {
+    // Magenta halo on the force selected for deletion in the scenario creator (v2 Wave 22 F1).
+    if (readyRef.current && mapRef.current)
+      setData(mapRef.current, 'force-select', destinationToGeoJSON(props.forceSelectPoint ?? null))
+  }, [props.forceSelectPoint])
   useEffect(() => {
     if (readyRef.current && mapRef.current)
       setData(mapRef.current, 'rendezvous', destinationToGeoJSON(props.rendezvous))

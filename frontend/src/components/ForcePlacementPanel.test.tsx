@@ -33,6 +33,8 @@ function renderPanel(overrides: Partial<Parameters<typeof ForcePlacementPanel>[0
     onTab: vi.fn(),
     selectedTypeId: null,
     onSelectType: vi.fn(),
+    selectedForceName: null,
+    onDeleteSelected: vi.fn(),
     onClose: vi.fn(),
     ...overrides,
   }
@@ -70,5 +72,19 @@ describe('ForcePlacementPanel', () => {
     renderPanel({ selectedTypeId: 'armor', side: 'red' })
     expect(screen.getByTestId('force-hint').textContent).toContain('red')
     expect(screen.getByTestId('force-hint').textContent).toContain('armor')
+  })
+
+  it('disables Delete unit until a force is selected', () => {
+    renderPanel({ selectedForceName: null })
+    expect((screen.getByTestId('force-delete') as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('deletes the selected force when Delete unit is clicked', () => {
+    const props = renderPanel({ selectedForceName: 'COBRA' })
+    expect(screen.getByTestId('force-selected').textContent).toContain('COBRA')
+    const btn = screen.getByTestId('force-delete') as HTMLButtonElement
+    expect(btn.disabled).toBe(false)
+    fireEvent.click(btn)
+    expect(props.onDeleteSelected).toHaveBeenCalled()
   })
 })

@@ -16,6 +16,9 @@ interface ForcePlacementPanelProps {
   onTab: (tab: ForceTab) => void
   selectedTypeId: string | null
   onSelectType: (id: string) => void
+  /** Display name of the force selected on the map for deletion, or null if none. */
+  selectedForceName: string | null
+  onDeleteSelected: () => void
   onClose: () => void
 }
 
@@ -27,6 +30,8 @@ export function ForcePlacementPanel({
   onTab,
   selectedTypeId,
   onSelectType,
+  selectedForceName,
+  onDeleteSelected,
   onClose,
 }: ForcePlacementPanelProps) {
   const options = unitsForTab(unitTypes, tab)
@@ -101,6 +106,21 @@ export function ForcePlacementPanel({
           ? `Click the map to place a ${side} ${selected.name}.`
           : 'Pick a unit type, then click the map to place it.'}
       </div>
+
+      <div className="force-delete" data-testid="force-selected">
+        {selectedForceName
+          ? `Selected: ${selectedForceName}`
+          : 'Click a placed force to select it.'}
+      </div>
+      <button
+        type="button"
+        className="wp-btn force-delete-btn"
+        data-testid="force-delete"
+        disabled={selectedForceName === null}
+        onClick={onDeleteSelected}
+      >
+        Delete unit
+      </button>
     </aside>
   )
 }

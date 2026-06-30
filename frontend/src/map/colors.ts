@@ -33,3 +33,8 @@ export const ZONE_THREAT_LINE = '#a8530d'
 // scenario force-placement side swatches so the picker matches the map symbols (v2 Wave 22 F1).
 export const FRIENDLY_SYMBOL = '#80e0ff'
 export const HOSTILE_SYMBOL = '#ff8080'
+
+// Magenta halo marking the force selected for deletion in the scenario creator (v2 Wave 22 F1) —
+// distinct from the yellow selected-unit and purple locate halos.
+export const FORCE_SELECT = '#ff33cc'
+export const FORCE_SELECT_RING = '#a3007a'
