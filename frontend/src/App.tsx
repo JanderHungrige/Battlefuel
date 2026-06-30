@@ -46,6 +46,8 @@ import { ConnectGraphPopup } from './components/ConnectGraphPopup'
 import { DrawnEdgeEditPanel } from './components/DrawnEdgeEditPanel'
 import { ForcePlacementPanel, type ForceSide } from './components/ForcePlacementPanel'
 import type { ForceTab } from './lib/forceCatalog'
+import { MultiCellThreatPanel } from './components/MultiCellThreatPanel'
+import { cellsToH3Indexes, toggleCell } from './lib/multiCellSelect'
 import { useRoutingGraph } from './hooks/useRoutingGraph'
 import { useSimSocket } from './hooks/useSimSocket'
 import { useAdviceMarker } from './hooks/useAdviceMarker'
@@ -76,6 +78,8 @@ export default function App() {
     useTheaterData()
 
   const [selectedCell, setSelectedCell] = useState<{ lat: number; lon: number } | null>(null)
+  // Multi-cell selection for batch threat-setting (v2 Wave 22 F4): Shift/Ctrl-click accumulates.
+  const [multiCells, setMultiCells] = useState<{ lat: number; lon: number }[]>([])
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null)
   const [highlightH3, setHighlightH3] = useState<string | null>(null)
 
@@ -200,6 +204,19 @@ export default function App() {
     [mutateTile],
   )
 
+  // Every H3 tile across the multi-selected cells, and a batch threat-set over them (v2 W22 F4).
+  const multiCellH3 = useMemo(
+    () => cellsToH3Indexes(multiCells, displayedTiles, gridPrecisionM),
+    [multiCells, displayedTiles, gridPrecisionM],
+  )
+  const setMultiThreat = useCallback(
+    (level: number) => {
+      onMutateCell(multiCellH3, { threat_level: level })
+      pushChatter(`Set threat ${level} on ${multiCells.length} cell(s)`, 'order')
+    },
+    [onMutateCell, multiCellH3, multiCells.length, pushChatter],
+  )
+
   // Place an obstacle from the selected catalog template (v2 Wave 4 F7): drop the obstacle, then
   // apply the template's tile defaults (situation/threat/road) to the containing H3 cell — the
   // tile_update WS echo refreshes the map. Operator can still edit the cell afterwards.
@@ -276,6 +293,7 @@ export default function App() {
 
   const clear = useCallback(() => {
     setSelectedCell(null)
+    setMultiCells([])
     setSelectedUnitId(null)
     setHighlightH3(null)
     setLocated(null)
@@ -820,9 +838,15 @@ export default function App() {
               gridPrecisionM={gridPrecisionM}
               onPlaceObstacle={placeObstacleFromTemplate}
               onRemoveObstacle={removeObstacle}
-              onSelectCell={(lat, lon) => {
+              multiCells={multiCells}
+              onSelectCell={(lat, lon, additive) => {
+                if (additive) {
+                  setMultiCells((prev) => toggleCell(prev, { lat, lon }, gridPrecisionM))
+                  return
+                }
                 setSelectedUnitId(null)
                 planning.resetPlanning()
+                setMultiCells([])
                 setSelectedCell({ lat, lon })
               }}
               onSelectUnit={(id) => {
@@ -983,6 +1007,13 @@ export default function App() {
                 selectedForceName={selectedForceEntity?.name ?? null}
                 onDeleteSelected={deleteSelectedForce}
                 onClose={toggleForcePlace}
+              />
+            )}
+            {multiCells.length > 0 && (
+              <MultiCellThreatPanel
+                count={multiCells.length}
+                onSetThreat={setMultiThreat}
+                onClear={() => setMultiCells([])}
               />
             )}
             {canShow(role, 'drawGraph') && draw.mode && (

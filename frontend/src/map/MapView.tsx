@@ -101,7 +101,9 @@ export interface MapViewProps {
   showUnitFuelBars?: boolean
   selectedCell: { lat: number; lon: number } | null
   gridPrecisionM: number
-  onSelectCell: (lat: number, lon: number) => void
+  onSelectCell: (lat: number, lon: number, additive: boolean) => void
+  /** Cells in the multi-select for batch threat-setting (v2 Wave 22 F4) — highlighted outlines. */
+  multiCells?: { lat: number; lon: number }[]
   onSelectUnit: (id: string) => void
   onPickDestination: (lat: number, lon: number) => void
   onPlaceObstacle: (lat: number, lon: number) => void
@@ -283,6 +285,21 @@ function initLayers(map: maplibregl.Map): void {
     type: 'line',
     source: 'selected-cell',
     paint: { 'line-color': '#1d4ed8', 'line-width': 2.5, 'line-opacity': 0.9 },
+  })
+
+  // Multi-cell selection for batch threat-setting (v2 Wave 22 F4): outlined + lightly filled squares.
+  map.addSource('multi-cells', { type: 'geojson', data: EMPTY })
+  map.addLayer({
+    id: 'multi-cells-fill',
+    type: 'fill',
+    source: 'multi-cells',
+    paint: { 'fill-color': '#1d4ed8', 'fill-opacity': 0.12 },
+  })
+  map.addLayer({
+    id: 'multi-cells',
+    type: 'line',
+    source: 'multi-cells',
+    paint: { 'line-color': '#1d4ed8', 'line-width': 1.6, 'line-opacity': 0.9, 'line-dasharray': [2, 1] },
   })
 
   map.addSource('active-routes', { type: 'geojson', data: EMPTY })
@@ -916,8 +933,10 @@ function wireInteraction(map: maplibregl.Map, propsRef: { current: MapViewProps 
     }
     const hitTiles = map.queryRenderedFeatures(e.point, { layers: ['tiles-fill'] })
     if (hitTiles.length > 0) {
-      // MGRS-native inspection: resolve the cell from the click coordinate (v2 Wave 9).
-      p.onSelectCell(e.lngLat.lat, e.lngLat.lng)
+      // MGRS-native inspection: resolve the cell from the click coordinate (v2 Wave 9). Shift/Ctrl
+      // (or Cmd) adds the cell to the multi-select for batch threat-setting (v2 Wave 22 F4).
+      const oe = e.originalEvent
+      p.onSelectCell(e.lngLat.lat, e.lngLat.lng, oe.shiftKey || oe.ctrlKey || oe.metaKey)
       return
     }
     p.onClearSelection()
@@ -1233,6 +1252,22 @@ export function MapView(props: MapViewProps) {
       : EMPTY
     setData(mapRef.current, 'selected-cell', data)
   }, [props.selectedCell, props.gridPrecisionM])
+  useEffect(() => {
+    // Multi-cell selection outlines for batch threat-setting (v2 Wave 22 F4).
+    if (!readyRef.current || !mapRef.current) return
+    const cells = props.multiCells ?? []
+    setData(mapRef.current, 'multi-cells', {
+      type: 'FeatureCollection',
+      features: cells.map((c) => ({
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'Polygon',
+          coordinates: [squareCornersFromCenter(c.lat, c.lon, props.gridPrecisionM)],
+        },
+      })),
+    })
+  }, [props.multiCells, props.gridPrecisionM])
   useEffect(() => {
     if (readyRef.current && mapRef.current)
       applyMgrsGrid(mapRef.current, props.theater, props.gridPrecisionM)

@@ -32,7 +32,7 @@ Mark `complete` only after ALL three gates pass (never on a localhost demo):
 | 1 | scenario-force-placement | docs/123-scenario-force-placement.md | complete | — |
 | 2 | scenario-default-half-fuel | docs/124-scenario-default-half-fuel.md | complete | scenario-force-placement |
 | 3 | opponents-removable | docs/125-opponents-removable.md | complete | — |
-| 4 | multi-tile-threat-select | — | planned | — |
+| 4 | multi-tile-threat-select | docs/126-multi-tile-threat-select.md | complete | — |
 | 5 | scenario-save-load | — | planned | scenario-force-placement |
 
 Build order: 1 → {2, 5}; 3 and 4 independent.

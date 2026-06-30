@@ -1104,6 +1104,13 @@ body {
   cursor: default;
 }
 
+/* Multi-cell threat panel (v2 Wave 22 F4) */
+.multi-threat-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
 /* Halt banner (v2 Wave 10 F1/F4) */
 .halt-banner {
   position: absolute;
