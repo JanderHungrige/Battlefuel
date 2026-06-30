@@ -1078,6 +1078,15 @@ body {
   background: #1c2230;
   color: #c8d0dc;
 }
+.force-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 5px;
+  vertical-align: middle;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+}
 
 /* Halt banner (v2 Wave 10 F1/F4) */
 .halt-banner {

@@ -73,6 +73,8 @@ async function sendJson<T>(method: string, path: string, body?: unknown): Promis
   if (!res.ok) {
     throw new ApiError(res.status, `${method} ${path} failed: ${res.status}`)
   }
+  // 204 No Content (e.g. DELETE) has an empty body — res.json() would throw. Return void.
+  if (res.status === 204) return undefined as T
   return (await res.json()) as T
 }
 

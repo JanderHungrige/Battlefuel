@@ -4,6 +4,7 @@
 
 import type { UnitType } from '../api/types'
 import { type ForceTab, unitsForTab } from '../lib/forceCatalog'
+import { FRIENDLY_SYMBOL, HOSTILE_SYMBOL } from '../map/colors'
 
 export type ForceSide = 'blue' | 'red'
 
@@ -44,7 +45,7 @@ export function ForcePlacementPanel({
           data-testid="force-side-blue"
           onClick={() => onSide('blue')}
         >
-          🟦 Blue
+          <span className="force-swatch" style={{ background: FRIENDLY_SYMBOL }} /> Blue
         </button>
         <button
           type="button"
@@ -52,7 +53,7 @@ export function ForcePlacementPanel({
           data-testid="force-side-red"
           onClick={() => onSide('red')}
         >
-          🟥 Red
+          <span className="force-swatch" style={{ background: HOSTILE_SYMBOL }} /> Red
         </button>
       </div>
 
