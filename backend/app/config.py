@@ -50,8 +50,10 @@ class Settings(BaseSettings):
     combat_event_catalog_provider: str = "csv_catalog"
     combat_event_catalog_path: str = "data/combat_zone_events.csv"
 
-    # Enemy-unit provider (v2 Wave 3): "seed" (Hohenfels stub) or "none".
-    enemy_unit_provider: str = "seed"
+    # In-memory enemy-unit source (v2 Wave 3): "seed" (Hohenfels stub), "chatter", or "none".
+    # Default "none" since v2 Wave 22 F3: the demo OPFOR now live in the DB (placed_enemy_units,
+    # migration 0021) so they are deletable; the in-memory seed would otherwise re-add them.
+    enemy_unit_provider: str = "none"
 
     # Provider the factory builds for manual obstacles (Wave 4 ships "db").
     obstacle_provider: str = "db"

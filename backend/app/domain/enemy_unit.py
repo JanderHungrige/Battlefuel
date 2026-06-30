@@ -21,6 +21,21 @@ class EnemyUnit(BaseModel):
     echelon: str | None = Field(default=None, description="Display echelon, e.g. 'company'")
 
 
+# APP-6 standard-identity (affiliation) digit position in a 20-digit SIDC: 3 = friend, 6 = hostile.
+_AFFILIATION_INDEX = 3
+
+
+def to_hostile_sidc(sidc: str) -> str:
+    """A friendly unit-type SIDC rendered hostile: flip the affiliation digit (index 3, '3'→'6').
+
+    Lets the scenario creator place a red force from the same unit-type catalog as blue (v2 Wave 22
+    F1) — the picked type's friendly SIDC becomes its hostile twin.
+    """
+    if len(sidc) > _AFFILIATION_INDEX:
+        return sidc[:_AFFILIATION_INDEX] + "6" + sidc[_AFFILIATION_INDEX + 1 :]
+    return sidc
+
+
 def enemy_unit_frame(unit: EnemyUnit) -> dict[str, object]:
     """The ``enemy_unit`` WebSocket frame for a chatter-driven sighting (v2 Wave 4).
 

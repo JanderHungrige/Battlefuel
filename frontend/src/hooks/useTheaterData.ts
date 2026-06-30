@@ -12,6 +12,7 @@ export interface TheaterData {
   setUnits: Dispatch<SetStateAction<UnitInstance[]>>
   unitTypes: UnitType[]
   enemyUnits: EnemyUnit[]
+  setEnemyUnits: Dispatch<SetStateAction<EnemyUnit[]>>
   error: string | null
 }
 
@@ -48,5 +49,5 @@ export function useTheaterData(): TheaterData {
     }
   }, [])
 
-  return { theater, tiles, units, setUnits, unitTypes, enemyUnits, error }
+  return { theater, tiles, units, setUnits, unitTypes, enemyUnits, setEnemyUnits, error }
 }

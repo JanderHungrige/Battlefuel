@@ -28,3 +28,13 @@ export const ZONE_BLOCKED_FILL = '#e8d24a'
 export const ZONE_BLOCKED_LINE = '#9c8410'
 export const ZONE_THREAT_FILL = '#ff8c2b'
 export const ZONE_THREAT_LINE = '#a8530d'
+
+// APP-6 affiliation fills milsymbol paints on the map (its default Light scheme) — reused for the
+// scenario force-placement side swatches so the picker matches the map symbols (v2 Wave 22 F1).
+export const FRIENDLY_SYMBOL = '#80e0ff'
+export const HOSTILE_SYMBOL = '#ff8080'
+
+// Magenta halo marking the force selected for deletion in the scenario creator (v2 Wave 22 F1) —
+// distinct from the yellow selected-unit and purple locate halos.
+export const FORCE_SELECT = '#ff33cc'
+export const FORCE_SELECT_RING = '#a3007a'

@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain.enemy_unit import EnemyUnit
 from app.domain.tile import RoadCondition, TerrainType
 from app.providers.enemy_units import build_enemy_unit_provider
+from app.providers.placed_enemy_units import list_placed_enemy_units
 from app.services.cost_model import edge_time_cost, safe_edge_cost, tile_factors
 from app.services.enemy_danger import enemy_threat_at
 from app.services.threat_grid import DEFAULT_THREAT_PRECISION_M, LocatedThreat, threat_at
@@ -121,6 +122,12 @@ async def _load_threats(session: AsyncSession) -> list[LocatedThreat]:
     return threats
 
 
+async def _default_enemies(session: AsyncSession) -> list[EnemyUnit]:
+    """Every red force routing should avoid: the configured in-memory source (seed/chatter) plus
+    operator-placed hostiles (v2 Wave 22 F1) — so SAFE cost + the danger circles see placed reds."""
+    return [*build_enemy_unit_provider().units(), *await list_placed_enemy_units(session)]
+
+
 def _effective_threat(
     ux: float,
     uy: float,
@@ -143,7 +150,7 @@ async def annotate_ways(
     FAST (``time_cost``) is unaffected. Enemy positions default to the configured provider.
     """
     if enemies is None:
-        enemies = list(build_enemy_unit_provider().units())
+        enemies = await _default_enemies(session)
     for col in _NEW_COLUMNS:
         await session.execute(text(f"ALTER TABLE ways ADD COLUMN IF NOT EXISTS {col}"))
 
@@ -184,7 +191,7 @@ async def annotate_cell(
     longer shadows. Uses the same cost model as the bulk annotation.
     """
     if enemies is None:
-        enemies = list(build_enemy_unit_provider().units())
+        enemies = await _default_enemies(session)
     tile = (
         await session.execute(
             text("SELECT center_lat, center_lon FROM tiles WHERE h3_index = :h"),
