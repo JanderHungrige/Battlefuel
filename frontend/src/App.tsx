@@ -745,7 +745,7 @@ export default function App() {
             data-testid="force-place-toggle"
             onClick={toggleForcePlace}
           >
-            {forcePlaceMode ? '🪖 Placing forces' : '🪖 Place forces'}
+            {forcePlaceMode ? '🚩 Placing forces' : '🚩 Place forces'}
           </button>
         )}
         <span className="spacer" />
