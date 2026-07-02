@@ -287,19 +287,20 @@ function initLayers(map: maplibregl.Map): void {
     paint: { 'line-color': '#1d4ed8', 'line-width': 2.5, 'line-opacity': 0.9 },
   })
 
-  // Multi-cell selection for batch threat-setting (v2 Wave 22 F4): outlined + lightly filled squares.
+  // Multi-cell selection for batch threat-setting (v2 Wave 22 F4): yellow-marked squares so the
+  // operator sees which cells are picked (same yellow as the selected unit), drawn above the wash.
   map.addSource('multi-cells', { type: 'geojson', data: EMPTY })
   map.addLayer({
     id: 'multi-cells-fill',
     type: 'fill',
     source: 'multi-cells',
-    paint: { 'fill-color': '#1d4ed8', 'fill-opacity': 0.12 },
+    paint: { 'fill-color': SELECTED_UNIT, 'fill-opacity': 0.3 },
   })
   map.addLayer({
     id: 'multi-cells',
     type: 'line',
     source: 'multi-cells',
-    paint: { 'line-color': '#1d4ed8', 'line-width': 1.6, 'line-opacity': 0.9, 'line-dasharray': [2, 1] },
+    paint: { 'line-color': SELECTED_UNIT_RING, 'line-width': 2.2, 'line-opacity': 0.95 },
   })
 
   map.addSource('active-routes', { type: 'geojson', data: EMPTY })
