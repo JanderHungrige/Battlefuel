@@ -19,22 +19,27 @@ export interface ThreatSquare {
   threat: number
 }
 
-/** A tile's threat grid code: the located-event location detail, or the ambient default. */
-export function tilePrecisionM(tile: Tile): number {
-  return tile.last_event?.precision_m ?? DEFAULT_THREAT_PRECISION_M
+/**
+ * A tile's threat grid code: the located-event location detail if it carries one (a 500 m mine
+ * stays 500 m regardless of the displayed grid — the Wave 21 headline), else the ambient default =
+ * the **displayed** grid precision, so operator-set/seeded threat is WYSIWYG at the grid the
+ * operator is editing/viewing (v2 Wave 22 fix).
+ */
+export function tilePrecisionM(tile: Tile, displayPrecisionM: number): number {
+  return tile.last_event?.precision_m ?? displayPrecisionM
 }
 
 /**
- * The distinct threat footprint squares for a set of tiles, each at its OWN grid-code size
- * (independent of the displayed grid). Tiles sharing a (precision, cell) footprint collapse to the
- * max level. Sorted ASCENDING by level so that, drawn in order, a higher-threat square paints OVER
- * a lower one — giving highest-wins nesting on the map. Zero-threat tiles are dropped.
+ * The distinct threat footprint squares for a set of tiles: **located-event** threats at their own
+ * grid-code size (independent of the displayed grid), **ambient** threats at `displayPrecisionM`.
+ * Tiles sharing a (precision, cell) footprint collapse to the max level. Sorted ASCENDING by level
+ * so a higher-threat square paints OVER a lower one (highest-wins nesting). Zero-threat tiles drop.
  */
-export function threatSquares(tiles: Tile[]): ThreatSquare[] {
+export function threatSquares(tiles: Tile[], displayPrecisionM: number): ThreatSquare[] {
   const cells = new Map<string, ThreatSquare>()
   for (const t of tiles) {
     if (t.threat_level <= 0) continue
-    const p = tilePrecisionM(t)
+    const p = tilePrecisionM(t, displayPrecisionM)
     const key = `${p}:${cellIdFor(t.center_lat, t.center_lon, p)}`
     const prev = cells.get(key)
     if (prev === undefined) {

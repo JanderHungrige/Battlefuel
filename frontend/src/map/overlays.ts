@@ -116,17 +116,16 @@ export function enemyUnitsToGeoJSON(enemies: EnemyUnit[]): FeatureCollection {
 }
 
 /**
- * Threat as shaded MGRS squares at each threat's OWN grid-code size (v2 Wave 21,
- * threat-grid-decoupled-render) — independent of the displayed grid. Each threatened tile emits one
- * square of side = its grid code (`threatSquares`): a 500 m threat paints a 500 m square even on the
- * 1 km grid. Features are ordered ascending by threat so a higher square paints OVER a lower one,
- * giving highest-wins nesting (a 500 m level-4 patch shows through a 2 km level-2 area). Each feature
- * carries `threat` for the opacity ramp.
+ * Threat as shaded MGRS squares (v2 Wave 21 threat-grid-decoupled-render + Wave 22 fix). A
+ * **located-event** threat paints a square of its OWN grid code (a 500 m mine stays 500 m even on
+ * the 1 km grid); **ambient/operator-set** threat paints at `displayPrecisionM` (the displayed
+ * grid) so edits are WYSIWYG. Features are ordered ascending by threat so a higher square paints
+ * OVER a lower one (highest-wins nesting). Each feature carries `threat` for the opacity ramp.
  */
-export function cellThreatToGeoJSON(tiles: Tile[]): FeatureCollection {
+export function cellThreatToGeoJSON(tiles: Tile[], displayPrecisionM: number): FeatureCollection {
   return {
     type: 'FeatureCollection',
-    features: threatSquares(tiles).map((s) => ({
+    features: threatSquares(tiles, displayPrecisionM).map((s) => ({
       type: 'Feature',
       geometry: {
         type: 'Polygon',

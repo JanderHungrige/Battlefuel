@@ -1029,7 +1029,7 @@ export function MapView(props: MapViewProps) {
       const p = propsRef.current
       initLayers(map)
       setData(map, 'tiles', tilesToGeoJSON(p.tiles))
-      setData(map, 'cell-threat', cellThreatToGeoJSON(p.tiles))
+      setData(map, 'cell-threat', cellThreatToGeoJSON(p.tiles, p.gridPrecisionM))
       syncUnits(map, p.units, p.unitTypes, p.livePositions)
       syncUnitFuelBars(map, p.units, p.unitTypes, p.livePositions, p.showUnitFuelBars ?? false)
       map.setFilter('unit-fuel-bars', ['!=', ['get', 'id'], p.selectedUnitId ?? ''])
@@ -1066,11 +1066,11 @@ export function MapView(props: MapViewProps) {
     if (readyRef.current && mapRef.current) setData(mapRef.current, 'tiles', tilesToGeoJSON(props.tiles))
   }, [props.tiles])
   useEffect(() => {
-    // Threat renders at each threat's OWN grid code, not the displayed grid (v2 Wave 21 F2), so this
-    // no longer depends on gridPrecisionM — resizing the grid never rescales the threat wash.
+    // Located-event threats render at their own grid code; ambient/operator-set threat renders at the
+    // displayed grid so edits are WYSIWYG (v2 Wave 21 F2 + Wave 22 fix) — hence gridPrecisionM here.
     if (readyRef.current && mapRef.current)
-      setData(mapRef.current, 'cell-threat', cellThreatToGeoJSON(props.tiles))
-  }, [props.tiles])
+      setData(mapRef.current, 'cell-threat', cellThreatToGeoJSON(props.tiles, props.gridPrecisionM))
+  }, [props.tiles, props.gridPrecisionM])
   useEffect(() => {
     if (readyRef.current && mapRef.current) {
       syncUnits(mapRef.current, props.units, props.unitTypes, props.livePositions)
