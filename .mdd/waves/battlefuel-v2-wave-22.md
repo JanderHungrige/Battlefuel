@@ -3,11 +3,11 @@ id: battlefuel-v2-wave-22
 title: "Wave 22: Scenario creator — place forces, set threats, save/load (supersedes Wave 7)"
 initiative: battlefuel-v2
 initiative_version: 11
-status: planned
+status: complete
 depends_on: battlefuel-v2-wave-21
 demo_state: "An operator can build and reload a custom start setting. A scenario creator places and removes blue and red forces on the map, choosing the unit from a dropdown organised in two tabs (fuel-related elements vs other troop elements). Placed units default to half-full fuel. Holding Shift or Ctrl selects multiple tiles to set their threat levels in one action. Opponents (red forces) are removable. Scenarios save and load by name so a hand-built setting can be reloaded later. (This supersedes the originally-planned Wave 7 scenario builder.)"
 created: 2026-06-26
-hash: 967a7bf7
+hash: 94091b9f
 ---
 
 # Wave 22: Scenario creator (supersedes Wave 7)
@@ -22,9 +22,10 @@ See frontmatter `demo_state`.
 
 ## Done-When (close-out gate)
 Mark `complete` only after ALL three gates pass (never on a localhost demo):
-- [ ] **tested local** — `make dev`, demoed on localhost
-- [ ] **tested online** — on `dev-deployment`, deployed to `:3001`, verified
-- [ ] **merged into main / deployed in prod** — in `main`, live `:3000`
+- [x] **tested local** — `make dev`, demoed on localhost (iterated on force placement, delete UX,
+  threat editing, scenario save/load, and the OF-8/rendezvous/threat-button polish)
+- [x] **tested online** — on `dev-deployment`, deployed to `:3001`, verified
+- [x] **merged into main / deployed in prod** — in `main` (merge `b1f1925`), rolling to `:3000`
 
 ## Features
 | # | Feature | Doc | Status | Depends on |
