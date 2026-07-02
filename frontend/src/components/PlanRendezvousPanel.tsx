@@ -136,7 +136,7 @@ export function PlanRendezvousPanel({
           {!scheduling ? (
             <button
               type="button"
-              className="ghost rdv-plan-toggle"
+              className="rdv-plan-toggle"
               data-testid="rdv-plan-toggle"
               disabled={busy}
               onClick={() => setScheduling(true)}

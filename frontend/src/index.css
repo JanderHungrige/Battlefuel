@@ -196,6 +196,7 @@ body {
    Plan-move panel's "+ Add refuel stop" / "Plan rendezvous" buttons (v2: take-a-tour follow-up). */
 .fuel-run-start,
 .rdv-start,
+.rdv-plan-toggle,
 .move-add-refuel,
 .move-plan-rdv {
   margin-top: 4px;
@@ -209,6 +210,7 @@ body {
 }
 .fuel-run-start:disabled,
 .rdv-start:disabled,
+.rdv-plan-toggle:disabled,
 .move-add-refuel:disabled,
 .move-plan-rdv:disabled {
   opacity: 0.5;
@@ -1104,14 +1106,72 @@ body {
   cursor: default;
 }
 
+/* Scenario save/load panel (v2 Wave 22 F5) */
+.scenario-save {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.scenario-name {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  font-size: 12px;
+  border: 1px solid #3a4250;
+  border-radius: 4px;
+  background: #1c2230;
+  color: #c8d0dc;
+}
+.scenario-empty {
+  margin-top: 6px;
+  font-size: 12px;
+  opacity: 0.6;
+}
+.scenario-list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.scenario-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+.scenario-row-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.scenario-row .wp-btn {
+  flex: 0 0 auto;
+}
+.scenario-del {
+  border-color: #7a0010;
+  color: #ffb3bd;
+}
+
 /* Multi-cell threat panel (v2 Wave 22 F4) */
 .multi-threat-row {
   display: flex;
   gap: 6px;
   margin-top: 8px;
 }
+/* Square level buttons: centre the digit (a plain wp-btn, no fixed-size .threat-btn conflict). */
+.multi-threat-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 0;
+}
 /* The level last applied to the selection — a yellow "set" marker so the click is acknowledged. */
-.threat-btn.threat-set {
+.multi-threat-btn.threat-set {
   border-color: #ffe600;
   background: #4a4520;
   color: #ffe600;
