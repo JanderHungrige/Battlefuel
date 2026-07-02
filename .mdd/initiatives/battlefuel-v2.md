@@ -3,7 +3,7 @@ id: battlefuel-v2
 title: BattleFuel v2 — Combat UX, Routing, Scenarios & Onboarding
 status: planned
 version: 11
-hash: 44fea0c7
+hash: 972118c5
 created: 2026-06-02
 ---
 
@@ -85,7 +85,7 @@ pass — track them as a checklist **in each wave doc** (not here — this is th
 | Wave 19 | waves/battlefuel-v2-wave-19.md | True hybrid routing: ONE composed route — stub to a road, follow roads while they help most (fast) / safest (safe), then break off-road to the target; prefer a direct route on short trips when it wins. (Today "hybrid" just picks the better WHOLE road-or-off-road route.) | planned |
 | Wave 20 | waves/battlefuel-v2-wave-20.md | Routing graph visibility + manual roads/paths: a top-row checkbox overlays the graph network (nodes+edges); OF-4 "Add road"/"Add path" tools draw a solid road / dotted path with remove-last-waypoint + stop, and on stop a popup connects first/last/both/none endpoints to the nearest graph node — drawn geometry enters the routing graph. | complete |
 | Wave 21 | waves/battlefuel-v2-wave-21.md | Multi-resolution threat model: threats colour their OWN grid size regardless of the displayed grid (500 m threat → 500 m cell on a 1 km view), nested highest-wins; routing-edge penalties read threat at the right resolution via grid code (decompose to base cells, max); an enemy unit paints a 500 m red danger circle. | complete |
-| Wave 22 | waves/battlefuel-v2-wave-22.md | Scenario creator (supersedes Wave 7): place/remove blue+red forces from a dropdown (tabs: fuel-related vs other troops), units default half-fuel, Shift/Ctrl multi-tile threat-set, opponents removable, save/load scenarios. | planned |
+| Wave 22 | waves/battlefuel-v2-wave-22.md | Scenario creator (supersedes Wave 7): place/remove blue+red forces from a dropdown (tabs: fuel-related vs other troops), units default half-fuel, Shift/Ctrl multi-tile threat-set, opponents removable, save/load scenarios. | complete |
 | Advanced | waves/battlefuel-v2-advanced.md | 3D terrain elevation on the map with an on/off switch (offline DEM). | planned |
 
 > Item→wave traceability for every line of the original request is kept in
