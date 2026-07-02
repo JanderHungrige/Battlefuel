@@ -112,6 +112,13 @@ export interface PlaceForceRequest {
   name?: string | null
 }
 
+/** A saved scenario's identity (v2 Wave 22 F5, scenario-save-load). */
+export interface ScenarioSummary {
+  id: string
+  name: string
+  created_at: string
+}
+
 export interface FuelProfile {
   fuel_type: string
   capacity_liters: number

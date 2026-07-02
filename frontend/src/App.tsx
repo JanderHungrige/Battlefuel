@@ -53,6 +53,8 @@ import { DrawnEdgeEditPanel } from './components/DrawnEdgeEditPanel'
 import { ForcePlacementPanel, type ForceSide } from './components/ForcePlacementPanel'
 import type { ForceTab } from './lib/forceCatalog'
 import { MultiCellThreatPanel } from './components/MultiCellThreatPanel'
+import { ScenarioPanel } from './components/ScenarioPanel'
+import { useScenarios } from './hooks/useScenarios'
 import { cellsToH3Indexes, toggleCell } from './lib/multiCellSelect'
 import { useRoutingGraph } from './hooks/useRoutingGraph'
 import { useSimSocket } from './hooks/useSimSocket'
@@ -130,6 +132,9 @@ export default function App() {
   const [forceTypeId, setForceTypeId] = useState<string | null>(null)
   // The force selected on the map for deletion (magenta halo + panel "Delete unit"); v2 W22 F1.
   const [selectedForce, setSelectedForce] = useState<{ side: ForceSide; id: string } | null>(null)
+  // Scenario save/load panel (v2 Wave 22 F5): list fetched while open.
+  const [scenarioOpen, setScenarioOpen] = useState(false)
+  const { scenarios, refetch: refetchScenarios } = useScenarios(scenarioOpen)
   // Supply entity the operator asked to locate on the map (v2 Wave 11 F5). Carries the entity id +
   // kind so the purple halo can fade with the entity (OF-8 per-tab dimming) and clear on delete.
   const [located, setLocated] = useState<
@@ -429,6 +434,36 @@ export default function App() {
       }
     },
     [setUnits, setEnemyUnits, pushChatter],
+  )
+
+  // Scenario save/load (v2 Wave 22 F5).
+  const saveScenario = useCallback(
+    (name: string) => {
+      api
+        .saveScenario(name)
+        .then(() => {
+          refetchScenarios()
+          pushChatter(`Saved scenario "${name}"`, 'order')
+        })
+        .catch((e: unknown) => pushChatter(`Save failed: ${String(e)}`, 'status'))
+    },
+    [refetchScenarios, pushChatter],
+  )
+  const loadScenario = useCallback((id: string) => {
+    // A scenario replaces the whole world; reload to re-bootstrap every hook cleanly.
+    api
+      .loadScenario(id)
+      .then(() => window.location.reload())
+      .catch((e: unknown) => console.error('[scenario] load failed:', e))
+  }, [])
+  const deleteScenario = useCallback(
+    (id: string) => {
+      api
+        .deleteScenario(id)
+        .then(() => refetchScenarios())
+        .catch((e: unknown) => console.error('[scenario] delete failed:', e))
+    },
+    [refetchScenarios],
   )
 
   // Select a placed force on the map (magenta halo + panel Delete button); v2 Wave 22 F1.
@@ -814,6 +849,15 @@ export default function App() {
             {forcePlaceMode ? 'Placing forces' : 'Place forces'}
           </button>
         )}
+        {theater && (
+          <button
+            className={`mode-toggle${scenarioOpen ? ' active' : ''}`}
+            data-testid="scenario-toggle"
+            onClick={() => setScenarioOpen((o) => !o)}
+          >
+            Scenarios
+          </button>
+        )}
         <span className="spacer" />
         {theater && <TourButton role={role} actions={tourActions} onEnd={clear} />}
         <span className="attribution">{OSM_ATTRIBUTION}</span>
@@ -1041,6 +1085,15 @@ export default function App() {
                 count={multiCells.length}
                 onSetThreat={setMultiThreat}
                 onClear={() => setMultiCells([])}
+              />
+            )}
+            {scenarioOpen && (
+              <ScenarioPanel
+                scenarios={scenarios}
+                onSave={saveScenario}
+                onLoad={loadScenario}
+                onDelete={deleteScenario}
+                onClose={() => setScenarioOpen(false)}
               />
             )}
             {canShow(role, 'drawGraph') && draw.mode && (
