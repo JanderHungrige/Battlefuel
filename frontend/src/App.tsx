@@ -862,7 +862,13 @@ export default function App() {
               multiCells={multiCells}
               onSelectCell={(lat, lon, additive) => {
                 if (additive) {
-                  setMultiCells((prev) => toggleCell(prev, { lat, lon }, gridPrecisionM))
+                  // Fold the currently-inspected cell into the multi-selection when it starts, so the
+                  // first (plain-clicked) tile is included in the batch threat-set (v2 Wave 22 F4 fix).
+                  setMultiCells((prev) => {
+                    const base = prev.length === 0 && selectedCell ? [selectedCell] : prev
+                    return toggleCell(base, { lat, lon }, gridPrecisionM)
+                  })
+                  setSelectedCell(null)
                   return
                 }
                 setSelectedUnitId(null)
