@@ -2,7 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { latLngToCell } from 'h3-js'
 import { api } from './api/client'
 import { errorMessage } from './api/errors'
-import type { ChatterMessage, DrawConnect, Recommendation, TileMutationRequest } from './api/types'
+import type {
+  ChatterMessage,
+  DrawConnect,
+  Recommendation,
+  Tile,
+  TileMutationRequest,
+} from './api/types'
 import { AdvisorPanel } from './components/AdvisorPanel'
 import { ChatterLog } from './components/ChatterLog'
 import { ChatterFilterControls } from './components/ChatterFilterControls'
@@ -80,6 +86,9 @@ export default function App() {
   const [selectedCell, setSelectedCell] = useState<{ lat: number; lon: number } | null>(null)
   // Multi-cell selection for batch threat-setting (v2 Wave 22 F4): Shift/Ctrl-click accumulates.
   const [multiCells, setMultiCells] = useState<{ lat: number; lon: number }[]>([])
+  // Optimistic tile edits (v2 Wave 22 fix): paint an operator threat/road change instantly, before
+  // the PATCH + WS echo round-trips. Cleared per tile once the authoritative echo lands.
+  const [optimisticTiles, setOptimisticTiles] = useState<Record<string, Partial<Tile>>>({})
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null)
   const [highlightH3, setHighlightH3] = useState<string | null>(null)
 
@@ -165,14 +174,20 @@ export default function App() {
     return Object.values(byId)
   }, [enemyUnits, enemySightings])
 
-  // Tiles merged with their latest live tile_update (threat/road/situation/etc.).
+  // Tiles merged with any pending optimistic operator edit FIRST, then the authoritative live
+  // tile_update. So an edit paints instantly, and once the WS echo (or a later sim change) for that
+  // cell lands it overrides the optimistic value — no reconciliation needed.
   const displayedTiles = useMemo(() => {
-    if (Object.keys(tileUpdates).length === 0) return tiles
+    if (Object.keys(tileUpdates).length === 0 && Object.keys(optimisticTiles).length === 0) {
+      return tiles
+    }
     return tiles.map((t) => {
       const u = tileUpdates[t.h3_index]
-      return u ? { ...t, ...u, h3_index: t.h3_index, boundary: t.boundary } : t
+      const o = optimisticTiles[t.h3_index]
+      if (!u && !o) return t
+      return { ...t, ...(o ?? {}), ...(u ?? {}), h3_index: t.h3_index, boundary: t.boundary }
     })
-  }, [tiles, tileUpdates])
+  }, [tiles, tileUpdates, optimisticTiles])
 
   // The clicked MGRS cell: aggregate the displayed tiles + units that fall in it (client-side).
   const selectedCellInfo = useMemo<InspectCell | null>(() => {
@@ -199,6 +214,12 @@ export default function App() {
 
   const onMutateCell = useCallback(
     (h3Indexes: string[], mutation: TileMutationRequest) => {
+      // Paint the edit immediately (optimistic), then persist via PATCH; the WS echo reconciles.
+      setOptimisticTiles((prev) => {
+        const next = { ...prev }
+        for (const h3 of h3Indexes) next[h3] = { ...next[h3], ...mutation }
+        return next
+      })
       for (const h3 of h3Indexes) mutateTile(h3, mutation)
     },
     [mutateTile],

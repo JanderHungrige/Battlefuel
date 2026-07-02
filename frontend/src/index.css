@@ -1110,6 +1110,13 @@ body {
   gap: 6px;
   margin-top: 8px;
 }
+/* The level last applied to the selection — a yellow "set" marker so the click is acknowledged. */
+.threat-btn.threat-set {
+  border-color: #ffe600;
+  background: #4a4520;
+  color: #ffe600;
+  font-weight: 700;
+}
 
 /* Halt banner (v2 Wave 10 F1/F4) */
 .halt-banner {
