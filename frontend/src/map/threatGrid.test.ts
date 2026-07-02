@@ -28,43 +28,53 @@ const tile = (lat: number, lon: number, threat: number, event?: Partial<TileEven
 })
 
 describe('tilePrecisionM', () => {
-  it('uses the located-event precision when present', () => {
-    expect(tilePrecisionM(tile(49.2, 11.8, 3, { precision_m: 500 }))).toBe(500)
+  it('uses the located-event precision when present, ignoring the display grid', () => {
+    expect(tilePrecisionM(tile(49.2, 11.8, 3, { precision_m: 500 }), 1000)).toBe(500)
   })
-  it('falls back to the ambient default with no event', () => {
-    expect(tilePrecisionM(tile(49.2, 11.8, 3))).toBe(DEFAULT_THREAT_PRECISION_M)
+  it('falls back to the displayed grid precision for ambient threat (no event)', () => {
+    expect(tilePrecisionM(tile(49.2, 11.8, 3), 2000)).toBe(2000)
+    expect(DEFAULT_THREAT_PRECISION_M).toBe(1000) // the reference ambient size
   })
 })
 
 describe('threatSquares', () => {
   it('drops zero-threat tiles', () => {
-    expect(threatSquares([tile(49.2, 11.8, 0)])).toEqual([])
+    expect(threatSquares([tile(49.2, 11.8, 0)], 1000)).toEqual([])
   })
 
   it('emits one square per (precision, cell), taking the max level', () => {
-    // Two tiles in the same 1 km cell → one square at the max level.
-    const sq = threatSquares([tile(49.215, 11.835, 2), tile(49.2152, 11.8352, 4)])
+    // Two ambient tiles in the same 1 km cell → one square at the max level (display grid 1 km).
+    const sq = threatSquares([tile(49.215, 11.835, 2), tile(49.2152, 11.8352, 4)], 1000)
     expect(sq).toHaveLength(1)
     expect(sq[0].threat).toBe(4)
-    expect(sq[0].precisionM).toBe(DEFAULT_THREAT_PRECISION_M)
+    expect(sq[0].precisionM).toBe(1000)
   })
 
-  it('keeps a smaller-grid-code threat separate from a larger one (own resolution)', () => {
-    // A 500 m located threat nested inside a default 1 km ambient threat → two distinct squares.
-    const sq = threatSquares([
-      tile(49.215, 11.835, 2),
-      tile(49.2151, 11.8351, 4, { precision_m: 500 }),
-    ])
+  it('ambient threat follows the displayed grid precision', () => {
+    // Same tile, viewed at 500 m → the ambient square is 500 m, not the 1 km default.
+    const sq = threatSquares([tile(49.215, 11.835, 3)], 500)
+    expect(sq[0].precisionM).toBe(500)
+  })
+
+  it('keeps a located-event threat at its own size, separate from ambient', () => {
+    // A 500 m located threat nested inside ambient viewed at 1 km → two distinct squares.
+    const sq = threatSquares(
+      [tile(49.215, 11.835, 2), tile(49.2151, 11.8351, 4, { precision_m: 500 })],
+      1000,
+    )
     expect(sq).toHaveLength(2)
     expect(sq.map((s) => s.precisionM).sort((a, b) => a - b)).toEqual([500, 1000])
   })
 
   it('sorts ascending by level so higher threats paint over lower', () => {
-    const sq = threatSquares([
-      tile(49.20, 11.80, 4, { precision_m: 500 }),
-      tile(49.25, 11.88, 1, { precision_m: 500 }),
-      tile(49.22, 11.84, 2, { precision_m: 500 }),
-    ])
+    const sq = threatSquares(
+      [
+        tile(49.2, 11.8, 4, { precision_m: 500 }),
+        tile(49.25, 11.88, 1, { precision_m: 500 }),
+        tile(49.22, 11.84, 2, { precision_m: 500 }),
+      ],
+      1000,
+    )
     expect(sq.map((s) => s.threat)).toEqual([1, 2, 4])
   })
 })

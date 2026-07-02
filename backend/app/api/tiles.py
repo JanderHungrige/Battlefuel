@@ -13,7 +13,8 @@ from app.db import get_session
 from app.domain.theater import BBox
 from app.domain.tile import Tile, TileMutation
 from app.providers.tiles import TileDataProvider, build_tile_provider
-from app.services.tile_mutation import apply_tile_mutation, tile_update_frame
+from app.services.routing_graph import annotate_cell
+from app.services.tile_mutation import tile_update_frame
 
 router = APIRouter(tags=["tiles"])
 
@@ -69,9 +70,16 @@ async def mutate_tile(
     session: SessionDep,
     provider: TileProviderDep,
 ) -> Tile:
-    """Apply a runtime mutation to a tile, re-cost its edges, and broadcast ``tile_update``."""
-    tile = await apply_tile_mutation(session, provider, h3_index, mutation)
+    """Apply a runtime tile mutation: broadcast ``tile_update`` immediately, then re-cost edges.
+
+    The map paints from tile data, not the routing graph, so we broadcast the change FIRST — the
+    operator sees the threat/road update instantly — and only then run ``annotate_cell`` (a wide-
+    radius re-cost that can take a couple of seconds). Ordering the re-cost after the broadcast
+    keeps the paint responsive; SAFE routing picks up the new cost a moment later.
+    """
+    tile = await provider.update_tile(session, h3_index, mutation)
     if tile is None:
         raise HTTPException(status_code=404, detail=f"tile {h3_index!r} not found")
     await manager.broadcast(tile_update_frame(tile))
+    await annotate_cell(session, h3_index)
     return tile

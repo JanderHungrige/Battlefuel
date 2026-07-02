@@ -101,7 +101,9 @@ export interface MapViewProps {
   showUnitFuelBars?: boolean
   selectedCell: { lat: number; lon: number } | null
   gridPrecisionM: number
-  onSelectCell: (lat: number, lon: number) => void
+  onSelectCell: (lat: number, lon: number, additive: boolean) => void
+  /** Cells in the multi-select for batch threat-setting (v2 Wave 22 F4) — highlighted outlines. */
+  multiCells?: { lat: number; lon: number }[]
   onSelectUnit: (id: string) => void
   onPickDestination: (lat: number, lon: number) => void
   onPlaceObstacle: (lat: number, lon: number) => void
@@ -283,6 +285,22 @@ function initLayers(map: maplibregl.Map): void {
     type: 'line',
     source: 'selected-cell',
     paint: { 'line-color': '#1d4ed8', 'line-width': 2.5, 'line-opacity': 0.9 },
+  })
+
+  // Multi-cell selection for batch threat-setting (v2 Wave 22 F4): yellow-marked squares so the
+  // operator sees which cells are picked (same yellow as the selected unit), drawn above the wash.
+  map.addSource('multi-cells', { type: 'geojson', data: EMPTY })
+  map.addLayer({
+    id: 'multi-cells-fill',
+    type: 'fill',
+    source: 'multi-cells',
+    paint: { 'fill-color': SELECTED_UNIT, 'fill-opacity': 0.3 },
+  })
+  map.addLayer({
+    id: 'multi-cells',
+    type: 'line',
+    source: 'multi-cells',
+    paint: { 'line-color': SELECTED_UNIT_RING, 'line-width': 2.2, 'line-opacity': 0.95 },
   })
 
   map.addSource('active-routes', { type: 'geojson', data: EMPTY })
@@ -916,8 +934,10 @@ function wireInteraction(map: maplibregl.Map, propsRef: { current: MapViewProps 
     }
     const hitTiles = map.queryRenderedFeatures(e.point, { layers: ['tiles-fill'] })
     if (hitTiles.length > 0) {
-      // MGRS-native inspection: resolve the cell from the click coordinate (v2 Wave 9).
-      p.onSelectCell(e.lngLat.lat, e.lngLat.lng)
+      // MGRS-native inspection: resolve the cell from the click coordinate (v2 Wave 9). Shift/Ctrl
+      // (or Cmd) adds the cell to the multi-select for batch threat-setting (v2 Wave 22 F4).
+      const oe = e.originalEvent
+      p.onSelectCell(e.lngLat.lat, e.lngLat.lng, oe.shiftKey || oe.ctrlKey || oe.metaKey)
       return
     }
     p.onClearSelection()
@@ -1001,13 +1021,16 @@ export function MapView(props: MapViewProps) {
       // Frame the theater: constrain panning to its bbox (padded) so the operator can't drift off.
       maxBounds: paddedBounds(theater.bbox),
       attributionControl: { compact: true },
+      // Free Shift for multi-cell threat select (v2 Wave 22 F4) — MapLibre's box-zoom otherwise
+      // binds Shift+drag and swallows Shift-clicks.
+      boxZoom: false,
     })
     map.addControl(new maplibregl.NavigationControl(), 'top-right')
     map.on('load', () => {
       const p = propsRef.current
       initLayers(map)
       setData(map, 'tiles', tilesToGeoJSON(p.tiles))
-      setData(map, 'cell-threat', cellThreatToGeoJSON(p.tiles))
+      setData(map, 'cell-threat', cellThreatToGeoJSON(p.tiles, p.gridPrecisionM))
       syncUnits(map, p.units, p.unitTypes, p.livePositions)
       syncUnitFuelBars(map, p.units, p.unitTypes, p.livePositions, p.showUnitFuelBars ?? false)
       map.setFilter('unit-fuel-bars', ['!=', ['get', 'id'], p.selectedUnitId ?? ''])
@@ -1044,11 +1067,11 @@ export function MapView(props: MapViewProps) {
     if (readyRef.current && mapRef.current) setData(mapRef.current, 'tiles', tilesToGeoJSON(props.tiles))
   }, [props.tiles])
   useEffect(() => {
-    // Threat renders at each threat's OWN grid code, not the displayed grid (v2 Wave 21 F2), so this
-    // no longer depends on gridPrecisionM — resizing the grid never rescales the threat wash.
+    // Located-event threats render at their own grid code; ambient/operator-set threat renders at the
+    // displayed grid so edits are WYSIWYG (v2 Wave 21 F2 + Wave 22 fix) — hence gridPrecisionM here.
     if (readyRef.current && mapRef.current)
-      setData(mapRef.current, 'cell-threat', cellThreatToGeoJSON(props.tiles))
-  }, [props.tiles])
+      setData(mapRef.current, 'cell-threat', cellThreatToGeoJSON(props.tiles, props.gridPrecisionM))
+  }, [props.tiles, props.gridPrecisionM])
   useEffect(() => {
     if (readyRef.current && mapRef.current) {
       syncUnits(mapRef.current, props.units, props.unitTypes, props.livePositions)
@@ -1233,6 +1256,22 @@ export function MapView(props: MapViewProps) {
       : EMPTY
     setData(mapRef.current, 'selected-cell', data)
   }, [props.selectedCell, props.gridPrecisionM])
+  useEffect(() => {
+    // Multi-cell selection outlines for batch threat-setting (v2 Wave 22 F4).
+    if (!readyRef.current || !mapRef.current) return
+    const cells = props.multiCells ?? []
+    setData(mapRef.current, 'multi-cells', {
+      type: 'FeatureCollection',
+      features: cells.map((c) => ({
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'Polygon',
+          coordinates: [squareCornersFromCenter(c.lat, c.lon, props.gridPrecisionM)],
+        },
+      })),
+    })
+  }, [props.multiCells, props.gridPrecisionM])
   useEffect(() => {
     if (readyRef.current && mapRef.current)
       applyMgrsGrid(mapRef.current, props.theater, props.gridPrecisionM)
