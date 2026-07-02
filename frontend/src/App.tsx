@@ -79,8 +79,15 @@ import { cellIdFor, cellMgrsLabel, DEFAULT_PRECISION_M, GRID_PRECISIONS } from '
 
 export default function App() {
   // Branded landing gate (v2 Wave 15): in-memory only (not persisted), so the landing + faux
-  // security check show on every page load / refresh.
-  const [entered, setEntered] = useState(false)
+  // security check show on every page load / refresh — except right after a scenario load, whose
+  // reload sets a one-shot flag so the operator lands straight back on the map (v2 Wave 22 F5).
+  const [entered, setEntered] = useState(() => {
+    if (sessionStorage.getItem('bf.scenarioReload')) {
+      sessionStorage.removeItem('bf.scenarioReload')
+      return true
+    }
+    return false
+  })
   const [role, setRole] = useState<Role>('OF4')
   const { theater, tiles, units, setUnits, unitTypes, enemyUnits, setEnemyUnits, error } =
     useTheaterData()
@@ -421,15 +428,17 @@ export default function App() {
   // Remove a placed force clicked in placement mode (v2 Wave 22 F1).
   const removeForce = useCallback(
     (side: 'blue' | 'red', id: string) => {
+      // Remove from the roster immediately (optimistic) so the first Delete click takes effect;
+      // then persist. The DELETE is idempotent, so a stale retry is harmless.
       if (side === 'blue') {
+        setUnits((prev) => prev.filter((u) => u.id !== id))
         api
           .removeUnitInstance(id)
-          .then(() => setUnits((prev) => prev.filter((u) => u.id !== id)))
           .catch((e: unknown) => pushChatter(`Remove failed: ${String(e)}`, 'status'))
       } else {
+        setEnemyUnits((prev) => prev.filter((en) => en.id !== id))
         api
           .removeEnemyUnit(id)
-          .then(() => setEnemyUnits((prev) => prev.filter((en) => en.id !== id)))
           .catch(() => pushChatter('Only operator-placed red forces can be removed', 'status'))
       }
     },
@@ -450,10 +459,14 @@ export default function App() {
     [refetchScenarios, pushChatter],
   )
   const loadScenario = useCallback((id: string) => {
-    // A scenario replaces the whole world; reload to re-bootstrap every hook cleanly.
+    // A scenario replaces the whole world; reload to re-bootstrap every hook cleanly. Flag the
+    // reload so we skip the (in-memory) landing gate and drop the operator straight back on the map.
     api
       .loadScenario(id)
-      .then(() => window.location.reload())
+      .then(() => {
+        sessionStorage.setItem('bf.scenarioReload', '1')
+        window.location.reload()
+      })
       .catch((e: unknown) => console.error('[scenario] load failed:', e))
   }, [])
   const deleteScenario = useCallback(
