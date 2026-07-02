@@ -2,7 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { latLngToCell } from 'h3-js'
 import { api } from './api/client'
 import { errorMessage } from './api/errors'
-import type { ChatterMessage, DrawConnect, Recommendation, TileMutationRequest } from './api/types'
+import type {
+  ChatterMessage,
+  DrawConnect,
+  Recommendation,
+  Tile,
+  TileMutationRequest,
+} from './api/types'
 import { AdvisorPanel } from './components/AdvisorPanel'
 import { ChatterLog } from './components/ChatterLog'
 import { ChatterFilterControls } from './components/ChatterFilterControls'
@@ -46,6 +52,10 @@ import { ConnectGraphPopup } from './components/ConnectGraphPopup'
 import { DrawnEdgeEditPanel } from './components/DrawnEdgeEditPanel'
 import { ForcePlacementPanel, type ForceSide } from './components/ForcePlacementPanel'
 import type { ForceTab } from './lib/forceCatalog'
+import { MultiCellThreatPanel } from './components/MultiCellThreatPanel'
+import { ScenarioPanel } from './components/ScenarioPanel'
+import { useScenarios } from './hooks/useScenarios'
+import { cellsToH3Indexes, toggleCell } from './lib/multiCellSelect'
 import { useRoutingGraph } from './hooks/useRoutingGraph'
 import { useSimSocket } from './hooks/useSimSocket'
 import { useAdviceMarker } from './hooks/useAdviceMarker'
@@ -69,13 +79,25 @@ import { cellIdFor, cellMgrsLabel, DEFAULT_PRECISION_M, GRID_PRECISIONS } from '
 
 export default function App() {
   // Branded landing gate (v2 Wave 15): in-memory only (not persisted), so the landing + faux
-  // security check show on every page load / refresh.
-  const [entered, setEntered] = useState(false)
+  // security check show on every page load / refresh — except right after a scenario load, whose
+  // reload sets a one-shot flag so the operator lands straight back on the map (v2 Wave 22 F5).
+  const [entered, setEntered] = useState(() => {
+    if (sessionStorage.getItem('bf.scenarioReload')) {
+      sessionStorage.removeItem('bf.scenarioReload')
+      return true
+    }
+    return false
+  })
   const [role, setRole] = useState<Role>('OF4')
   const { theater, tiles, units, setUnits, unitTypes, enemyUnits, setEnemyUnits, error } =
     useTheaterData()
 
   const [selectedCell, setSelectedCell] = useState<{ lat: number; lon: number } | null>(null)
+  // Multi-cell selection for batch threat-setting (v2 Wave 22 F4): Shift/Ctrl-click accumulates.
+  const [multiCells, setMultiCells] = useState<{ lat: number; lon: number }[]>([])
+  // Optimistic tile edits (v2 Wave 22 fix): paint an operator threat/road change instantly, before
+  // the PATCH + WS echo round-trips. Cleared per tile once the authoritative echo lands.
+  const [optimisticTiles, setOptimisticTiles] = useState<Record<string, Partial<Tile>>>({})
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null)
   const [highlightH3, setHighlightH3] = useState<string | null>(null)
 
@@ -117,6 +139,9 @@ export default function App() {
   const [forceTypeId, setForceTypeId] = useState<string | null>(null)
   // The force selected on the map for deletion (magenta halo + panel "Delete unit"); v2 W22 F1.
   const [selectedForce, setSelectedForce] = useState<{ side: ForceSide; id: string } | null>(null)
+  // Scenario save/load panel (v2 Wave 22 F5): list fetched while open.
+  const [scenarioOpen, setScenarioOpen] = useState(false)
+  const { scenarios, refetch: refetchScenarios } = useScenarios(scenarioOpen)
   // Supply entity the operator asked to locate on the map (v2 Wave 11 F5). Carries the entity id +
   // kind so the purple halo can fade with the entity (OF-8 per-tab dimming) and clear on delete.
   const [located, setLocated] = useState<
@@ -161,14 +186,20 @@ export default function App() {
     return Object.values(byId)
   }, [enemyUnits, enemySightings])
 
-  // Tiles merged with their latest live tile_update (threat/road/situation/etc.).
+  // Tiles merged with any pending optimistic operator edit FIRST, then the authoritative live
+  // tile_update. So an edit paints instantly, and once the WS echo (or a later sim change) for that
+  // cell lands it overrides the optimistic value — no reconciliation needed.
   const displayedTiles = useMemo(() => {
-    if (Object.keys(tileUpdates).length === 0) return tiles
+    if (Object.keys(tileUpdates).length === 0 && Object.keys(optimisticTiles).length === 0) {
+      return tiles
+    }
     return tiles.map((t) => {
       const u = tileUpdates[t.h3_index]
-      return u ? { ...t, ...u, h3_index: t.h3_index, boundary: t.boundary } : t
+      const o = optimisticTiles[t.h3_index]
+      if (!u && !o) return t
+      return { ...t, ...(o ?? {}), ...(u ?? {}), h3_index: t.h3_index, boundary: t.boundary }
     })
-  }, [tiles, tileUpdates])
+  }, [tiles, tileUpdates, optimisticTiles])
 
   // The clicked MGRS cell: aggregate the displayed tiles + units that fall in it (client-side).
   const selectedCellInfo = useMemo<InspectCell | null>(() => {
@@ -195,9 +226,28 @@ export default function App() {
 
   const onMutateCell = useCallback(
     (h3Indexes: string[], mutation: TileMutationRequest) => {
+      // Paint the edit immediately (optimistic), then persist via PATCH; the WS echo reconciles.
+      setOptimisticTiles((prev) => {
+        const next = { ...prev }
+        for (const h3 of h3Indexes) next[h3] = { ...next[h3], ...mutation }
+        return next
+      })
       for (const h3 of h3Indexes) mutateTile(h3, mutation)
     },
     [mutateTile],
+  )
+
+  // Every H3 tile across the multi-selected cells, and a batch threat-set over them (v2 W22 F4).
+  const multiCellH3 = useMemo(
+    () => cellsToH3Indexes(multiCells, displayedTiles, gridPrecisionM),
+    [multiCells, displayedTiles, gridPrecisionM],
+  )
+  const setMultiThreat = useCallback(
+    (level: number) => {
+      onMutateCell(multiCellH3, { threat_level: level })
+      pushChatter(`Set threat ${level} on ${multiCells.length} cell(s)`, 'order')
+    },
+    [onMutateCell, multiCellH3, multiCells.length, pushChatter],
   )
 
   // Place an obstacle from the selected catalog template (v2 Wave 4 F7): drop the obstacle, then
@@ -276,6 +326,7 @@ export default function App() {
 
   const clear = useCallback(() => {
     setSelectedCell(null)
+    setMultiCells([])
     setSelectedUnitId(null)
     setHighlightH3(null)
     setLocated(null)
@@ -377,19 +428,55 @@ export default function App() {
   // Remove a placed force clicked in placement mode (v2 Wave 22 F1).
   const removeForce = useCallback(
     (side: 'blue' | 'red', id: string) => {
+      // Remove from the roster immediately (optimistic) so the first Delete click takes effect;
+      // then persist. The DELETE is idempotent, so a stale retry is harmless.
       if (side === 'blue') {
+        setUnits((prev) => prev.filter((u) => u.id !== id))
         api
           .removeUnitInstance(id)
-          .then(() => setUnits((prev) => prev.filter((u) => u.id !== id)))
           .catch((e: unknown) => pushChatter(`Remove failed: ${String(e)}`, 'status'))
       } else {
+        setEnemyUnits((prev) => prev.filter((en) => en.id !== id))
         api
           .removeEnemyUnit(id)
-          .then(() => setEnemyUnits((prev) => prev.filter((en) => en.id !== id)))
           .catch(() => pushChatter('Only operator-placed red forces can be removed', 'status'))
       }
     },
     [setUnits, setEnemyUnits, pushChatter],
+  )
+
+  // Scenario save/load (v2 Wave 22 F5).
+  const saveScenario = useCallback(
+    (name: string) => {
+      api
+        .saveScenario(name)
+        .then(() => {
+          refetchScenarios()
+          pushChatter(`Saved scenario "${name}"`, 'order')
+        })
+        .catch((e: unknown) => pushChatter(`Save failed: ${String(e)}`, 'status'))
+    },
+    [refetchScenarios, pushChatter],
+  )
+  const loadScenario = useCallback((id: string) => {
+    // A scenario replaces the whole world; reload to re-bootstrap every hook cleanly. Flag the
+    // reload so we skip the (in-memory) landing gate and drop the operator straight back on the map.
+    api
+      .loadScenario(id)
+      .then(() => {
+        sessionStorage.setItem('bf.scenarioReload', '1')
+        window.location.reload()
+      })
+      .catch((e: unknown) => console.error('[scenario] load failed:', e))
+  }, [])
+  const deleteScenario = useCallback(
+    (id: string) => {
+      api
+        .deleteScenario(id)
+        .then(() => refetchScenarios())
+        .catch((e: unknown) => console.error('[scenario] delete failed:', e))
+    },
+    [refetchScenarios],
   )
 
   // Select a placed force on the map (magenta halo + panel Delete button); v2 Wave 22 F1.
@@ -775,6 +862,15 @@ export default function App() {
             {forcePlaceMode ? 'Placing forces' : 'Place forces'}
           </button>
         )}
+        {theater && (
+          <button
+            className={`mode-toggle${scenarioOpen ? ' active' : ''}`}
+            data-testid="scenario-toggle"
+            onClick={() => setScenarioOpen((o) => !o)}
+          >
+            Scenarios
+          </button>
+        )}
         <span className="spacer" />
         {theater && <TourButton role={role} actions={tourActions} onEnd={clear} />}
         <span className="attribution">{OSM_ATTRIBUTION}</span>
@@ -820,9 +916,21 @@ export default function App() {
               gridPrecisionM={gridPrecisionM}
               onPlaceObstacle={placeObstacleFromTemplate}
               onRemoveObstacle={removeObstacle}
-              onSelectCell={(lat, lon) => {
+              multiCells={multiCells}
+              onSelectCell={(lat, lon, additive) => {
+                if (additive) {
+                  // Fold the currently-inspected cell into the multi-selection when it starts, so the
+                  // first (plain-clicked) tile is included in the batch threat-set (v2 Wave 22 F4 fix).
+                  setMultiCells((prev) => {
+                    const base = prev.length === 0 && selectedCell ? [selectedCell] : prev
+                    return toggleCell(base, { lat, lon }, gridPrecisionM)
+                  })
+                  setSelectedCell(null)
+                  return
+                }
                 setSelectedUnitId(null)
                 planning.resetPlanning()
+                setMultiCells([])
                 setSelectedCell({ lat, lon })
               }}
               onSelectUnit={(id) => {
@@ -983,6 +1091,22 @@ export default function App() {
                 selectedForceName={selectedForceEntity?.name ?? null}
                 onDeleteSelected={deleteSelectedForce}
                 onClose={toggleForcePlace}
+              />
+            )}
+            {multiCells.length > 0 && (
+              <MultiCellThreatPanel
+                count={multiCells.length}
+                onSetThreat={setMultiThreat}
+                onClear={() => setMultiCells([])}
+              />
+            )}
+            {scenarioOpen && (
+              <ScenarioPanel
+                scenarios={scenarios}
+                onSave={saveScenario}
+                onLoad={loadScenario}
+                onDelete={deleteScenario}
+                onClose={() => setScenarioOpen(false)}
               />
             )}
             {canShow(role, 'drawGraph') && draw.mode && (

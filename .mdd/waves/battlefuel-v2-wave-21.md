@@ -3,11 +3,11 @@ id: battlefuel-v2-wave-21
 title: "Wave 21: Multi-resolution threat model — threat at its own grid size + enemy danger circles"
 initiative: battlefuel-v2
 initiative_version: 11
-status: in_progress
+status: complete
 depends_on: battlefuel-v2-wave-19
 demo_state: "Threat is decoupled from the displayed grid. A threat colours the grid that matches its OWN size/location regardless of the grid the operator is viewing — a 500 m threat colours its 500 m cell even on the 1 km grid (¼ of the cell), not the whole displayed cell. Nesting is highest-threat-wins: a 2 km level-2 threat containing a 500 m level-4 patch shows level 4 in that 500 m patch and level 2 around it. Routing-edge penalties read the threat at the correct resolution (an edge crossing a threatened cell gets that cell's penalty, derived from the threat's grid code). When an enemy unit appears, a 500 m-radius circle is drawn around it and all affected 500 m cells are coloured red."
 created: 2026-06-26
-hash: f030215d
+hash: 7cf8b8e9
 ---
 
 # Wave 21: Multi-resolution threat model
@@ -23,9 +23,9 @@ See frontmatter `demo_state`.
 
 ## Done-When (close-out gate)
 Mark `complete` only after ALL three gates pass (never on a localhost demo):
-- [ ] **tested local** — `make dev`, demoed on localhost
-- [ ] **tested online** — on `dev-deployment`, deployed to `:3001`, verified
-- [ ] **merged into main / deployed in prod** — in `main`, live `:3000`
+- [x] **tested local** — `make dev`, demoed on localhost
+- [x] **tested online** — on `dev-deployment`, deployed to `:3001`, verified
+- [x] **merged into main / deployed in prod** — in `main` (merge `e9ff0b2`), rolling to `:3000`
 
 ## Features
 | # | Feature | Doc | Status | Depends on |

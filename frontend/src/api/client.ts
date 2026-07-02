@@ -37,6 +37,7 @@ import type {
   RendezvousResponse,
   RouteOption,
   RoutingGraph,
+  ScenarioSummary,
   ScheduleRendezvousRequest,
   SupplyOverview,
   Theater,
@@ -98,6 +99,13 @@ export const api = {
   placeEnemyUnit: (req: PlaceForceRequest): Promise<EnemyUnit> =>
     postJson<EnemyUnit>('/enemy-units', req),
   removeEnemyUnit: (id: string): Promise<void> => deleteJson<void>(`/enemy-units/${id}`),
+  // Scenario save/load (v2 Wave 22 F5).
+  getScenarios: (): Promise<ScenarioSummary[]> => getJson<ScenarioSummary[]>('/scenarios'),
+  saveScenario: (name: string): Promise<ScenarioSummary> =>
+    postJson<ScenarioSummary>('/scenarios', { name }),
+  loadScenario: (id: string): Promise<ScenarioSummary> =>
+    postJson<ScenarioSummary>(`/scenarios/${id}/load`),
+  deleteScenario: (id: string): Promise<void> => deleteJson<void>(`/scenarios/${id}`),
   // The pgRouting graph (edges + vertices) for the optional map overlay (v2 Wave 20 F1).
   getRoutingGraph: (): Promise<RoutingGraph> => getJson<RoutingGraph>('/routing-graph'),
   getUnitTypes: (): Promise<UnitType[]> => getJson<UnitType[]>('/units'),
