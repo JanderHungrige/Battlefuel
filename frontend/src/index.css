@@ -196,6 +196,7 @@ body {
    Plan-move panel's "+ Add refuel stop" / "Plan rendezvous" buttons (v2: take-a-tour follow-up). */
 .fuel-run-start,
 .rdv-start,
+.rdv-plan-toggle,
 .move-add-refuel,
 .move-plan-rdv {
   margin-top: 4px;
@@ -209,6 +210,7 @@ body {
 }
 .fuel-run-start:disabled,
 .rdv-start:disabled,
+.rdv-plan-toggle:disabled,
 .move-add-refuel:disabled,
 .move-plan-rdv:disabled {
   opacity: 0.5;
@@ -1160,8 +1162,16 @@ body {
   gap: 6px;
   margin-top: 8px;
 }
+/* Square level buttons: centre the digit (a plain wp-btn, no fixed-size .threat-btn conflict). */
+.multi-threat-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 0;
+}
 /* The level last applied to the selection — a yellow "set" marker so the click is acknowledged. */
-.threat-btn.threat-set {
+.multi-threat-btn.threat-set {
   border-color: #ffe600;
   background: #4a4520;
   color: #ffe600;

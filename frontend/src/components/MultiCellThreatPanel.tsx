@@ -30,7 +30,7 @@ export function MultiCellThreatPanel({ count, onSetThreat, onClear }: MultiCellT
           <button
             key={n}
             type="button"
-            className={`wp-btn threat-btn${lastSet === n ? ' threat-set' : ''}`}
+            className={`wp-btn multi-threat-btn${lastSet === n ? ' threat-set' : ''}`}
             data-testid={`multi-threat-${n}`}
             aria-pressed={lastSet === n}
             onClick={() => {
