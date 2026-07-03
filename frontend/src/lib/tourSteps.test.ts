@@ -57,6 +57,45 @@ describe('stepsForRole', () => {
     expect(actions).toContain('cancel-rendezvous')
   })
 
+  it('shows the shared scenario-building tools (graph, forces, multi-tile, scenarios) for both roles', () => {
+    for (const role of ['OF4', 'OF8'] as const) {
+      const steps = stepsForRole(role)
+      const sel = steps.map((s) => s.selector)
+      // graph overlay + each scenario tool anchor and its revealed panel
+      expect(sel).toContain('[data-testid="graph-overlay-toggle"]')
+      expect(sel).toContain('[data-testid="force-place-toggle"]')
+      expect(sel).toContain('[data-testid="force-placement-panel"]')
+      expect(sel).toContain('[data-testid="multi-cell-panel"]')
+      expect(sel).toContain('[data-testid="scenario-toggle"]')
+      expect(sel).toContain('[data-testid="scenario-panel"]')
+      // the panels are revealed by demo actions before their step
+      const actions = steps.map((s) => s.before?.action).filter(Boolean)
+      expect(actions).toContain('show-graph')
+      expect(actions).toContain('open-force-place')
+      expect(actions).toContain('multi-select-demo')
+      expect(actions).toContain('open-scenarios')
+    }
+  })
+
+  it('turns the graph overlay off again when leaving its step (after: hide-graph)', () => {
+    for (const role of ['OF4', 'OF8'] as const) {
+      const graphStep = stepsForRole(role).find(
+        (s) => s.selector === '[data-testid="graph-overlay-toggle"]',
+      )
+      expect(graphStep?.before?.action).toBe('show-graph')
+      expect(graphStep?.after?.action).toBe('hide-graph')
+    }
+  })
+
+  it('scopes the draw-graph steps (add road / edit graph) to OF-4 only', () => {
+    const of4 = stepsForRole('OF4').map((s) => s.selector)
+    expect(of4).toContain('[data-testid="draw-road-toggle"]')
+    expect(of4).toContain('[data-testid="edit-graph-toggle"]')
+    const of8 = stepsForRole('OF8').map((s) => s.selector)
+    expect(of8).not.toContain('[data-testid="draw-road-toggle"]')
+    expect(of8).not.toContain('[data-testid="edit-graph-toggle"]')
+  })
+
   it('every step has a non-empty title and caption', () => {
     for (const role of ['OF4', 'OF8'] as const) {
       for (const step of stepsForRole(role)) {

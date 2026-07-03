@@ -1,0 +1,59 @@
+/* Branded "powered by" overlay for auto-play demo tours (v2: take-a-tour, demo expansion).
+   Fixed lower-left, above the driver.js overlay (z ~10000). A translucent dark chip so both the
+   World Fuel mark and the white-recoloured Eraneos wordmark read over any map background. */
+
+.demo-branding {
+  position: fixed;
+  left: 20px;
+  bottom: 20px;
+  z-index: 100001;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 12px 18px 10px;
+  border-radius: 10px;
+  background: rgba(10, 16, 26, 0.72);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(3px);
+  pointer-events: none;
+}
+
+.demo-branding-label {
+  font-size: 10px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: rgba(220, 230, 244, 0.55);
+}
+
+.demo-branding-logos {
+  display: inline-flex;
+  align-items: center;
+  gap: 22px;
+}
+
+.demo-branding-logos img {
+  height: 24px;
+  width: auto;
+  display: block;
+}
+
+/* Eraneos: black-on-transparent mark recoloured to white for the dark chip. */
+.demo-branding-logos img[alt='Eraneos'] {
+  height: 16px;
+  filter: brightness(0) invert(1);
+  transform: translateY(4px);
+}
+
+/* World Fuel: mostly circle + "Services" subtext, so ~3x the Eraneos height to match its main
+   text size; nudged down so the main wordmark aligns with the Eraneos line. */
+.demo-branding-logos img[alt='World Fuel Services'] {
+  height: 46px;
+  transform: translateY(3px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-branding {
+    backdrop-filter: none;
+  }
+}

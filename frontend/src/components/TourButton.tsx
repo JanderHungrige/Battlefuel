@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Role } from '../roles'
 import { useTour, type TourActions, type TourMode } from '../hooks/useTour'
+import { DemoBranding } from './DemoBranding'
 import './TourButton.css'
 
 interface TourButtonProps {
@@ -39,6 +40,7 @@ export function TourButton({ role, actions, onEnd }: TourButtonProps) {
 
   return (
     <div className="tour" data-tour="tour-button" ref={ref}>
+      {tour.demo && <DemoBranding />}
       <button
         type="button"
         className="tour-btn"

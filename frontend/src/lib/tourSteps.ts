@@ -14,14 +14,25 @@ import type { Role } from '../roles'
 
 export type TourSide = 'top' | 'bottom' | 'left' | 'right'
 export type TourAlign = 'start' | 'center' | 'end'
-export type TourActionKey = 'select-unit' | 'plan-rendezvous' | 'cancel-rendezvous'
+export type TourActionKey =
+  | 'select-unit'
+  | 'plan-rendezvous'
+  | 'cancel-rendezvous'
+  | 'show-graph'
+  | 'hide-graph'
+  | 'open-force-place'
+  | 'multi-select-demo'
+  | 'open-scenarios'
 
-export interface TourBefore {
-  /** Selector the hook clicks before showing this step (e.g. switch a sub-tab). */
+/** A click and/or named app action fired at a step boundary (`before` reveal, `after` cleanup). */
+export interface TourHook {
+  /** Selector the hook clicks (e.g. switch a sub-tab). */
   click?: string
   /** A named app action the hook runs via its actions map (e.g. select a demo unit). */
   action?: TourActionKey
 }
+/** @deprecated alias kept for readability — use {@link TourHook}. */
+export type TourBefore = TourHook
 
 export interface TourStep {
   /** CSS selector for the highlighted element. */
@@ -30,7 +41,10 @@ export interface TourStep {
   text: string
   side?: TourSide
   align?: TourAlign
-  before?: TourBefore
+  /** Run as this step is shown — reveals the *next* step's target. */
+  before?: TourHook
+  /** Run when leaving this step (before the next step's `before`) — cleanup, e.g. hide an overlay. */
+  after?: TourHook
 }
 
 // ---- shared (both roles) ----------------------------------------------------------------------
@@ -73,6 +87,60 @@ const MAP: TourStep = {
   side: 'top',
   align: 'center',
 }
+// The graph overlay + scenario-building tools live in the toolbar for BOTH roles (they only need a
+// theater). `show-graph` turns the routing-graph overlay on so it's visible while we explain it.
+const GRAPH_OVERLAY: TourStep = {
+  selector: '[data-testid="graph-overlay-toggle"]',
+  title: 'Routing graph overlay',
+  text: 'Toggle the routing graph the optimizer actually routes on — nodes and edges drawn over the map. I’ve switched it on so you can see the road/off-road network the SAFE/FAST planner traverses.',
+  side: 'bottom',
+  before: { action: 'show-graph' },
+  after: { action: 'hide-graph' },
+}
+
+// ---- scenario building (both roles): place forces, batch threat, save/load ---------------------
+
+const FORCE_PLACE: TourStep = {
+  selector: '[data-testid="force-place-toggle"]',
+  title: 'Place forces',
+  text: 'Build your own scenario: drop friendly and hostile units straight onto the map. Watch — I’ll open the force-placement panel.',
+  side: 'bottom',
+  before: { action: 'open-force-place' },
+}
+const FORCE_PANEL: TourStep = {
+  selector: '[data-testid="force-placement-panel"]',
+  title: 'Force-placement panel',
+  text: 'Pick a side — Blue (friendly) or Red (hostile) — then a category tab, Fuel elements or Other troops, choose the exact unit type, and click the map to place it. Select a placed unit here to delete it.',
+  side: 'left',
+}
+const MULTI_TILE: TourStep = {
+  selector: '.map-area',
+  title: 'Multi-tile threat select',
+  text: 'Shift- or Ctrl-click map cells to select several at once — I’ve highlighted a few. Batch-editing threat across a whole area beats setting it tile by tile.',
+  side: 'top',
+  align: 'center',
+  before: { action: 'multi-select-demo' },
+}
+const MULTI_PANEL: TourStep = {
+  selector: '[data-testid="multi-cell-panel"]',
+  title: 'Batch threat level',
+  text: 'The batch panel shows how many cells are selected; press 0–5 to set that threat level on every tile in the selection at once, then clear the selection.',
+  side: 'left',
+}
+const SCENARIOS: TourStep = {
+  selector: '[data-testid="scenario-toggle"]',
+  title: 'Scenarios',
+  text: 'Once a situation is set up — forces, roads, threats — save the whole thing as a named scenario. Watch — I’ll open the scenarios panel.',
+  side: 'bottom',
+  before: { action: 'open-scenarios' },
+}
+const SCENARIO_PANEL: TourStep = {
+  selector: '[data-testid="scenario-panel"]',
+  title: 'Save & load scenarios',
+  text: 'Name the current situation and Save it; every saved scenario is listed to Load back instantly or delete. Great for prepping demos and comparing courses of action.',
+  side: 'left',
+}
+
 const CHATTER: TourStep = {
   selector: '.chatter',
   title: 'Intel & chatter feed',
@@ -92,6 +160,20 @@ const OBSTACLE: TourStep = {
   selector: '[data-testid="obstacle-mode-toggle"]',
   title: 'Obstacle mode',
   text: 'Mark blocked or mined ground the router must avoid — place obstacles directly on the map.',
+  side: 'bottom',
+}
+// Draw-graph tools are OF-4 only (canShow('OF4','drawGraph')). Purely descriptive — no `before`,
+// so the tour never leaves the app in a drawing mode.
+const ADD_ROAD: TourStep = {
+  selector: '[data-testid="draw-road-toggle"]',
+  title: 'Add roads & paths',
+  text: 'Extend the network yourself: “Add road” draws a new road, “Add path” a lighter track — click to lay points, then connect it into the routing graph so units can use it immediately.',
+  side: 'bottom',
+}
+const EDIT_GRAPH: TourStep = {
+  selector: '[data-testid="edit-graph-toggle"]',
+  title: 'Edit the graph',
+  text: '“Edit graph” selects any drawn edge to retune or remove it — reshape the road network on the fly and watch routes re-cost against the change.',
   side: 'bottom',
 }
 // Selecting a unit (the `before`) opens the Plan-move panel so the next steps can point at it.
@@ -206,11 +288,22 @@ const SUPPLY_DOCS: TourStep = {
   align: 'end',
 }
 
-const COMMON_HEAD: readonly TourStep[] = [INTRO, ROLE, GRID, UNITS, ADVISOR, MAP]
+const COMMON_HEAD: readonly TourStep[] = [INTRO, ROLE, GRID, UNITS, ADVISOR, MAP, GRAPH_OVERLAY]
+// Scenario-building tools shared by both roles, shown after the role-specific depth.
+const SCENARIO_TOOLS: readonly TourStep[] = [
+  FORCE_PLACE,
+  FORCE_PANEL,
+  MULTI_TILE,
+  MULTI_PANEL,
+  SCENARIOS,
+  SCENARIO_PANEL,
+]
 const COMMON_TAIL: readonly TourStep[] = [CHATTER, REPLAY]
 
 const OF4_STEPS: readonly TourStep[] = [
   OBSTACLE,
+  ADD_ROAD,
+  EDIT_GRAPH,
   ROUTING_INTRO,
   TRAVEL_MODES,
   ROUTE_SAFE_FAST,
@@ -234,5 +327,5 @@ const OF8_STEPS: readonly TourStep[] = [
 /** Ordered steps for the given role's current view. */
 export function stepsForRole(role: Role): TourStep[] {
   const roleSteps = role === 'OF8' ? OF8_STEPS : OF4_STEPS
-  return [...COMMON_HEAD, ...roleSteps, ...COMMON_TAIL]
+  return [...COMMON_HEAD, ...roleSteps, ...SCENARIO_TOOLS, ...COMMON_TAIL]
 }
