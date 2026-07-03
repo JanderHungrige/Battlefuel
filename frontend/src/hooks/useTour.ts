@@ -13,7 +13,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { driver, type Driver } from 'driver.js'
 import 'driver.js/dist/driver.css'
 import type { Role } from '../roles'
-import { stepsForRole, type TourActionKey, type TourStep } from '../lib/tourSteps'
+import { stepsForRole, type TourActionKey, type TourHook, type TourStep } from '../lib/tourSteps'
 import { autoAdvanceDelayMs } from '../lib/tourTiming'
 
 export type TourMode = 'guided' | 'auto'
@@ -26,12 +26,15 @@ export interface TourController {
   active: boolean
   /** Auto-play is paused (Space). */
   paused: boolean
+  /** An auto-play (demo/show) tour is running — drives the branded overlay. */
+  demo: boolean
 }
 
-/** Run a step's `before`: click a selector (e.g. switch a sub-tab) and/or fire an app action. */
-function runBefore(step: TourStep | undefined, actions: TourActions): void {
-  if (!step?.before) return
-  const { click, action } = step.before
+/** Run a step hook (`before` or `after`): click a selector (e.g. switch a sub-tab) and/or fire an
+ * app action. `before` reveals the next step's target; `after` cleans up when leaving a step. */
+function runHook(hook: TourHook | undefined, actions: TourActions): void {
+  if (!hook) return
+  const { click, action } = hook
   if (click) {
     const el = document.querySelector<HTMLElement>(click)
     el?.click()
@@ -42,12 +45,14 @@ function runBefore(step: TourStep | undefined, actions: TourActions): void {
 export function useTour(role: Role, actions: TourActions = {}, onEnd?: () => void): TourController {
   const [active, setActive] = useState(false)
   const [paused, setPaused] = useState(false)
+  const [demo, setDemo] = useState(false)
 
   const driverRef = useRef<Driver | null>(null)
   const modeRef = useRef<TourMode>('guided')
   const stepsRef = useRef<TourStep[]>([])
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pausedRef = useRef(false)
+  const lastIdxRef = useRef<number | null>(null)
   const actionsRef = useRef<TourActions>(actions)
   const onEndRef = useRef<typeof onEnd>(onEnd)
   useEffect(() => {
@@ -85,6 +90,7 @@ export function useTour(role: Role, actions: TourActions = {}, onEnd?: () => voi
     pausedRef.current = false
     setPaused(false)
     setActive(false)
+    setDemo(false)
     driverRef.current = null
     onEndRef.current?.()
   }, [clearTimer])
@@ -100,6 +106,7 @@ export function useTour(role: Role, actions: TourActions = {}, onEnd?: () => voi
       clearTimer()
       pausedRef.current = false
       setPaused(false)
+      lastIdxRef.current = null
       modeRef.current = mode
 
       // Keep steps whose target is present now, plus every step from the first gated step onward
@@ -123,11 +130,17 @@ export function useTour(role: Role, actions: TourActions = {}, onEnd?: () => voi
           element: s.selector,
           popover: { title: s.title, description: s.text, side: s.side, align: s.align },
         })),
-        // Run the step's `before` as it is shown — it enables the *next* step's target. Reposition
-        // after, since switching a sub-tab can shift layout under a stable anchor.
+        // As a step is shown: first run the *leaving* step's `after` (cleanup — e.g. hide the graph
+        // overlay), then this step's `before` (enables the next step's target). Reposition after,
+        // since switching a sub-tab can shift layout under a stable anchor.
         onHighlightStarted: (_el, _step, opts) => {
           const idx = opts.state.activeIndex ?? 0
-          runBefore(stepsRef.current[idx], actionsRef.current)
+          const prev = lastIdxRef.current
+          if (prev !== null && prev !== idx) {
+            runHook(stepsRef.current[prev]?.after, actionsRef.current)
+          }
+          lastIdxRef.current = idx
+          runHook(stepsRef.current[idx]?.before, actionsRef.current)
           setTimeout(() => driverRef.current?.refresh(), 60)
         },
         onHighlighted: () => scheduleAdvance(),
@@ -135,6 +148,7 @@ export function useTour(role: Role, actions: TourActions = {}, onEnd?: () => voi
       })
       driverRef.current = d
       setActive(true)
+      setDemo(mode === 'auto')
       d.drive()
     },
     [role, scheduleAdvance, reset, clearTimer],
@@ -165,5 +179,5 @@ export function useTour(role: Role, actions: TourActions = {}, onEnd?: () => voi
     [clearTimer],
   )
 
-  return { start, active, paused }
+  return { start, active, paused, demo }
 }

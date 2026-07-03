@@ -562,9 +562,46 @@ export default function App() {
         if (t) planRdv.start(t.instance_id, t.name)
       },
       'cancel-rendezvous': () => planRdv.cancel(),
+      // Demo-only scenario-tool actions (v2 take-a-tour demo expansion). Each first `clear()`s any
+      // selection/planning so the Plan-move panel (and other rail panels) close, then opens exactly
+      // one demo panel — so the right rail shows a single panel at a time.
+      'show-graph': () => setShowGraph(true),
+      'hide-graph': () => setShowGraph(false),
+      'open-force-place': () => {
+        clear()
+        setScenarioOpen(false)
+        setForcePlaceMode(true)
+      },
+      'multi-select-demo': () => {
+        clear() // resets multiCells too — reseed below, after clear's setState
+        setForcePlaceMode(false)
+        setScenarioOpen(false)
+        const cells = units.slice(0, 3).map((u) => ({ lat: u.lat, lon: u.lon }))
+        setMultiCells(
+          cells.length > 0
+            ? cells
+            : theater
+              ? [{ lat: theater.center_lat, lon: theater.center_lon }]
+              : [],
+        )
+      },
+      'open-scenarios': () => {
+        clear()
+        setForcePlaceMode(false)
+        setScenarioOpen(true)
+      },
     }),
-    [units, planning, supply.overview, planRdv],
+    [units, planning, supply.overview, planRdv, theater, clear],
   )
+
+  // Restore the normal UI when a tour ends: clear selection/planning AND close the demo panels /
+  // overlay the tour opened (force placement, scenarios, multi-tile via clear, graph overlay).
+  const endTour = useCallback(() => {
+    clear()
+    setForcePlaceMode(false)
+    setScenarioOpen(false)
+    setShowGraph(false)
+  }, [clear])
 
   // Remove a hand-added depot / logistic site (prune the OF-8 supply list).
   const removeDepot = useCallback(
@@ -872,7 +909,7 @@ export default function App() {
           </button>
         )}
         <span className="spacer" />
-        {theater && <TourButton role={role} actions={tourActions} onEnd={clear} />}
+        {theater && <TourButton role={role} actions={tourActions} onEnd={endTour} />}
         <span className="attribution">{OSM_ATTRIBUTION}</span>
       </header>
       <main className="map-area">
