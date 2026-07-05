@@ -33,6 +33,8 @@ import type {
   PlanWaypointsRequest,
   RefuelOrder,
   RendezvousOrder,
+  ReportIssueRequest,
+  ReportIssueResponse,
   RendezvousPlanResponse,
   RendezvousResponse,
   RouteOption,
@@ -106,6 +108,9 @@ export const api = {
   loadScenario: (id: string): Promise<ScenarioSummary> =>
     postJson<ScenarioSummary>(`/scenarios/${id}/load`),
   deleteScenario: (id: string): Promise<void> => deleteJson<void>(`/scenarios/${id}`),
+  // Report a bug / suggestion → opens a GitHub issue server-side (doc 129).
+  reportIssue: (req: ReportIssueRequest): Promise<ReportIssueResponse> =>
+    postJson<ReportIssueResponse>('/report-issue', req),
   // The pgRouting graph (edges + vertices) for the optional map overlay (v2 Wave 20 F1).
   getRoutingGraph: (): Promise<RoutingGraph> => getJson<RoutingGraph>('/routing-graph'),
   getUnitTypes: (): Promise<UnitType[]> => getJson<UnitType[]>('/units'),
