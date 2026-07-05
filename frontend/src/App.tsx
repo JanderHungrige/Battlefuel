@@ -54,6 +54,7 @@ import { ForcePlacementPanel, type ForceSide } from './components/ForcePlacement
 import type { ForceTab } from './lib/forceCatalog'
 import { MultiCellThreatPanel } from './components/MultiCellThreatPanel'
 import { ScenarioPanel } from './components/ScenarioPanel'
+import { ReportIssuePanel } from './components/ReportIssuePanel'
 import { useScenarios } from './hooks/useScenarios'
 import { cellsToH3Indexes, toggleCell } from './lib/multiCellSelect'
 import { useRoutingGraph } from './hooks/useRoutingGraph'
@@ -141,6 +142,8 @@ export default function App() {
   const [selectedForce, setSelectedForce] = useState<{ side: ForceSide; id: string } | null>(null)
   // Scenario save/load panel (v2 Wave 22 F5): list fetched while open.
   const [scenarioOpen, setScenarioOpen] = useState(false)
+  // Report-a-bug / suggestion modal (doc 129).
+  const [reportOpen, setReportOpen] = useState(false)
   const { scenarios, refetch: refetchScenarios } = useScenarios(scenarioOpen)
   // Supply entity the operator asked to locate on the map (v2 Wave 11 F5). Carries the entity id +
   // kind so the purple halo can fade with the entity (OF-8 per-tab dimming) and clear on delete.
@@ -910,6 +913,16 @@ export default function App() {
         )}
         <span className="spacer" />
         {theater && <TourButton role={role} actions={tourActions} onEnd={endTour} />}
+        {theater && (
+          <button
+            className="mode-toggle"
+            data-testid="report-issue-toggle"
+            onClick={() => setReportOpen(true)}
+            title="Report a bug or suggestion"
+          >
+            Report a bug
+          </button>
+        )}
         <span className="attribution">{OSM_ATTRIBUTION}</span>
       </header>
       <main className="map-area">
@@ -1144,6 +1157,13 @@ export default function App() {
                 onLoad={loadScenario}
                 onDelete={deleteScenario}
                 onClose={() => setScenarioOpen(false)}
+              />
+            )}
+            {reportOpen && (
+              <ReportIssuePanel
+                role={role}
+                view={role === 'OF8' ? 'supply' : 'tactical'}
+                onClose={() => setReportOpen(false)}
               />
             )}
             {canShow(role, 'drawGraph') && draw.mode && (

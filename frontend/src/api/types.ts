@@ -641,3 +641,35 @@ export interface CombatEventCatalogItem {
   threat_level: number
   supply_relevant: boolean
 }
+
+// ---- Report a bug / suggestion (doc 129) --------------------------------------------------------
+
+export type IssueKind = 'bug' | 'suggestion'
+export type IssueScope = 'of4' | 'of8' | 'both'
+export type IssueSeverity = 'minor' | 'major' | 'blocker'
+
+/** Client-captured, advisory context appended to the GitHub issue body. */
+export interface IssueContext {
+  app_version?: string
+  role?: string
+  view?: string
+  user_agent?: string
+  sim_clock?: string
+}
+
+/** Payload for POST /report-issue. `hp` is a honeypot — real submissions leave it empty. */
+export interface ReportIssueRequest {
+  title: string
+  kind: IssueKind
+  scope: IssueScope
+  description: string
+  severity: IssueSeverity | null
+  contact: string | null
+  context: IssueContext | null
+  hp: string
+}
+
+export interface ReportIssueResponse {
+  number: number
+  url: string
+}

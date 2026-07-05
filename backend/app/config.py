@@ -111,6 +111,13 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173",
     ]
 
+    # "Report a bug / suggestion" → GitHub issue (doc 129). The token is server-side only and is
+    # supplied via the host env-file (never committed / never in the image). Empty token disables
+    # the endpoint (503). Repo is "owner/name". Rate limit is per-client-IP, sliding 1-hour window.
+    github_issue_token: str = ""
+    github_issue_repo: str = "JanderHungrige/Battlefuel"
+    report_issue_rate_limit_per_hour: int = 20
+
 
 def get_settings() -> Settings:
     """Return a freshly-read :class:`Settings` instance.

@@ -39,6 +39,11 @@ services:
       # backend image at /app/data). Set BATTLEFUEL_COMBAT_EVENT_FEED_PROVIDER=scripted in an
       # env-file to fall back to the 6-event demo set on a given environment.
       BATTLEFUEL_COMBAT_EVENT_FEED_PROVIDER: ${BATTLEFUEL_COMBAT_EVENT_FEED_PROVIDER:-catalog}
+      # "Report a bug / suggestion" → GitHub issue (doc 129). Server-side token, supplied via the
+      # host env-file (same as the DB password) — never committed / never in the image. Optional:
+      # if unset the /report-issue endpoint returns 503 (feature disabled) rather than failing boot.
+      BATTLEFUEL_GITHUB_ISSUE_TOKEN: ${BATTLEFUEL_GITHUB_ISSUE_TOKEN:-}
+      BATTLEFUEL_GITHUB_ISSUE_REPO: ${BATTLEFUEL_GITHUB_ISSUE_REPO:-JanderHungrige/Battlefuel}
     command: >
       sh -c "alembic upgrade head &&
              python scripts/startup_data.py &&

@@ -1,0 +1,113 @@
+/* Report-a-bug / suggestion modal overlay (doc 129). Centered dialog over a dimmed backdrop. */
+
+.report-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 10, 18, 0.55);
+  backdrop-filter: blur(2px);
+  padding: 24px;
+}
+
+.report-panel {
+  position: relative;
+  width: min(520px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--panel-bg, #121826);
+  color: var(--panel-fg, #e6edf6);
+  border: 1px solid rgba(120, 140, 170, 0.25);
+  border-radius: 12px;
+  padding: 22px 24px 20px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.5);
+}
+
+.report-title-h {
+  margin: 0 0 14px;
+  font-size: 18px;
+}
+
+.report-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.report-field > span {
+  color: rgba(210, 222, 240, 0.75);
+}
+
+.report-field input,
+.report-field select,
+.report-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border-radius: 7px;
+  border: 1px solid rgba(120, 140, 170, 0.3);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  font: inherit;
+}
+
+.report-field textarea {
+  resize: vertical;
+  min-height: 92px;
+}
+
+.report-row {
+  display: flex;
+  gap: 12px;
+}
+
+.report-row .report-field {
+  flex: 1;
+}
+
+/* Honeypot — visually and assistively hidden, but still in the DOM for bots to trip on. */
+.report-hp {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.report-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.report-send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.report-send:not(:disabled) {
+  background: var(--accent, #3b82f6);
+  border-color: var(--accent, #3b82f6);
+  color: #fff;
+}
+
+.report-error {
+  color: #ff9b9b;
+  font-size: 13px;
+  margin: 2px 0 8px;
+}
+
+.report-sent {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.report-sent a {
+  color: var(--accent, #6ea8fe);
+}
