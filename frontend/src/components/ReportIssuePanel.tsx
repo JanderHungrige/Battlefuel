@@ -72,13 +72,6 @@ export function ReportIssuePanel({ role, view, onClose }: ReportIssuePanelProps)
         {status.state === 'sent' ? (
           <div className="report-sent" data-testid="report-sent">
             <p>✅ Thanks — your {form.kind === 'bug' ? 'bug report' : 'suggestion'} was filed.</p>
-            {status.url ? (
-              <p>
-                <a href={status.url} target="_blank" rel="noreferrer">
-                  View issue #{status.number} on GitHub →
-                </a>
-              </p>
-            ) : null}
             <button className="wp-btn" onClick={onClose}>
               Close
             </button>
