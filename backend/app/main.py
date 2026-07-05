@@ -27,6 +27,7 @@ from app.api.move_orders import router as move_orders_router
 from app.api.obstacles import router as obstacles_router
 from app.api.refuel_orders import router as refuel_orders_router
 from app.api.rendezvous import router as rendezvous_router
+from app.api.report_issue import router as report_issue_router
 from app.api.routes import router as routes_router
 from app.api.routing_graph import router as routing_graph_router
 from app.api.scenarios import router as scenarios_router
@@ -94,6 +95,7 @@ def create_app(enable_sim: bool = False) -> FastAPI:
     api_v1.include_router(advice_redistribution_router)
     api_v1.include_router(advice_movement_router)
     api_v1.include_router(combat_events_router)
+    api_v1.include_router(report_issue_router)
     api_v1.include_router(ws_router)
     app.include_router(api_v1)
     return app
