@@ -25,13 +25,15 @@ ENV_FILE="${1:?usage: auto-deploy.sh <env-file> (e.g. deploy/.env.prod)}"
 TAG="$(basename "$ENV_FILE" | sed 's/^\.env\.//')"   # .env.prod -> prod (for log lines only)
 log() { printf '%s [auto-deploy:%s] %s\n' "$(date -u +%FT%TZ)" "$TAG" "$*"; }
 
-# Host-wide lock. The cron fires this every minute for BOTH prod AND dev (and sibling projects
-# share this same path), so concurrent pulls + `docker image prune` never race the shared
-# containerd store. Crucially we WAIT for the lock (up to LOCK_WAIT_S) rather than skip on
-# contention — the old `flock -n` skip meant a busy host could starve an env for many ticks, so a
-# stale image never rolled. Waiting lets every tick eventually roll.
-LOCK="/tmp/battlefuel-auto-deploy.lock"
-LOCK_WAIT_S=50
+# Host-wide lock shared by EVERY auto-deploy run on this box — both battlefuel envs AND sibling
+# projects (funding-tender-tracker, …). They all share ONE dockerd/containerd, so a pull in one
+# project racing a `docker image prune` in another corrupts the content store ("unable to lease
+# content: lease does not exist"). A single shared lock serialises all of them, so EVERY project's
+# auto-deploy script MUST point at this exact path. We WAIT for the lock (up to LOCK_WAIT_S) rather
+# than skip — the old `flock -n` skip starved a contended env for many ticks so stale images never
+# rolled. Waiting queues the tick so it still rolls.
+LOCK="/tmp/docker-image-deploy.lock"
+LOCK_WAIT_S=90
 if ! exec 9>>"$LOCK" 2>/dev/null; then
   log "✖ cannot open lock file $LOCK — check permissions"; exit 1
 fi
@@ -55,7 +57,13 @@ before="$("${COMPOSE[@]}" images -q backend frontend 2>/dev/null | sort || true)
 log "pulling backend + frontend ($TAG tag)…"
 if ! pull_out="$("${COMPOSE[@]}" pull backend frontend 2>&1)"; then
   log "✖ pull failed:"; printf '%s\n' "$pull_out" | sed 's/^/    /'
-  log "  hint: the host may need 'docker login ghcr.io' (token expired) — private pulls need auth."
+  if printf '%s' "$pull_out" | grep -qiE 'lease does not exist|content store|already exists|context deadline'; then
+    log "  hint: containerd content-store race — another docker pull/prune ran concurrently."
+    log "        every auto-deploy script on this host must share the same lock ($LOCK)."
+    log "        usually transient (next serialised tick recovers); if it persists: 'docker system prune'."
+  elif printf '%s' "$pull_out" | grep -qiE 'denied|unauthor|authentication|forbidden'; then
+    log "  hint: GHCR auth — run 'docker login ghcr.io' with a read:packages token."
+  fi
   exit 1
 fi
 
